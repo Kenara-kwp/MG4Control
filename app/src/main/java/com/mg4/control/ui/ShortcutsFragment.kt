@@ -21,6 +21,7 @@ import com.mg4.control.R
 import com.mg4.control.model.RegenLevel
 import com.mg4.control.profile.ProfileManager
 import com.mg4.control.shortcut.ShortcutAction
+import com.mg4.control.hardware.MG4Hardware
 import com.mg4.control.util.FirmwareInfo
 
 class ShortcutsFragment : Fragment() {
@@ -97,6 +98,9 @@ class ShortcutsFragment : Fragment() {
             add(ActionItem(getString(R.string.shortcuts_action_profile_picker), ShortcutAction.PROFILE_PICKER))
             add(ActionItem(getString(R.string.shortcuts_action_open_app),       ShortcutAction.OPEN_APP))
             add(ActionItem(getString(R.string.shortcuts_action_open_custom_app),ShortcutAction.OPEN_CUSTOM_APP))
+            if (MG4Hardware.hasVehiclePowerOff()) {
+                add(ActionItem(getString(R.string.shortcuts_action_vehicle_power_off), ShortcutAction.VEHICLE_POWER_OFF))
+            }
         }
 
         // ── Affichage des sections de config selon firmware ───────────────

@@ -37,6 +37,7 @@
     <string name="shortcuts_action_tsr">Schilder (TSR)</string>
     <string name="shortcuts_action_apply_profile">Profil starten</string>
     <string name="shortcuts_action_profile_picker">Profilauswahl (Popup)</string>
+    <string name="shortcuts_action_vehicle_power_off">Fahrzeug ausschalten</string>
         <string name="overlay_brightness_title">Helligkeit</string>
     <string name="overlay_brightness_night">Nacht</string>
     <string name="overlay_brightness_mid">Mittel</string>
@@ -244,6 +245,7 @@
     <string name="vehicle_power_dialog_msg">Das Fahrzeug wird ausgeschaltet; der Bildschirm bleibt an. Nur im Stand und in Stellung P verfügbar.</string>
     <string name="vehicle_power_dialog_confirm">Ausschalten</string>
     <string name="vehicle_power_dialog_cancel">Abbrechen</string>
+    <string name="vehicle_power_need_park">Das Fahrzeug muss stehen, Gang in Stellung P.</string>
     <string name="settings_theme">Erscheinungsbild</string>
     <string name="settings_theme_auto">Auto</string>
     <string name="settings_theme_dark">Dunkles Design</string>

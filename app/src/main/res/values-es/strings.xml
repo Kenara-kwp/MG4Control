@@ -37,6 +37,7 @@
     <string name="shortcuts_action_tsr">Señales (TSR)</string>
     <string name="shortcuts_action_apply_profile">Iniciar un perfil</string>
     <string name="shortcuts_action_profile_picker">Selector de perfil (popup)</string>
+    <string name="shortcuts_action_vehicle_power_off">Apagar el coche</string>
         <string name="overlay_brightness_title">Brillo</string>
     <string name="overlay_brightness_night">Noche</string>
     <string name="overlay_brightness_mid">Medio</string>
@@ -244,6 +245,7 @@
     <string name="vehicle_power_dialog_msg">El vehículo se apagará; la pantalla permanece activa. Solo disponible detenido y con la palanca en P.</string>
     <string name="vehicle_power_dialog_confirm">Apagar</string>
     <string name="vehicle_power_dialog_cancel">Cancelar</string>
+    <string name="vehicle_power_need_park">El coche debe estar parado, con la palanca en P.</string>
     <string name="settings_theme">Apariencia</string>
     <string name="settings_theme_auto">Auto</string>
     <string name="settings_theme_dark">Modo oscuro</string>

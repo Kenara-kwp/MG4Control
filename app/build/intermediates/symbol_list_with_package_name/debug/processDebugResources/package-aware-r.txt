@@ -4520,6 +4520,7 @@ string shortcuts_action_profile_picker
 string shortcuts_action_sound
 string shortcuts_action_speed_limit
 string shortcuts_action_tsr
+string shortcuts_action_vehicle_power_off
 string shortcuts_btn1_label
 string shortcuts_btn2_label
 string shortcuts_cfg_adas
@@ -4577,6 +4578,7 @@ string vehicle_power_dialog_cancel
 string vehicle_power_dialog_confirm
 string vehicle_power_dialog_msg
 string vehicle_power_dialog_title
+string vehicle_power_need_park
 style AlertDialog_AppCompat
 style AlertDialog_AppCompat_Light
 style Animation_AppCompat_Dialog

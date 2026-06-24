@@ -37,6 +37,7 @@
     <string name="shortcuts_action_tsr">Panneaux (TSR)</string>
     <string name="shortcuts_action_apply_profile">Lancer un profil</string>
     <string name="shortcuts_action_profile_picker">Sélecteur de profil (popup)</string>
+    <string name="shortcuts_action_vehicle_power_off">Éteindre la voiture</string>
         <string name="overlay_brightness_title">Luminosité</string>
     <string name="overlay_brightness_night">Nuit</string>
     <string name="overlay_brightness_mid">Moyen</string>
@@ -246,6 +247,7 @@
     <string name="vehicle_power_dialog_msg">Le véhicule va être mis hors tension ; l\'écran reste actif. Disponible uniquement à l\'arrêt, levier en position P.</string>
     <string name="vehicle_power_dialog_confirm">Éteindre</string>
     <string name="vehicle_power_dialog_cancel">Annuler</string>
+    <string name="vehicle_power_need_park">La voiture doit être à l\'arrêt, levier en position P.</string>
     <string name="settings_theme">Apparence</string>
     <string name="settings_theme_auto">Auto</string>
     <string name="settings_theme_dark">Mode sombre</string>

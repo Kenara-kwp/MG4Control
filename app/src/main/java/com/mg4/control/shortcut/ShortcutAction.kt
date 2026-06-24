@@ -13,7 +13,8 @@ enum class ShortcutAction(val id: Int) {
     ENERGY_SAVING_TOGGLE(9),
     TSR_TOGGLE(10),
     APPLY_PROFILE(11),
-    PROFILE_PICKER(12);
+    PROFILE_PICKER(12),
+    VEHICLE_POWER_OFF(13);
 
     companion object {
         fun fromId(id: Int) = values().firstOrNull { it.id == id } ?: NONE

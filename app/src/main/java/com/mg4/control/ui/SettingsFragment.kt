@@ -24,6 +24,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.button.MaterialButton
@@ -175,17 +176,28 @@ class SettingsFragment : Fragment() {
             dividerVehiclePower.visibility = View.GONE
         } else {
             btnVehiclePower.setOnClickListener {
-                AlertDialog.Builder(requireContext())
-                    .setTitle(R.string.vehicle_power_dialog_title)
-                    .setMessage(R.string.vehicle_power_dialog_msg)
-                    .setNegativeButton(R.string.vehicle_power_dialog_cancel, null)
-                    .setPositiveButton(R.string.vehicle_power_dialog_confirm) { _, _ ->
-                        CoroutineScope(Dispatchers.IO).launch {
-                            val ok = MG4Hardware.vehiclePowerOff()
-                            AppLogger.i("MG4_SETTINGS", "Vehicle power off → $ok")
+                // Sécurité : on ne propose l'extinction que si le levier est confirmé en P.
+                CoroutineScope(Dispatchers.IO).launch {
+                    val inPark = MG4Hardware.isVehicleInPark()
+                    withContext(Dispatchers.Main) {
+                        if (!isAdded) return@withContext
+                        if (inPark == true) {
+                            AlertDialog.Builder(requireContext())
+                                .setTitle(R.string.vehicle_power_dialog_title)
+                                .setMessage(R.string.vehicle_power_dialog_msg)
+                                .setNegativeButton(R.string.vehicle_power_dialog_cancel, null)
+                                .setPositiveButton(R.string.vehicle_power_dialog_confirm) { _, _ ->
+                                    CoroutineScope(Dispatchers.IO).launch {
+                                        val ok = MG4Hardware.vehiclePowerOff()
+                                        AppLogger.i("MG4_SETTINGS", "Vehicle power off → $ok")
+                                    }
+                                }
+                                .show()
+                        } else {
+                            Toast.makeText(requireContext(), R.string.vehicle_power_need_park, Toast.LENGTH_LONG).show()
                         }
                     }
-                    .show()
+                }
             }
         }
 

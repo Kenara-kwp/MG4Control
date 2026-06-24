@@ -37,6 +37,7 @@
     <string name="shortcuts_action_tsr">Sinais (TSR)</string>
     <string name="shortcuts_action_apply_profile">Iniciar um perfil</string>
     <string name="shortcuts_action_profile_picker">Seletor de perfil (popup)</string>
+    <string name="shortcuts_action_vehicle_power_off">Desligar o carro</string>
         <string name="overlay_brightness_title">Brilho</string>
     <string name="overlay_brightness_night">Noite</string>
     <string name="overlay_brightness_mid">Médio</string>
@@ -244,6 +245,7 @@
     <string name="vehicle_power_dialog_msg">O veículo será desligado; o ecrã permanece ativo. Disponível apenas parado, com a alavanca em P.</string>
     <string name="vehicle_power_dialog_confirm">Desligar</string>
     <string name="vehicle_power_dialog_cancel">Cancelar</string>
+    <string name="vehicle_power_need_park">O carro deve estar parado, com a alavanca em P.</string>
     <string name="settings_theme">Aparência</string>
     <string name="settings_theme_auto">Auto</string>
     <string name="settings_theme_dark">Modo escuro</string>

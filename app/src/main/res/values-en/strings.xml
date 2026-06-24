@@ -37,6 +37,7 @@
     <string name="shortcuts_action_tsr">Signs (TSR)</string>
     <string name="shortcuts_action_apply_profile">Launch a profile</string>
     <string name="shortcuts_action_profile_picker">Profile picker (popup)</string>
+    <string name="shortcuts_action_vehicle_power_off">Power off the car</string>
         <string name="overlay_brightness_title">Brightness</string>
     <string name="overlay_brightness_night">Night</string>
     <string name="overlay_brightness_mid">Medium</string>
@@ -244,6 +245,7 @@
     <string name="vehicle_power_dialog_msg">The vehicle will be powered off; the screen stays on. Only available when stopped, with the gear in P.</string>
     <string name="vehicle_power_dialog_confirm">Power off</string>
     <string name="vehicle_power_dialog_cancel">Cancel</string>
+    <string name="vehicle_power_need_park">The car must be stopped, with the gear in P.</string>
     <string name="settings_theme">Appearance</string>
     <string name="settings_theme_auto">Auto</string>
     <string name="settings_theme_dark">Dark mode</string>

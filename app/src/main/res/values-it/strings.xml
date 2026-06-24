@@ -37,6 +37,7 @@
     <string name="shortcuts_action_tsr">Segnali (TSR)</string>
     <string name="shortcuts_action_apply_profile">Avvia un profilo</string>
     <string name="shortcuts_action_profile_picker">Selettore profilo (popup)</string>
+    <string name="shortcuts_action_vehicle_power_off">Spegnere l\'auto</string>
         <string name="overlay_brightness_title">Luminosità</string>
     <string name="overlay_brightness_night">Notte</string>
     <string name="overlay_brightness_mid">Medio</string>
@@ -244,6 +245,7 @@
     <string name="vehicle_power_dialog_msg">Il veicolo verrà spento; lo schermo resta attivo. Disponibile solo da fermo, con il cambio in P.</string>
     <string name="vehicle_power_dialog_confirm">Spegni</string>
     <string name="vehicle_power_dialog_cancel">Annulla</string>
+    <string name="vehicle_power_need_park">L\'auto deve essere ferma, con il cambio in P.</string>
     <string name="settings_theme">Aspetto</string>
     <string name="settings_theme_auto">Auto</string>
     <string name="settings_theme_dark">Modalità scura</string>

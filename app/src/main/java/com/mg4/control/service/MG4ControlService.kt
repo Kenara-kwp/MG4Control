@@ -1,5 +1,6 @@
 package com.mg4.control.service
 
+import android.app.AlertDialog
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,6 +14,10 @@ import android.content.IntentFilter
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.view.ContextThemeWrapper
+import android.view.WindowManager
+import android.widget.Toast
+import com.mg4.control.util.LocaleHelper
 import com.mg4.control.R
 import com.mg4.control.bluetooth.BluetoothProfileManager
 import com.mg4.control.debug.AppLogger
@@ -196,6 +201,12 @@ class MG4ControlService : Service() {
             return
         }
 
+        // VEHICLE_POWER_OFF : check P → confirmation (overlay) → extinction. Sinon message "en P".
+        if (action == ShortcutAction.VEHICLE_POWER_OFF) {
+            showVehiclePowerOffConfirm()
+            return
+        }
+
         // Pour tous les autres toggles : état en mémoire (réinitialisé au démarrage du service)
         // Évite le bug du 1er appui causé par un état SharedPrefs désynchronisé après redémarrage.
         val newState = !(toggleStates[action.name] ?: false)
@@ -264,6 +275,37 @@ class MG4ControlService : Service() {
                     }
                 }
                 else -> {}
+            }
+        }
+    }
+
+    /**
+     * Raccourci « Éteindre la voiture » : vérifie d'abord la position P (lecture gear), puis affiche
+     * le MÊME dialogue de confirmation que les Réglages, en fenêtre overlay (déclenché depuis le
+     * service). Si pas en P → Toast. `vehiclePowerOff()` re-vérifie le P au moment de l'envoi.
+     */
+    private fun showVehiclePowerOffConfirm() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val inPark = MG4Hardware.isVehicleInPark()
+            Handler(Looper.getMainLooper()).post {
+                if (inPark == true) {
+                    val themed = ContextThemeWrapper(LocaleHelper.applyLocale(this@MG4ControlService), R.style.Theme_MG4Control)
+                    val dialog = AlertDialog.Builder(themed)
+                        .setTitle(R.string.vehicle_power_dialog_title)
+                        .setMessage(R.string.vehicle_power_dialog_msg)
+                        .setNegativeButton(R.string.vehicle_power_dialog_cancel, null)
+                        .setPositiveButton(R.string.vehicle_power_dialog_confirm) { _, _ ->
+                            CoroutineScope(Dispatchers.IO).launch {
+                                val ok = MG4Hardware.vehiclePowerOff()
+                                AppLogger.i(TAG, "SHORTCUT VEHICLE_POWER_OFF confirmé → $ok")
+                            }
+                        }
+                        .create()
+                    dialog.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+                    dialog.show()
+                } else {
+                    Toast.makeText(this@MG4ControlService, R.string.vehicle_power_need_park, Toast.LENGTH_LONG).show()
+                }
             }
         }
     }

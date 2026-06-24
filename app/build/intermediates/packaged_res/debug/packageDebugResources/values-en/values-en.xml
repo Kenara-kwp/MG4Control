@@ -171,6 +171,7 @@
     <string name="shortcuts_action_sound">Sound</string>
     <string name="shortcuts_action_speed_limit">Speed limit alert</string>
     <string name="shortcuts_action_tsr">Signs (TSR)</string>
+    <string name="shortcuts_action_vehicle_power_off">Power off the car</string>
     <string name="shortcuts_btn1_label">★ Left Button</string>
     <string name="shortcuts_btn2_label">★ Right Button</string>
     <string name="shortcuts_cfg_adas">ADAS — Cycle</string>
@@ -225,4 +226,5 @@
     <string name="vehicle_power_dialog_confirm">Power off</string>
     <string name="vehicle_power_dialog_msg">The vehicle will be powered off; the screen stays on. Only available when stopped, with the gear in P.</string>
     <string name="vehicle_power_dialog_title">Power off vehicle</string>
+    <string name="vehicle_power_need_park">The car must be stopped, with the gear in P.</string>
 </resources>

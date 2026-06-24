@@ -1191,12 +1191,24 @@ object MG4Hardware {
     private const val CAR_ADAPTER_CLIENT_CLASS  = "com.saicmotor.carapi.CarAdapterClient"
     private const val COMFORTABLET_SERVICE_CODE = 0xf
 
-    /** Disponible sur tous les firmwares connus. */
+    /**
+     * Disponible sur les 6 firmwares : chacun a un check « position P » implémenté (garde de
+     * sécurité — le firmware ne garde PAS la commande, donc sans check P une extinction en roulant
+     * serait possible). Valeur P = 1 partout (cf. isVehicleInPark) :
+     *   • SWI133 : gear VPM 0x5030043 ✓
+     *   • A9 (132/131/69) : CarStateClient.getGearState() ✓ (confirmé SWI132)
+     *   • SWI68/165 : VehicleConditionManager.getCarGear() poll ✓ (confirmé SWI68, même SDK 165)
+     */
     fun hasVehiclePowerOff(): Boolean =
         FirmwareInfo.getGeneration() != FirmwareInfo.Gen.UNKNOWN
 
     /** Coupe l'alimentation du véhicule tout en gardant l'écran/infodivertissement actif. */
     fun vehiclePowerOff(): Boolean {
+        // Garde de sécurité : jamais d'extinction hors position P (re-vérifiée à l'envoi).
+        if (isVehicleInPark() != true) {
+            AppLogger.w(TAG, "vehiclePowerOff REFUSÉ — levier pas confirmé en P")
+            return false
+        }
         val gen = FirmwareInfo.getGeneration()
         AppLogger.i(TAG, "vehiclePowerOff (gen=$gen)")
         return when {
@@ -1230,6 +1242,70 @@ object MG4Hardware {
         } catch (e: Exception) {
             AppLogger.w(TAG, "  A9 power-off error: ${e.javaClass.simpleName}: ${e.message}")
             false
+        }
+    }
+
+    // ── Garde de sécurité : levier en position P ? ───────────────────────────
+    // L'OEM n'autorise le power-off qu'en P (gear == 1), mais NE garde PAS la commande
+    // côté firmware → c'est l'app qui doit vérifier (sinon extinction possible en roulant).
+    // Sources gear par firmware (smali) :
+    //   • SWI133        : VPM getIntProperty(0x5030043) ; PARK = 1 (CAR_GEAR_PARK_RANGE)
+    //   • SWI68/SWI165  : VehicleConditionBean.getCarGear() (signal condition véhicule)
+    //   • A9 (132/131/69): CarStateClient.getGearState()
+    // Seul SWI133 est implémenté ET vérifiable ici ; ailleurs on renvoie null → power-off bloqué.
+    private const val PROP_GEAR_STS   = 0x5030043   // SENSOR_TYPE_GEAR_STS (VPM, SWI133)
+    private const val GEAR_PARK_VALUE = 1
+
+    /**
+     * Levier en P ? true/false si déterminable, null si on ne sait pas (→ bloquer le power-off).
+     * Valeur P = 1 sur tous les firmwares étudiés (SWI133 0x5030043, A9 getGearState confirmé,
+     * SWI68/165 getCarGear = CarGearValue.PARK).
+     */
+    fun isVehicleInPark(): Boolean? {
+        val gen = FirmwareInfo.getGeneration()
+        val gear = when {
+            gen == FirmwareInfo.Gen.SWI133 ->
+                if (sVpm == null) Int.MIN_VALUE else getIntPropertyVpm(PROP_GEAR_STS)
+            FirmwareInfo.isNewGenVsm() || gen == FirmwareInfo.Gen.SWI132 ->
+                readA9GearState()                 // CarStateClient.getGearState()
+            gen == FirmwareInfo.Gen.SWI68 || gen == FirmwareInfo.Gen.SWI165 ->
+                readVcmCarGear()                  // VehicleConditionManager.getCarGear()
+            else -> Int.MIN_VALUE
+        }
+        AppLogger.i(TAG, "isVehicleInPark — gen=$gen gear=$gear (P=$GEAR_PARK_VALUE)")
+        return if (gear < 0) null else gear == GEAR_PARK_VALUE
+    }
+
+    // ── Lecture gear SWI68/165 (poll direct) + A9 (CarStateClient) ───────────
+    private const val CAR_STATE_CLIENT_CLASS = "com.saicmotor.carapi.client.CarStateClient"
+    private const val CAR_STATE_SERVICE_CODE = 0xb
+    @Volatile private var sCarState: Any? = null                   // A9 : CarStateClient (lazy)
+
+    /** SWI68/165 : VehicleConditionManager.getCarGear() (poll synchrone via sVcm). */
+    private fun readVcmCarGear(): Int {
+        val vcm = sVcm ?: return Int.MIN_VALUE
+        return try {
+            (vcm.javaClass.getMethod("getCarGear").invoke(vcm) as? Int) ?: Int.MIN_VALUE
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "  getCarGear err: ${e.javaClass.simpleName}: ${e.message}"); Int.MIN_VALUE
+        }
+    }
+
+    /** A9 : CarStateClient.getGearState() via CarAdapterClient.queryClient(0xb). */
+    private fun readA9GearState(): Int {
+        val cl = sVsm?.javaClass?.classLoader ?: return Int.MIN_VALUE
+        return try {
+            if (sCarState == null) {
+                val adapterClass = cl.loadClass(CAR_ADAPTER_CLIENT_CLASS)
+                val adapter = adapterClass.getMethod("getInstance", Context::class.java).invoke(null, sAppContext)
+                val binder = adapterClass.getMethod("queryClient", Int::class.javaPrimitiveType)
+                    .invoke(adapter, CAR_STATE_SERVICE_CODE) as? android.os.IBinder ?: return Int.MIN_VALUE
+                val stateClass = cl.loadClass(CAR_STATE_CLIENT_CLASS)
+                sCarState = stateClass.getConstructor(android.os.IBinder::class.java).newInstance(binder)
+            }
+            (sCarState!!.javaClass.getMethod("getGearState").invoke(sCarState) as? Int) ?: Int.MIN_VALUE
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "  A9 getGearState err: ${e.javaClass.simpleName}: ${e.message}"); Int.MIN_VALUE
         }
     }
 
