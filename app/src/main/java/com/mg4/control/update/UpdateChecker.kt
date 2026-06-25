@@ -118,14 +118,15 @@ object UpdateChecker {
             val tagName = json.getString("tag_name")
             val notes   = json.optString("body", "").take(400)
             val assets  = json.optJSONArray("assets") ?: return null
-            var apkUrl  = ""
+            val apks = mutableListOf<Pair<String, String>>()
             for (i in 0 until assets.length()) {
                 val asset = assets.getJSONObject(i)
-                if (asset.getString("name").endsWith(".apk")) {
-                    apkUrl = asset.getString("browser_download_url")
-                    break
+                val name  = asset.getString("name")
+                if (name.endsWith(".apk", ignoreCase = true)) {
+                    apks += name to asset.getString("browser_download_url")
                 }
             }
+            val apkUrl = selectApk(apks)
             if (apkUrl.isEmpty()) {
                 AppLogger.w(TAG, "GitHub : aucun asset .apk trouvé → fallback GitLab")
                 return null
@@ -164,7 +165,7 @@ object UpdateChecker {
             // Le champ "name" est un libellé libre (ex: "MG4Control v1.2.0") — pas forcément
             // le nom de fichier. On vérifie donc aussi l'URL elle-même en fallback.
             val links  = json.optJSONObject("assets")?.optJSONArray("links") ?: return null
-            var apkUrl = ""
+            val apks = mutableListOf<Pair<String, String>>()
             for (i in 0 until links.length()) {
                 val link      = links.getJSONObject(i)
                 val linkName  = link.optString("name")
@@ -173,10 +174,12 @@ object UpdateChecker {
                 }
                 if (linkName.endsWith(".apk", ignoreCase = true)
                     || linkUrl.contains(".apk", ignoreCase = true)) {
-                    apkUrl = linkUrl
-                    break
+                    // Le "name" GitLab est un libellé libre : on combine name + url pour
+                    // que la détection du flavor "online" fonctionne dans les deux cas.
+                    apks += "$linkName $linkUrl" to linkUrl
                 }
             }
+            val apkUrl = selectApk(apks)
             if (apkUrl.isEmpty()) {
                 AppLogger.w(TAG, "GitLab : aucun asset .apk trouvé dans les links")
                 return null
@@ -192,6 +195,30 @@ object UpdateChecker {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Sélectionne l'APK à télécharger parmi les assets `.apk` d'une release.
+     *
+     * Règle de gestion (releases multi-flavor online/offline) :
+     *  - 0 APK   → chaîne vide (déclenche le fallback / l'erreur).
+     *  - 1 APK   → on le prend (compat. anciennes releases mono-APK).
+     *  - 2+ APK  → on prend celui dont le nom contient "online" (le flavor réseau,
+     *              seul à gérer l'OTA). Si aucun ne matche, on prend le premier.
+     *
+     * Chaque élément est une paire (libellé pour la détection, URL de téléchargement).
+     */
+    private fun selectApk(apks: List<Pair<String, String>>): String {
+        if (apks.isEmpty()) return ""
+        if (apks.size == 1) return apks[0].second
+
+        val online = apks.firstOrNull { it.first.contains("online", ignoreCase = true) }
+        if (online != null) {
+            AppLogger.i(TAG, "${apks.size} APK trouvés → sélection 'online' : ${online.first}")
+            return online.second
+        }
+        AppLogger.w(TAG, "${apks.size} APK trouvés mais aucun 'online' → premier par défaut : ${apks[0].first}")
+        return apks[0].second
+    }
 
     /**
      * Sauvegarde la version [version] comme "à ne plus rappeler".
