@@ -1,5 +1,7 @@
 ![image info](mg4control_github_banner.svg)
 
+[![Security](https://github.com/SliDeeN/MG4Control/actions/workflows/security.yml/badge.svg)](https://github.com/SliDeeN/MG4Control/actions/workflows/security.yml)
+
 > Application Android Automotive pour le contrôle avancé des paramètres de conduite du MG4 électrique.
 > Android Automotive app for advanced driving settings control on the MG4 electric vehicle.
 
