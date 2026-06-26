@@ -17,10 +17,8 @@
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
-    <!-- Mise à jour automatique -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.INSTALL_PACKAGES" />
+    <!-- Réseau / auto-update : déclarés UNIQUEMENT dans le flavor online
+         (src/online/AndroidManifest.xml). Le flavor offline n'en a aucun, par construction. -->
 
     <application
         android:name=".MG4App"
@@ -46,25 +44,10 @@
             android:exported="false"
             android:directBootAware="true" />
 
-        <!-- FileProvider pour ouvrir l'APK dans le gestionnaire de fichiers AAOS -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="com.mg4.control.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_provider_paths" />
-        </provider>
-
-        <!-- Récepteur résultat d'installation silencieuse -->
-        <receiver
-            android:name=".update.InstallReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.mg4.control.ACTION_INSTALL_STATUS" />
-            </intent-filter>
-        </receiver>
+        <!-- FileProvider + InstallReceiver (auto-update) : déclarés UNIQUEMENT dans
+             le flavor online (src/online/AndroidManifest.xml). Déplacer le FileProvider
+             hors du manifest de base évite aussi un conflit d'authority qui empêcherait
+             d'installer les APK online et offline côte à côte. -->
 
         <receiver
             android:name=".receiver.BootReceiver"

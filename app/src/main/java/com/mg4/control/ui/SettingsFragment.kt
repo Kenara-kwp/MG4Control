@@ -28,10 +28,9 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.button.MaterialButton
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.MultiFormatWriter
+import com.mg4.control.BuildConfig
 import com.mg4.control.R
+import com.mg4.control.util.QrCode
 import com.mg4.control.debug.AppLogger
 import com.mg4.control.debug.CrashLogger
 import com.mg4.control.hardware.MG4Hardware
@@ -161,10 +160,16 @@ class SettingsFragment : Fragment() {
         }
 
         // ── Vérification auto des mises à jour ───────────────────────────────
-        val switchAutoUpdate = view.findViewById<Switch>(R.id.switch_auto_update)
-        switchAutoUpdate.isChecked = prefs.getBoolean("auto_check_update", true)
-        switchAutoUpdate.setOnCheckedChangeListener { _, checked ->
-            prefs.edit().putBoolean("auto_check_update", checked).apply()
+        // Build offline : pas de réseau → on masque toute l'UI de mise à jour.
+        if (BuildConfig.OFFLINE) {
+            view.findViewById<View>(R.id.row_auto_update).visibility = View.GONE
+            view.findViewById<View>(R.id.row_update_buttons).visibility = View.GONE
+        } else {
+            val switchAutoUpdate = view.findViewById<Switch>(R.id.switch_auto_update)
+            switchAutoUpdate.isChecked = prefs.getBoolean("auto_check_update", true)
+            switchAutoUpdate.setOnCheckedChangeListener { _, checked ->
+                prefs.edit().putBoolean("auto_check_update", checked).apply()
+            }
         }
 
         // ── Alimentation véhicule (SWI133) — éteint la voiture, garde l'écran ──
@@ -483,11 +488,11 @@ class SettingsFragment : Fragment() {
 
         // QR Code GitHub
         val ivQrGithub = dialogView.findViewById<ImageView>(R.id.iv_qr_code_github)
-        generateQrBitmap(githubUrl, 400)?.let { ivQrGithub.setImageBitmap(it) }
+        QrCode.generate(githubUrl, 400)?.let { ivQrGithub.setImageBitmap(it) }
 
         // QR Code GitLab
         val ivQrGitlab = dialogView.findViewById<ImageView>(R.id.iv_qr_code_gitlab)
-        generateQrBitmap(gitlabUrl, 400)?.let { ivQrGitlab.setImageBitmap(it) }
+        QrCode.generate(gitlabUrl, 400)?.let { ivQrGitlab.setImageBitmap(it) }
 
         // Lien GitHub cliquable
         dialogView.findViewById<TextView>(R.id.tv_github_link).setOnClickListener {
@@ -512,28 +517,5 @@ class SettingsFragment : Fragment() {
         }
 
         dialog.show()
-    }
-
-    // ── Génération QR code (ZXing core) ──────────────────────────────────────
-
-    private fun generateQrBitmap(content: String, sizePx: Int = 400): Bitmap? {
-        return try {
-            val hints = mapOf(
-                EncodeHintType.MARGIN to 1,
-                EncodeHintType.CHARACTER_SET to "UTF-8"
-            )
-            val matrix = MultiFormatWriter().encode(
-                content, BarcodeFormat.QR_CODE, sizePx, sizePx, hints
-            )
-            val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.RGB_565)
-            for (x in 0 until sizePx) {
-                for (y in 0 until sizePx) {
-                    bmp.setPixel(x, y, if (matrix[x, y]) Color.BLACK else Color.WHITE)
-                }
-            }
-            bmp
-        } catch (e: Exception) {
-            null
-        }
     }
 }

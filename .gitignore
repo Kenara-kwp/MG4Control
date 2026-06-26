@@ -22,9 +22,12 @@ mockup/
 *.ipr
 .DS_Store
 
-# Keystore (ne jamais committer)
+# Keystore & secrets de signature (ne jamais committer)
 *.jks
 *.keystore
+keystore.properties
+signing.properties
+*KEYSTORE_BASE64*
 
 # Fichiers de log
 *.log
