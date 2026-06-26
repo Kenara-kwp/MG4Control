@@ -275,4 +275,11 @@
     <string name="nav_audio">Audio</string>
     <string name="audio_loudness_title">Loudness</string>
     <string name="audio_loudness_desc">Boost d\'intensité sonore</string>
+    <!-- Sauvegarde / restauration des profils -->
+    <string name="profile_restore_title">Restaurer les profils ?</string>
+    <string name="profile_restore_msg">%d profil(s) sauvegardé(s) ont été trouvés sur ce véhicule. Les restaurer ?</string>
+    <string name="profile_restore_confirm">Restaurer</string>
+    <string name="profile_restore_cancel">Ignorer</string>
+    <string name="profile_restore_done">%d profil(s) restauré(s)</string>
+    <string name="settings_profile_backup_info">Profils sauvegardés automatiquement dans la mémoire du véhicule.</string>
 </resources>

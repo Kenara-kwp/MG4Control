@@ -273,4 +273,11 @@
     <string name="nav_audio">Audio</string>
     <string name="audio_loudness_title">Loudness</string>
     <string name="audio_loudness_desc">Klangverstärkung</string>
+    <!-- Profil-Sicherung / Wiederherstellung -->
+    <string name="profile_restore_title">Profile wiederherstellen?</string>
+    <string name="profile_restore_msg">%d gespeicherte(s) Profil(e) auf diesem Fahrzeug gefunden. Wiederherstellen?</string>
+    <string name="profile_restore_confirm">Wiederherstellen</string>
+    <string name="profile_restore_cancel">Ignorieren</string>
+    <string name="profile_restore_done">%d Profil(e) wiederhergestellt</string>
+    <string name="settings_profile_backup_info">Profile werden automatisch im Fahrzeugspeicher gesichert.</string>
 </resources>

@@ -4,6 +4,9 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mg4.control.model.DrivingProfile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class ProfileManager(private val context: Context) {
 
@@ -16,6 +19,7 @@ class ProfileManager(private val context: Context) {
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
+    private val backupManager = ProfileBackupManager()
 
     // -------------------------------------------------------------------------
     // CRUD
@@ -44,6 +48,7 @@ class ProfileManager(private val context: Context) {
             list.add(profile)
         }
         persist(list)
+        triggerBackup()
         return true
     }
 
@@ -55,14 +60,17 @@ class ProfileManager(private val context: Context) {
         if (prefs.getString(KEY_DEFAULT_ID, null) == profileId) {
             prefs.edit().remove(KEY_DEFAULT_ID).apply()
         }
+        triggerBackup()
     }
 
     fun setDefault(profileId: String) {
         prefs.edit().putString(KEY_DEFAULT_ID, profileId).apply()
+        triggerBackup()
     }
 
     fun clearDefault() {
         prefs.edit().remove(KEY_DEFAULT_ID).apply()
+        triggerBackup()
     }
 
     fun getDefaultProfile(): DrivingProfile? {
@@ -77,6 +85,42 @@ class ProfileManager(private val context: Context) {
     // [BT-PROFILES] Retourne le premier profil dont le btDeviceMac correspond au MAC donné.
     fun getProfileForBtDevice(mac: String): DrivingProfile? =
         getAll().firstOrNull { it.btDeviceMac.equals(mac, ignoreCase = true) }
+
+    // -------------------------------------------------------------------------
+    // Sauvegarde / restauration (fichier mémoire voiture — survit à la désinstallation)
+    // -------------------------------------------------------------------------
+
+    fun hasBackup(): Boolean = backupManager.backupExists()
+
+    /** Lit la sauvegarde sans rien modifier (pour proposer la restauration). */
+    fun readBackup() = backupManager.readBackup()
+
+    /**
+     * Restaure les profils depuis une sauvegarde : remplace les profils locaux par ceux
+     * de la sauvegarde (plafonné à [MAX_PROFILES]) et applique le profil par défaut.
+     * Retourne le nombre de profils restaurés.
+     */
+    fun restoreFrom(backup: com.mg4.control.model.ProfileBackup): Int {
+        val restored = backup.profiles.take(MAX_PROFILES)
+        persist(restored)
+        val defId = backup.defaultId
+        if (defId != null && restored.any { it.id == defId }) {
+            prefs.edit().putString(KEY_DEFAULT_ID, defId).apply()
+        } else {
+            prefs.edit().remove(KEY_DEFAULT_ID).apply()
+        }
+        triggerBackup()
+        return restored.size
+    }
+
+    /** Réécrit le fichier de sauvegarde en arrière-plan (état courant des profils). */
+    private fun triggerBackup() {
+        val snapshot = getAll()
+        val defaultId = getDefaultId()
+        CoroutineScope(Dispatchers.IO).launch {
+            backupManager.writeBackup(snapshot, defaultId)
+        }
+    }
 
     // -------------------------------------------------------------------------
     // Persistence
