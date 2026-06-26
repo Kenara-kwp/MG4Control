@@ -271,4 +271,8 @@
     <string name="bt_pick_device_title">Appareil Bluetooth</string>
     <string name="bt_profile_applied">Profil appliqué via Bluetooth : %s</string>
     <string name="bt_no_paired_devices">Aucun appareil associé</string>
+    <!-- Écran Audio (A9 uniquement) -->
+    <string name="nav_audio">Audio</string>
+    <string name="audio_loudness_title">Loudness</string>
+    <string name="audio_loudness_desc">Boost d\'intensité sonore</string>
 </resources>

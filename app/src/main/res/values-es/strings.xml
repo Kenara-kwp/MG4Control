@@ -269,4 +269,8 @@
     <string name="bt_pick_device_title">Dispositivo Bluetooth</string>
     <string name="bt_profile_applied">Perfil aplicado vía Bluetooth: %s</string>
     <string name="bt_no_paired_devices">No hay dispositivos emparejados</string>
+    <!-- Pantalla de audio (solo A9) -->
+    <string name="nav_audio">Audio</string>
+    <string name="audio_loudness_title">Loudness</string>
+    <string name="audio_loudness_desc">Refuerzo de intensidad de sonido</string>
 </resources>

@@ -12,6 +12,9 @@ import com.mg4.control.debug.AppLogger
 import com.mg4.control.model.DriveMode
 import com.mg4.control.model.RegenLevel
 import com.mg4.control.util.FirmwareInfo
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Hardware abstraction layer for MG4 vehicle control.
@@ -119,6 +122,10 @@ object MG4Hardware {
     // A9 (SWI132/131/69) = phase 2 (setScreenBrightness(III), params non décodables sans SystemUI).
     private const val GENERAL_MANAGER_CLASS = "com.saicmotor.sdk.systemsettings.GeneralManager"
     private const val BRIGHTNESS_NATIVE_MAX = 255
+
+    // Loudness — ancien SDK (SWI133/68/165) : SmartSoundManager.setLoudnessState(Boolean)/getLoudnessState().
+    // Même SDK systemsettings/BaseManager que GeneralManager (singleton sInstance + init(Context, listener)).
+    private const val SMART_SOUND_MANAGER_CLASS = "com.saicmotor.sdk.systemsettings.SmartSoundManager"
     private const val BRIGHTNESS_MIN_PERCENT = 5   // plancher de sécurité : ne jamais éteindre l'écran
 
     // SWI69/SWI131 : accès via CarAdapterClient → queryClient(0x8) → CarVehicleSettingClient
@@ -207,6 +214,7 @@ object MG4Hardware {
     @Volatile private var sVsmService: Any? = null   // mVehicleSettingService field value (SWI68)
     @Volatile private var sVsm133: Any? = null       // VehicleSettingManager instance (SWI133, pour ELK)
     @Volatile private var sGeneral: Any? = null      // GeneralManager instance (SWI133/68/165, luminosité)
+    @Volatile private var sSmartSound: Any? = null   // SmartSoundManager instance (SWI133/68/165, loudness)
     @Volatile private var sCarGeneral: Any? = null   // CarGeneralClient instance (A9 SWI132/131/69, luminosité)
     @Volatile private var sInitialized = false
     @Volatile private var sCarBindAttempted = false
@@ -571,6 +579,9 @@ object MG4Hardware {
         // 3b) GeneralManager pour SWI133 (luminosité écran)
         tryInitGeneralManager(launcherCtx, context)
 
+        // 3c) SmartSoundManager pour SWI133 (loudness audio)
+        tryInitSmartSoundManager(launcherCtx, context)
+
         // 4) Retries pour récupérer mIVehiclePropertyService et VSM133 une fois le service connecté
         val h = Handler(Looper.getMainLooper())
         listOf(2_000L, 5_000L, 10_000L, 15_000L, 20_000L, 30_000L, 45_000L, 60_000L).forEach { delay ->
@@ -578,6 +589,7 @@ object MG4Hardware {
                 if (sVpmService == null) tryGetVpmService(sVpm ?: return@postDelayed)
                 if (sVsm133 == null) tryInitVsm133(launcherCtx, context)
                 if (sGeneral == null) tryInitGeneralManager(launcherCtx, context)
+                if (sSmartSound == null) tryInitSmartSoundManager(launcherCtx, context)
             }, delay)
         }
 
@@ -794,6 +806,53 @@ object MG4Hardware {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Loudness — SmartSoundManager (ancien SDK SWI133/68/165)
+    // Même SDK/pattern que GeneralManager : singleton sInstance + init(Context, ISettingsServiceListener).
+    // -------------------------------------------------------------------------
+
+    private fun tryInitSmartSoundManager(launcherCtx: Context, appCtx: Context) {
+        if (sSmartSound != null) return
+        try {
+            val cls = launcherCtx.classLoader.loadClass(SMART_SOUND_MANAGER_CLASS)
+
+            // Tentative 1 : singleton déjà initialisé
+            val f = cls.getDeclaredField("sInstance")
+            f.isAccessible = true
+            f.get(null)?.let {
+                sSmartSound = it
+                AppLogger.i(TAG, "  SmartSoundManager singleton ✓")
+                return
+            }
+
+            // Tentative 2 : init(Context, ISettingsServiceListener) — proxy dynamique
+            val initMethod = cls.methods.firstOrNull { m ->
+                m.name == "init" && m.parameterCount == 2 &&
+                Context::class.java.isAssignableFrom(m.parameterTypes[0])
+            } ?: run {
+                AppLogger.w(TAG, "  SmartSoundManager init() non trouvé")
+                return
+            }
+            val listenerType = initMethod.parameterTypes[1]
+            val listener = if (listenerType.isInterface) {
+                java.lang.reflect.Proxy.newProxyInstance(listenerType.classLoader, arrayOf(listenerType)) { _, method, _ ->
+                    if (method.name == "onServiceConnected") {
+                        try {
+                            f.get(null)?.let { sSmartSound = it }
+                            AppLogger.i(TAG, "  SmartSoundManager onServiceConnected — sSmartSound=${if (sSmartSound != null) "OK ✓" else "null"}")
+                        } catch (_: Exception) {}
+                    }
+                    null
+                }
+            } else null
+            initMethod.invoke(null, appCtx, listener)
+            f.get(null)?.let { sSmartSound = it }
+            AppLogger.i(TAG, "  SmartSoundManager.init() called — sSmartSound=${if (sSmartSound != null) "OK ✓" else "null"}")
+        } catch (e: Exception) {
+            AppLogger.d(TAG, "  tryInitSmartSoundManager exc: ${e.message}")
+        }
+    }
+
     /** A9 (SWI132/131/69) : luminosité via CarGeneralClient.setScreenBrightness(mode,day,night). */
     private fun isA9Brightness(): Boolean =
         FirmwareInfo.isNewGenVsm() || FirmwareInfo.getGeneration() == FirmwareInfo.Gen.SWI132
@@ -962,6 +1021,9 @@ object MG4Hardware {
         // GeneralManager pour SWI68/SWI165 (luminosité écran) — même launcher context
         tryInitGeneralManager(launcherCtx, context)
 
+        // SmartSoundManager pour SWI68/SWI165 (loudness audio) — même launcher context
+        tryInitSmartSoundManager(launcherCtx, context)
+
         // Retries pour récupérer mVehicleSettingService et le singleton si pas encore prêt
         val h = Handler(Looper.getMainLooper())
         listOf(1_000L, 3_000L, 5_000L, 10_000L, 15_000L, 20_000L, 30_000L).forEach { delay ->
@@ -976,6 +1038,7 @@ object MG4Hardware {
                 }
                 sVsm?.let { if (sVsmService == null) tryGetVsmService(it, vsmClass) }
                 if (sGeneral == null) tryInitGeneralManager(launcherCtx, context)
+                if (sSmartSound == null) tryInitSmartSoundManager(launcherCtx, context)
             }, delay)
         }
     }
@@ -2897,4 +2960,169 @@ object MG4Hardware {
 
         return sb.toString()
     }
+
+    // ── Contrôle audio (CarAdapterService vendor SAIC) — A9 uniquement ──────────
+    //
+    // Le service vendor `com.saicmotor.caradapter` (descripteur ICarAudioService)
+    // n'existe QUE sur la famille A9 (SWI69/131/132). Sur old-SDK (SWI133/68/165)
+    // il est absent → on ne tente même pas le bind (cf. hasAudioControl / initAudio).
+    // Codes de transaction vérifiés identiques sur les 3 A9 (ICarAudioService$Stub).
+
+    /** A9 (SWI69/131/132) : loudness via le service vendor caradapter (ICarAudioService). */
+    private fun isA9Sound(): Boolean =
+        FirmwareInfo.isNewGenVsm() || FirmwareInfo.getGeneration() == FirmwareInfo.Gen.SWI132
+
+    /** Ancien SDK (SWI133/68/165) : loudness via SmartSoundManager (SDK systemsettings). */
+    private fun isOldSdkSound(): Boolean {
+        val gen = FirmwareInfo.getGeneration()
+        return gen == FirmwareInfo.Gen.SWI133 || gen == FirmwareInfo.Gen.SWI68 || gen == FirmwareInfo.Gen.SWI165
+    }
+
+    /** Le contrôle audio (loudness) est disponible sur A9 ET sur l'ancien SDK. */
+    fun hasAudioControl(): Boolean = isA9Sound() || isOldSdkSound()
+
+    private const val DESCRIPTOR_CARADAPTER = "com.saicmotor.carapi.ICarAdapterService"
+    private const val TX_QUERY_AUDIO_CLIENT = 1
+    private const val HELPER_AUDIO_CODE     = 10
+
+    private const val AUDIO_SET_FADER_FRONT   = 12
+    private const val AUDIO_SET_BALANCE_RIGHT = 13
+    private const val AUDIO_SET_LOUDNESS      = 15
+    private const val AUDIO_GET_LOUDNESS      = 16
+    private const val AUDIO_SET_SPEED_VOL     = 17
+    private const val AUDIO_GET_SPEED_VOL     = 18
+    private const val AUDIO_SET_3D_EFFECT     = 26
+    private const val AUDIO_GET_3D_EFFECT     = 27
+    private const val AUDIO_SET_SOUND_FIELD   = 30
+    private const val AUDIO_GET_BALANCE       = 31
+    private const val AUDIO_GET_FADER         = 32
+    private const val AUDIO_SET_BOSE_SOUND    = 36
+    private const val AUDIO_GET_BOSE_SOUND    = 37
+    private const val AUDIO_SET_TONE          = 40
+    private const val AUDIO_GET_TONE          = 41
+
+    @Volatile private var sCarAdapterBinder: IBinder? = null
+    @Volatile private var sAudioHelper: IBinder? = null
+    @Volatile private var sAudioDescriptor: String = ""
+    @Volatile private var sAudioServiceConn: ServiceConnection? = null
+
+    val isAudioAvailable: Boolean get() = sAudioHelper?.isBinderAlive == true
+
+    fun initAudio(context: Context) {
+        // Le bind caradapter ne concerne que l'A9. Sur old-SDK, le loudness passe par
+        // SmartSoundManager (initialisé dans le flux Katman4), donc rien à binder ici.
+        if (!isA9Sound()) return
+        if (sAudioHelper?.isBinderAlive == true) return
+        if (sAudioServiceConn != null) return
+        val intent = Intent().apply {
+            setClassName("com.saicmotor.caradapter", "com.saicmotor.caradapter.service.CarAdapterService")
+        }
+        val conn = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                sCarAdapterBinder = binder
+                AppLogger.i(TAG, "  Audio: CarAdapterService connecté ✓")
+                CoroutineScope(Dispatchers.IO).launch { tryGetAudioHelper() }
+            }
+            override fun onServiceDisconnected(name: ComponentName?) {
+                sCarAdapterBinder = null; sAudioHelper = null
+            }
+        }
+        sAudioServiceConn = conn
+        try {
+            val bound = context.applicationContext.bindService(intent, conn, Context.BIND_AUTO_CREATE)
+            if (!bound) {
+                sAudioServiceConn = null
+                Handler(Looper.getMainLooper()).postDelayed({ if (sAudioHelper == null) initAudio(context.applicationContext) }, 10_000L)
+            }
+        } catch (e: Exception) { sAudioServiceConn = null; AppLogger.w(TAG, "  Audio: bindService error: ${e.message}") }
+    }
+
+    private fun tryGetAudioHelper() {
+        val svc = sCarAdapterBinder ?: return
+        val data = Parcel.obtain(); val reply = Parcel.obtain()
+        try {
+            data.writeInterfaceToken(DESCRIPTOR_CARADAPTER)
+            data.writeInt(HELPER_AUDIO_CODE)
+            if (svc.transact(TX_QUERY_AUDIO_CLIENT, data, reply, 0)) {
+                reply.readException()
+                val helper = reply.readStrongBinder()
+                if (helper != null && helper.isBinderAlive) {
+                    sAudioHelper = helper; sAudioDescriptor = helper.interfaceDescriptor ?: ""
+                    AppLogger.i(TAG, "  Audio: helper OK descriptor='$sAudioDescriptor'")
+                } else {
+                    Handler(Looper.getMainLooper()).postDelayed({ CoroutineScope(Dispatchers.IO).launch { tryGetAudioHelper() } }, 5_000)
+                }
+            }
+        } finally { data.recycle(); reply.recycle() }
+    }
+
+    private fun audioGet(txCode: Int): Int {
+        val h = sAudioHelper ?: return -1
+        if (!h.isBinderAlive) { sAudioHelper = null; return -1 }
+        val data = Parcel.obtain(); val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(sAudioDescriptor)
+            if (h.transact(txCode, data, reply, 0)) { reply.readException(); reply.readInt() } else -1
+        } catch (_: Exception) { -1 } finally { data.recycle(); reply.recycle() }
+    }
+
+    private fun audioSet(txCode: Int, value: Int): Boolean {
+        val h = sAudioHelper ?: return false
+        if (!h.isBinderAlive) { sAudioHelper = null; return false }
+        val data = Parcel.obtain(); val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(sAudioDescriptor)
+            data.writeInt(value)
+            h.transact(txCode, data, reply, 0).also { if (it) reply.readException() }
+        } catch (_: Exception) { false } finally { data.recycle(); reply.recycle() }
+    }
+
+    private const val AUDIO_TYPE_MIN  = 0
+    private const val AUDIO_TYPE_MAX  = 3
+    private const val AUDIO_LEVEL_MIN = -9
+    private const val AUDIO_LEVEL_MAX =  9
+
+    fun getBoseSoundType(): Int              = audioGet(AUDIO_GET_BOSE_SOUND)
+    fun setBoseSoundType(t: Int): Boolean    = audioSet(AUDIO_SET_BOSE_SOUND, t.coerceIn(AUDIO_TYPE_MIN, AUDIO_TYPE_MAX))
+    fun getAudioBalance(): Int               = audioGet(AUDIO_GET_BALANCE)
+    fun setAudioBalance(v: Int): Boolean     = audioSet(AUDIO_SET_BALANCE_RIGHT, v.coerceIn(AUDIO_LEVEL_MIN, AUDIO_LEVEL_MAX))
+    fun getAudioFader(): Int                 = audioGet(AUDIO_GET_FADER)
+    fun setAudioFader(v: Int): Boolean       = audioSet(AUDIO_SET_FADER_FRONT, v.coerceIn(AUDIO_LEVEL_MIN, AUDIO_LEVEL_MAX))
+    // Loudness : l'API réelle est booléenne (1=ON / 0=OFF) — l'appelant (AudioFragment) envoie 1/0.
+    // Routage par firmware : A9 → binder caradapter ; old-SDK → SmartSoundManager (reflection).
+    fun getLoudnessState(): Int = when {
+        isA9Sound()     -> audioGet(AUDIO_GET_LOUDNESS)
+        isOldSdkSound() -> getLoudnessOldSdk()
+        else            -> -1
+    }
+    fun setLoudnessState(s: Int): Boolean = when {
+        isA9Sound()     -> audioSet(AUDIO_SET_LOUDNESS, s)
+        isOldSdkSound() -> setLoudnessOldSdk(s != 0)
+        else            -> false
+    }
+
+    // ── old-SDK : SmartSoundManager.getLoudnessState()/setLoudnessState(boolean) via reflection ──
+    private fun getLoudnessOldSdk(): Int {
+        val m = sSmartSound ?: return -1
+        return try {
+            val on = m.javaClass.getMethod("getLoudnessState").invoke(m) as? Boolean ?: return -1
+            if (on) 1 else 0
+        } catch (e: Exception) { AppLogger.w(TAG, "  getLoudnessOldSdk exc: ${e.message}"); -1 }
+    }
+
+    private fun setLoudnessOldSdk(on: Boolean): Boolean {
+        val m = sSmartSound ?: return false
+        return try {
+            m.javaClass.getMethod("setLoudnessState", Boolean::class.javaPrimitiveType).invoke(m, on)
+            true
+        } catch (e: Exception) { AppLogger.w(TAG, "  setLoudnessOldSdk exc: ${e.message}"); false }
+    }
+    fun getSpeedVolumeLevel(): Int           = audioGet(AUDIO_GET_SPEED_VOL)
+    fun setSpeedVolumeLevel(l: Int): Boolean = audioSet(AUDIO_SET_SPEED_VOL, l.coerceIn(AUDIO_TYPE_MIN, AUDIO_TYPE_MAX))
+    fun getSoundFieldType(): Int             = -1
+    fun setSoundFieldType(t: Int): Boolean   = audioSet(AUDIO_SET_SOUND_FIELD, t)
+    fun get3dEffectType(): Int               = audioGet(AUDIO_GET_3D_EFFECT)
+    fun set3dEffectType(t: Int): Boolean     = audioSet(AUDIO_SET_3D_EFFECT, t.coerceIn(AUDIO_TYPE_MIN, AUDIO_TYPE_MAX))
+    fun getToneControl(): Int                = audioGet(AUDIO_GET_TONE)
+    fun setToneControl(v: Int): Boolean      = audioSet(AUDIO_SET_TONE, v.coerceIn(AUDIO_LEVEL_MIN, AUDIO_LEVEL_MAX))
 }

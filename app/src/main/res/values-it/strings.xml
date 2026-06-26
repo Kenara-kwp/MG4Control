@@ -269,4 +269,8 @@
     <string name="bt_pick_device_title">Dispositivo Bluetooth</string>
     <string name="bt_profile_applied">Profilo applicato via Bluetooth: %s</string>
     <string name="bt_no_paired_devices">Nessun dispositivo associato</string>
+    <!-- Schermata Audio (solo A9) -->
+    <string name="nav_audio">Audio</string>
+    <string name="audio_loudness_title">Loudness</string>
+    <string name="audio_loudness_desc">Potenziamento dell\'intensità sonora</string>
 </resources>
