@@ -278,6 +278,4 @@
     <string name="profile_restore_msg">Trovati %d profilo/i salvato/i su questo veicolo. Ripristinarli?</string>
     <string name="profile_restore_confirm">Ripristina</string>
     <string name="profile_restore_cancel">Ignora</string>
-    <string name="profile_restore_done">%d profilo/i ripristinato/i</string>
-    <string name="settings_profile_backup_info">I profili vengono salvati automaticamente nella memoria del veicolo.</string>
-</resources>
+    <string name="profile_restore_done">%d profilo/i ripristinato/i</string></resources>

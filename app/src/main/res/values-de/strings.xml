@@ -278,6 +278,4 @@
     <string name="profile_restore_msg">%d gespeicherte(s) Profil(e) auf diesem Fahrzeug gefunden. Wiederherstellen?</string>
     <string name="profile_restore_confirm">Wiederherstellen</string>
     <string name="profile_restore_cancel">Ignorieren</string>
-    <string name="profile_restore_done">%d Profil(e) wiederhergestellt</string>
-    <string name="settings_profile_backup_info">Profile werden automatisch im Fahrzeugspeicher gesichert.</string>
-</resources>
+    <string name="profile_restore_done">%d Profil(e) wiederhergestellt</string></resources>

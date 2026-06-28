@@ -278,6 +278,4 @@
     <string name="profile_restore_msg">%d saved profile(s) were found on this vehicle. Restore them?</string>
     <string name="profile_restore_confirm">Restore</string>
     <string name="profile_restore_cancel">Ignore</string>
-    <string name="profile_restore_done">%d profile(s) restored</string>
-    <string name="settings_profile_backup_info">Profiles are automatically backed up to the vehicle storage.</string>
-</resources>
+    <string name="profile_restore_done">%d profile(s) restored</string></resources>
