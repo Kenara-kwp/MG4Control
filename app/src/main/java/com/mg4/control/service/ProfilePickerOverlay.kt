@@ -1,10 +1,12 @@
 package com.mg4.control.service
 
+import android.app.AlertDialog
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
+import android.widget.Toast
 import android.util.TypedValue
 import android.view.ContextThemeWrapper
 import android.view.Gravity
@@ -168,6 +170,17 @@ object ProfilePickerOverlay {
             dismissOnMainThread(context)
         }
 
+        // ── Bouton « Éteindre la voiture » (centré, gated firmware) ────────
+        val btnPowerOff = view.findViewById<MaterialButton>(R.id.overlay_btn_poweroff)
+        if (!MG4Hardware.hasVehiclePowerOff()) {
+            btnPowerOff?.visibility = View.GONE
+        } else {
+            btnPowerOff?.setOnClickListener {
+                dismissOnMainThread(context)              // ferme le popup profils
+                showVehiclePowerOffConfirm(context)       // P-check + confirmation
+            }
+        }
+
         // ── Tap sur le fond → fermeture ───────────────────────────────────
         view.findViewById<View>(R.id.overlay_backdrop)?.setOnClickListener {
             dismissOnMainThread(context)
@@ -278,6 +291,37 @@ object ProfilePickerOverlay {
                     if (overlayView == null) return@post
                     if (cur >= 0) slider?.value = cur.coerceIn(5, 100).toFloat()  // label via le listener
                     else briValue?.text = "--%"
+                }
+            }
+        }
+    }
+
+    /**
+     * « Éteindre la voiture » depuis l'overlay : vérifie la position P (lecture gear),
+     * puis affiche le MÊME dialogue de confirmation que les Réglages/raccourci, en
+     * fenêtre overlay. Si pas en P → Toast. `vehiclePowerOff()` re-vérifie le P à l'envoi.
+     */
+    private fun showVehiclePowerOffConfirm(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val inPark = MG4Hardware.isVehicleInPark()
+            handler.post {
+                if (inPark == true) {
+                    val themed = ContextThemeWrapper(LocaleHelper.applyLocale(context), R.style.Theme_MG4Control)
+                    val dialog = AlertDialog.Builder(themed)
+                        .setTitle(R.string.vehicle_power_dialog_title)
+                        .setMessage(R.string.vehicle_power_dialog_msg)
+                        .setNegativeButton(R.string.vehicle_power_dialog_cancel, null)
+                        .setPositiveButton(R.string.vehicle_power_dialog_confirm) { _, _ ->
+                            CoroutineScope(Dispatchers.IO).launch {
+                                val ok = MG4Hardware.vehiclePowerOff()
+                                AppLogger.i(TAG, "OVERLAY VEHICLE_POWER_OFF confirmé → $ok")
+                            }
+                        }
+                        .create()
+                    dialog.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+                    dialog.show()
+                } else {
+                    Toast.makeText(context, R.string.vehicle_power_need_park, Toast.LENGTH_LONG).show()
                 }
             }
         }

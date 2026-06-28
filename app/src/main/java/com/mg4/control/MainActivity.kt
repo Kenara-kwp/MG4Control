@@ -15,7 +15,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import com.google.android.material.button.MaterialButton
+import com.mg4.control.hardware.MG4Hardware
+import com.mg4.control.profile.ProfileManager
 import com.mg4.control.service.MG4ControlService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.mg4.control.update.UpdateChecker
 import com.mg4.control.update.UpdateDialogManager
 import com.mg4.control.util.FirmwareInfo
@@ -49,6 +55,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         startForegroundService(Intent(this, MG4ControlService::class.java))
+        MG4Hardware.initAudio(applicationContext)  // connecte le helper audio vendor (A9 uniquement, no-op ailleurs)
 
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
@@ -60,6 +67,47 @@ class MainActivity : AppCompatActivity() {
         checkUnknownFirmware()  // après setupFirmwareChips pour que les chips soient prêtes
         navigateToDefaultScreen(savedInstanceState)
         checkForUpdates()
+        checkProfileRestore()
+    }
+
+    // ── Restauration des profils depuis la sauvegarde (après réinstallation) ──────
+    // Ne se déclenche QUE si l'app n'a aucun profil local (vraie désinstallation /
+    // effacement de données — pas une simple mise à jour qui conserve les données).
+    private fun checkProfileRestore() {
+        val pm = ProfileManager(this)
+        if (pm.getAll().isNotEmpty()) return
+        val settings = getSharedPreferences("mg4_settings", MODE_PRIVATE)
+        if (settings.getBoolean("restore_prompt_dismissed", false)) return
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val backup = pm.readBackup()
+            if (backup == null || backup.profiles.isEmpty()) return@launch
+            withContext(Dispatchers.Main) {
+                if (isFinishing || isDestroyed) return@withContext
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle(R.string.profile_restore_title)
+                    .setMessage(getString(R.string.profile_restore_msg, backup.profiles.size))
+                    .setCancelable(false)
+                    .setNegativeButton(R.string.profile_restore_cancel) { _, _ ->
+                        settings.edit().putBoolean("restore_prompt_dismissed", true).apply()
+                    }
+                    .setPositiveButton(R.string.profile_restore_confirm) { _, _ ->
+                        CoroutineScope(Dispatchers.IO).launch {
+                            val n = pm.restoreFrom(backup)
+                            withContext(Dispatchers.Main) {
+                                if (!isFinishing && !isDestroyed) {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        getString(R.string.profile_restore_done, n),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        }
+                    }
+                    .show()
+            }
+        }
     }
 
     // ── Déblocage du bouton Diagnostic (5 clics sur le logo) ────────────────
@@ -243,9 +291,22 @@ class MainActivity : AppCompatActivity() {
     // ── Boutons de navigation dans la top-bar ─────────────────────────────────
 
     private fun setupNavButtons() {
+        val btnAudio     = findViewById<MaterialButton>(R.id.btn_nav_audio)
         val btnShortcuts = findViewById<MaterialButton>(R.id.btn_nav_shortcuts)
         val btnProfiles  = findViewById<MaterialButton>(R.id.btn_nav_profiles)
         val btnSettings  = findViewById<MaterialButton>(R.id.btn_nav_settings)
+
+        // Bouton Audio : contrôle vendor caradapter dispo uniquement sur A9 → masqué ailleurs.
+        if (MG4Hardware.hasAudioControl()) {
+            btnAudio.setOnClickListener {
+                when (navController.currentDestination?.id) {
+                    R.id.audioFragment -> navController.popBackStack(R.id.dashboardFragment, false)
+                    else               -> navController.navigate(R.id.audioFragment)
+                }
+            }
+        } else {
+            btnAudio.visibility = View.GONE
+        }
 
         btnShortcuts.setOnClickListener {
             when (navController.currentDestination?.id) {
@@ -271,6 +332,9 @@ class MainActivity : AppCompatActivity() {
         navController.addOnDestinationChangedListener { _, destination, _ ->
             val accent   = getColor(R.color.dash_accent_dim)
             val inactive = getColor(R.color.dash_btn)
+            btnAudio.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                if (destination.id == R.id.audioFragment) accent else inactive
+            )
             btnShortcuts.backgroundTintList = android.content.res.ColorStateList.valueOf(
                 if (destination.id == R.id.shortcutsFragment) accent else inactive
             )

@@ -372,6 +372,17 @@
 
                 </LinearLayout>
 
+                <!-- Info : sauvegarde automatique des profils (mémoire véhicule) -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_profile_backup_info"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="8dp" />
+
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"

@@ -269,4 +269,15 @@
     <string name="bt_pick_device_title">Dispositivo Bluetooth</string>
     <string name="bt_profile_applied">Perfil aplicado via Bluetooth: %s</string>
     <string name="bt_no_paired_devices">Nenhum dispositivo emparelhado</string>
+    <!-- Ecrã de áudio (apenas A9) -->
+    <string name="nav_audio">Audio</string>
+    <string name="audio_loudness_title">Loudness</string>
+    <string name="audio_loudness_desc">Reforço de intensidade sonora</string>
+    <!-- Cópia de segurança / restauro de perfis -->
+    <string name="profile_restore_title">Restaurar perfis?</string>
+    <string name="profile_restore_msg">Foram encontrados %d perfil(is) guardado(s) neste veículo. Restaurar?</string>
+    <string name="profile_restore_confirm">Restaurar</string>
+    <string name="profile_restore_cancel">Ignorar</string>
+    <string name="profile_restore_done">%d perfil(is) restaurado(s)</string>
+    <string name="settings_profile_backup_info">Os perfis são guardados automaticamente na memória do veículo.</string>
 </resources>
