@@ -276,6 +276,10 @@
     <string name="door_volume_title">Volume ao abrir a porta</string>
     <string name="door_volume_desc">Baixa o volume de média ao abrir uma porta dianteira</string>
     <string name="door_volume_level_label">Nível alvo</string>
+    <string name="door_volume_restore_title">Restaurar ao fechar</string>
+    <string name="door_volume_doors_label">Portas de ativação</string>
+    <string name="door_left">Esquerda</string>
+    <string name="door_right">Direita</string>
     <!-- Cópia de segurança / restauro de perfis -->
     <string name="profile_restore_title">Restaurar perfis?</string>
     <string name="profile_restore_msg">Foram encontrados %d perfil(is) guardado(s) neste veículo. Restaurar?</string>

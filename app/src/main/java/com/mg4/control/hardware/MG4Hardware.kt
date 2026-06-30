@@ -3167,6 +3167,7 @@ object MG4Hardware {
     @Volatile private var sCarPropMgr: Any? = null
     @Volatile private var sDoorConnecting = false
     @Volatile private var sAnyFrontOpenPrev = false
+    @Volatile private var sVolumeBeforeDrop = -1   // volume mémorisé à l'ouverture (pour restauration)
 
     /** v1 : feature dispo sur SWI133 uniquement. */
     fun hasDoorVolumeFeature(): Boolean =
@@ -3177,6 +3178,18 @@ object MG4Hardware {
 
     private fun doorVolumeLevel(): Int =
         sAppContext?.getSharedPreferences("mg4_settings", 0)?.getInt("door_volume_level", 0) ?: 0
+
+    private fun doorRestoreEnabled(): Boolean =
+        sAppContext?.getSharedPreferences("mg4_settings", 0)?.getBoolean("door_volume_restore", false) ?: false
+
+    /** areaIds des portes choisies par l'utilisateur (gauche=0x1, droite=0x4). */
+    private fun doorTriggerAreas(): IntArray {
+        val p = sAppContext?.getSharedPreferences("mg4_settings", 0) ?: return DOOR_FRONT_AREAS
+        val list = ArrayList<Int>(2)
+        if (p.getBoolean("door_volume_left", true)) list += 0x1
+        if (p.getBoolean("door_volume_right", true)) list += 0x4
+        return list.toIntArray()
+    }
 
     fun startDoorVolumeWatcher() {
         if (!hasDoorVolumeFeature()) return
@@ -3227,21 +3240,34 @@ object MG4Hardware {
         val poll = object : Runnable {
             override fun run() {
                 if (sCarPropMgr == null) return
-                // Une porte AVANT est ouverte si DLOCK_DOOR_OPEN_STS == 1 sur l'areaId 0x1 ou 0x4.
-                var anyFrontOpen = false
-                for (area in DOOR_FRONT_AREAS) {
+                // Une porte choisie est ouverte si DLOCK_DOOR_OPEN_STS == 1 sur son areaId (0x1/0x4).
+                var anyOpen = false
+                for (area in doorTriggerAreas()) {
                     val v = try { getInt.invoke(mgr, DOOR_OPEN_PROP, area) as? Int ?: -1 } catch (_: Exception) { -1 }
-                    if (v == 1) anyFrontOpen = true
+                    if (v == 1) anyOpen = true
                 }
-                // Front « fermé→ouvert » → baisse du volume une seule fois.
-                if (anyFrontOpen && !sAnyFrontOpenPrev && sDoorWatcherOn && doorVolumeEnabled()) {
-                    val level = doorVolumeLevel()
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val ok = setMediaVolume(level)
-                        AppLogger.i(DOORWATCH_TAG, "porte avant ouverte → setMediaVolume($level) = $ok")
+                if (sDoorWatcherOn && doorVolumeEnabled()) {
+                    if (anyOpen && !sAnyFrontOpenPrev) {
+                        // Ouverture : mémorise le volume actuel puis baisse au niveau cible.
+                        val level = doorVolumeLevel()
+                        CoroutineScope(Dispatchers.IO).launch {
+                            sVolumeBeforeDrop = getMediaVolume()
+                            val ok = setMediaVolume(level)
+                            AppLogger.i(DOORWATCH_TAG, "porte ouverte → vol $sVolumeBeforeDrop→$level = $ok")
+                        }
+                    } else if (!anyOpen && sAnyFrontOpenPrev) {
+                        // Fermeture : restaure le volume initial si l'option est activée.
+                        val restore = sVolumeBeforeDrop
+                        sVolumeBeforeDrop = -1
+                        if (doorRestoreEnabled() && restore >= 0) {
+                            CoroutineScope(Dispatchers.IO).launch {
+                                val ok = setMediaVolume(restore)
+                                AppLogger.i(DOORWATCH_TAG, "porte fermée → restauration vol $restore = $ok")
+                            }
+                        }
                     }
                 }
-                sAnyFrontOpenPrev = anyFrontOpen
+                sAnyFrontOpenPrev = anyOpen
                 h.postDelayed(this, 500L)
             }
         }

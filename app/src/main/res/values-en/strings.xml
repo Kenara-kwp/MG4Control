@@ -276,6 +276,10 @@
     <string name="door_volume_title">Door-open volume</string>
     <string name="door_volume_desc">Lowers media volume when a front door opens</string>
     <string name="door_volume_level_label">Target level</string>
+    <string name="door_volume_restore_title">Restore on close</string>
+    <string name="door_volume_doors_label">Trigger doors</string>
+    <string name="door_left">Left</string>
+    <string name="door_right">Right</string>
     <!-- Profile backup / restore -->
     <string name="profile_restore_title">Restore profiles?</string>
     <string name="profile_restore_msg">%d saved profile(s) were found on this vehicle. Restore them?</string>

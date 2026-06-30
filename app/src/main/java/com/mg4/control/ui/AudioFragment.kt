@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.CheckBox
 import android.widget.Switch
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -52,16 +53,25 @@ class AudioFragment : Fragment() {
             return
         }
 
-        val prefs = requireContext().getSharedPreferences("mg4_settings", Context.MODE_PRIVATE)
-        val toggle = view.findViewById<Switch>(R.id.switch_door_volume)
-        val slider = view.findViewById<Slider>(R.id.slider_door_volume)
+        val prefs   = requireContext().getSharedPreferences("mg4_settings", Context.MODE_PRIVATE)
+        val toggle  = view.findViewById<Switch>(R.id.switch_door_volume)
+        val slider  = view.findViewById<Slider>(R.id.slider_door_volume)
+        val restore = view.findViewById<Switch>(R.id.switch_door_restore)
+        val cbLeft  = view.findViewById<CheckBox>(R.id.cb_door_left)
+        val cbRight = view.findViewById<CheckBox>(R.id.cb_door_right)
 
         val enabled = prefs.getBoolean("door_volume_enabled", false)
-        toggle.isChecked = enabled
-        slider.isEnabled = enabled
+        toggle.isChecked  = enabled
+        restore.isChecked = prefs.getBoolean("door_volume_restore", false)
+        cbLeft.isChecked  = prefs.getBoolean("door_volume_left", true)
+        cbRight.isChecked = prefs.getBoolean("door_volume_right", true)
 
-        // Si déjà activé, (re)démarre le watcher à l'ouverture de l'onglet (idempotent) :
-        // garantit la connexion Car / les logs MG4_DOOR sans avoir à re-toggler.
+        fun setSubEnabled(e: Boolean) {
+            slider.isEnabled = e; restore.isEnabled = e; cbLeft.isEnabled = e; cbRight.isEnabled = e
+        }
+        setSubEnabled(enabled)
+
+        // Si déjà activé, (re)démarre le watcher à l'ouverture de l'onglet (idempotent).
         if (enabled) {
             viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) { MG4Hardware.startDoorVolumeWatcher() }
         }
@@ -79,7 +89,7 @@ class AudioFragment : Fragment() {
 
         toggle.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean("door_volume_enabled", checked).apply()
-            slider.isEnabled = checked
+            setSubEnabled(checked)
             viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
                 if (checked) MG4Hardware.startDoorVolumeWatcher()
                 else MG4Hardware.stopDoorVolumeWatcher()
@@ -88,6 +98,15 @@ class AudioFragment : Fragment() {
 
         slider.addOnChangeListener { _, value, fromUser ->
             if (fromUser) prefs.edit().putInt("door_volume_level", value.toInt()).apply()
+        }
+        restore.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean("door_volume_restore", checked).apply()
+        }
+        cbLeft.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean("door_volume_left", checked).apply()
+        }
+        cbRight.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean("door_volume_right", checked).apply()
         }
     }
 }

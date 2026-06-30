@@ -278,6 +278,10 @@
     <string name="door_volume_title">Volume à l\'ouverture de porte</string>
     <string name="door_volume_desc">Baisse le volume média à l\'ouverture d\'une porte avant</string>
     <string name="door_volume_level_label">Niveau cible</string>
+    <string name="door_volume_restore_title">Restaurer à la fermeture</string>
+    <string name="door_volume_doors_label">Portes déclencheuses</string>
+    <string name="door_left">Gauche</string>
+    <string name="door_right">Droite</string>
     <!-- Sauvegarde / restauration des profils -->
     <string name="profile_restore_title">Restaurer les profils ?</string>
     <string name="profile_restore_msg">%d profil(s) sauvegardé(s) ont été trouvés sur ce véhicule. Les restaurer ?</string>
