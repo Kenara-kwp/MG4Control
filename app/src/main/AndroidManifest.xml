@@ -28,6 +28,9 @@
         android:theme="@style/Theme.MG4Control"
         android:supportsRtl="true">
 
+        <!-- API Car AOSP (CarDoorLockManager pour la détection d'ouverture de porte) -->
+        <uses-library android:name="android.car" android:required="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

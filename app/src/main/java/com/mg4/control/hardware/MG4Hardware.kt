@@ -590,6 +590,7 @@ object MG4Hardware {
                 if (sVsm133 == null) tryInitVsm133(launcherCtx, context)
                 if (sGeneral == null) tryInitGeneralManager(launcherCtx, context)
                 if (sSmartSound == null) tryInitSmartSoundManager(launcherCtx, context)
+                if (doorVolumeEnabled() && sCarPropMgr == null) startDoorVolumeWatcher()
             }, delay)
         }
 
@@ -3116,6 +3117,135 @@ object MG4Hardware {
             m.javaClass.getMethod("setLoudnessState", Boolean::class.javaPrimitiveType).invoke(m, on)
             true
         } catch (e: Exception) { AppLogger.w(TAG, "  setLoudnessOldSdk exc: ${e.message}"); false }
+    }
+
+    // ── Volume média (SmartSoundManager, old-SDK) — VOL_TYPE_MEDIA=0 ────────────
+    private const val VOL_TYPE_MEDIA = 0
+
+    /** Max du volume média (borne le slider). -1 si indisponible. */
+    fun getMediaVolumeMax(): Int {
+        val m = sSmartSound ?: return -1
+        return try {
+            m.javaClass.getMethod("getMaxVolume", Int::class.javaPrimitiveType).invoke(m, VOL_TYPE_MEDIA) as? Int ?: -1
+        } catch (e: Exception) { AppLogger.w(TAG, "getMediaVolumeMax exc: ${e.message}"); -1 }
+    }
+
+    /** Volume média courant. -1 si indisponible. */
+    fun getMediaVolume(): Int {
+        val m = sSmartSound ?: return -1
+        return try {
+            m.javaClass.getMethod("getVolume", Int::class.javaPrimitiveType).invoke(m, VOL_TYPE_MEDIA) as? Int ?: -1
+        } catch (e: Exception) { -1 }
+    }
+
+    /** Fixe le volume média. setVolume(type, niveau, flags=0). */
+    fun setMediaVolume(level: Int): Boolean {
+        val m = sSmartSound ?: return false
+        return try {
+            m.javaClass.getMethod(
+                "setVolume",
+                Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType
+            ).invoke(m, VOL_TYPE_MEDIA, level, 0)
+            true
+        } catch (e: Exception) { AppLogger.w(TAG, "setMediaVolume exc: ${e.message}"); false }
+    }
+
+    // ── Baisse du volume à l'ouverture d'une porte avant (v1 : SWI133) ──────────
+    // Détection via l'API Car AOSP **CarPropertyManager** (service "property") + permission
+    // CAR_VENDOR_EXTENSION (déjà déclarée). IDs portes AVANT confirmés par un utilisateur :
+    // FL/FR "ratio" (taux d'ouverture, >0 = ouverte) + "mode". Le SDK SAIC (getIntProperty)
+    // ne les lisait pas. Poll ~700ms, change-only (log MG4_DOOR), baisse à l'ouverture.
+    // Pas de restauration. Connexion Car async (createCar + ServiceConnection).
+
+    private const val DOORWATCH_TAG = "MG4_DOOR"
+    // Signal d'ouverture confirmé sur SWI133 : DLOCK_DOOR_OPEN_STS (propriété de zone PORTE),
+    // areaId 0x1 = porte AV-gauche, 0x4 = AV-droite ; valeur 1 = ouverte, 0 = fermée.
+    private const val DOOR_OPEN_PROP = 0x2640c623
+    private val DOOR_FRONT_AREAS = intArrayOf(0x1, 0x4)
+    @Volatile private var sDoorWatcherOn = false
+    @Volatile private var sCarInstance: Any? = null
+    @Volatile private var sCarPropMgr: Any? = null
+    @Volatile private var sDoorConnecting = false
+    @Volatile private var sAnyFrontOpenPrev = false
+
+    /** v1 : feature dispo sur SWI133 uniquement. */
+    fun hasDoorVolumeFeature(): Boolean =
+        FirmwareInfo.getGeneration() == FirmwareInfo.Gen.SWI133
+
+    private fun doorVolumeEnabled(): Boolean =
+        sAppContext?.getSharedPreferences("mg4_settings", 0)?.getBoolean("door_volume_enabled", false) ?: false
+
+    private fun doorVolumeLevel(): Int =
+        sAppContext?.getSharedPreferences("mg4_settings", 0)?.getInt("door_volume_level", 0) ?: 0
+
+    fun startDoorVolumeWatcher() {
+        if (!hasDoorVolumeFeature()) return
+        sDoorWatcherOn = true
+        connectCarProperty()
+    }
+
+    fun stopDoorVolumeWatcher() {
+        sDoorWatcherOn = false           // poll conservé ; on ne déclenche plus la baisse
+        AppLogger.i(TAG, "  DoorVolumeWatcher: déclenchement désactivé")
+    }
+
+    /** Connexion (async) à l'API Car AOSP pour obtenir CarPropertyManager (service "property"). */
+    private fun connectCarProperty() {
+        if (sCarPropMgr != null || sDoorConnecting) return
+        val ctx = sAppContext ?: return
+        sDoorConnecting = true
+        try {
+            val carCls = ctx.classLoader.loadClass("android.car.Car")
+            val conn = object : ServiceConnection {
+                override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                    try {
+                        val car = sCarInstance ?: return
+                        val mgr = carCls.getMethod("getCarManager", String::class.java).invoke(car, "property")
+                        if (mgr != null) { sCarPropMgr = mgr; startDoorPolling(mgr) }
+                        else AppLogger.w(DOORWATCH_TAG, "getCarManager(property) = null")
+                    } catch (e: Exception) { AppLogger.w(DOORWATCH_TAG, "getCarManager échec: ${e.message}") }
+                }
+                override fun onServiceDisconnected(name: ComponentName?) { sCarPropMgr = null }
+            }
+            val car = carCls.getMethod("createCar", Context::class.java, ServiceConnection::class.java)
+                .invoke(null, ctx, conn)
+            sCarInstance = car
+            try { carCls.getMethod("connect").invoke(car) } catch (_: Exception) {}
+            AppLogger.i(DOORWATCH_TAG, "connexion Car (property)…")
+        } catch (e: Exception) {
+            sDoorConnecting = false
+            AppLogger.w(DOORWATCH_TAG, "Car createCar échec: ${e.message}")
+        }
+    }
+
+    private fun startDoorPolling(mgr: Any) {
+        val getInt = try {
+            mgr.javaClass.getMethod("getIntProperty", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+        } catch (e: Exception) { AppLogger.w(DOORWATCH_TAG, "getIntProperty introuvable: ${e.message}"); return }
+        AppLogger.i(DOORWATCH_TAG, "watcher porte actif (DLOCK_DOOR_OPEN_STS AV)")
+        val h = Handler(Looper.getMainLooper())
+        val poll = object : Runnable {
+            override fun run() {
+                if (sCarPropMgr == null) return
+                // Une porte AVANT est ouverte si DLOCK_DOOR_OPEN_STS == 1 sur l'areaId 0x1 ou 0x4.
+                var anyFrontOpen = false
+                for (area in DOOR_FRONT_AREAS) {
+                    val v = try { getInt.invoke(mgr, DOOR_OPEN_PROP, area) as? Int ?: -1 } catch (_: Exception) { -1 }
+                    if (v == 1) anyFrontOpen = true
+                }
+                // Front « fermé→ouvert » → baisse du volume une seule fois.
+                if (anyFrontOpen && !sAnyFrontOpenPrev && sDoorWatcherOn && doorVolumeEnabled()) {
+                    val level = doorVolumeLevel()
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val ok = setMediaVolume(level)
+                        AppLogger.i(DOORWATCH_TAG, "porte avant ouverte → setMediaVolume($level) = $ok")
+                    }
+                }
+                sAnyFrontOpenPrev = anyFrontOpen
+                h.postDelayed(this, 500L)
+            }
+        }
+        h.post(poll)
     }
     fun getSpeedVolumeLevel(): Int           = audioGet(AUDIO_GET_SPEED_VOL)
     fun setSpeedVolumeLevel(l: Int): Boolean = audioSet(AUDIO_SET_SPEED_VOL, l.coerceIn(AUDIO_TYPE_MIN, AUDIO_TYPE_MAX))

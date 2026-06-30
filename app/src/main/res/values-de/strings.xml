@@ -273,6 +273,9 @@
     <string name="nav_audio">Audio</string>
     <string name="audio_loudness_title">Loudness</string>
     <string name="audio_loudness_desc">Klangverstärkung</string>
+    <string name="door_volume_title">Lautstärke bei Türöffnung</string>
+    <string name="door_volume_desc">Senkt die Medienlautstärke beim Öffnen einer Vordertür</string>
+    <string name="door_volume_level_label">Zielpegel</string>
     <!-- Profil-Sicherung / Wiederherstellung -->
     <string name="profile_restore_title">Profile wiederherstellen?</string>
     <string name="profile_restore_msg">%d gespeicherte(s) Profil(e) auf diesem Fahrzeug gefunden. Wiederherstellen?</string>

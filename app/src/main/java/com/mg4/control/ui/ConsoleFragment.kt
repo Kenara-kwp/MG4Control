@@ -2,6 +2,8 @@ package com.mg4.control.ui
 
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.view.LayoutInflater
@@ -25,6 +27,19 @@ class ConsoleFragment : Fragment() {
         activity?.runOnUiThread { if (isAdded) renderLog() }
     }
 
+    // Auto-refresh périodique (status + logs) sans casser la position de scroll.
+    private val handler = Handler(Looper.getMainLooper())
+    private var lastLogCount = -1
+    private val refresh = object : Runnable {
+        override fun run() {
+            if (isAdded) {
+                renderStatus()
+                if (AppLogger.entries.size != lastLogCount) renderLog()
+            }
+            handler.postDelayed(this, 800L)
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View = inflater.inflate(R.layout.fragment_console, container, false)
@@ -45,6 +60,7 @@ class ConsoleFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         AppLogger.addListener(logListener)
+        handler.post(refresh)
         renderStatus()
         renderLog()
     }
@@ -52,6 +68,7 @@ class ConsoleFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         AppLogger.removeListener(logListener)
+        handler.removeCallbacks(refresh)
     }
 
     // ---- Status banner ----
@@ -77,7 +94,18 @@ class ConsoleFragment : Fragment() {
 
     // ---- Log list ----
 
+    /** True si l'utilisateur est (quasi) tout en bas → on suit les nouveaux logs ; sinon on le laisse. */
+    private fun isAtBottom(): Boolean {
+        val child = scrollView.getChildAt(0) ?: return true
+        val marginPx = (24 * resources.displayMetrics.density).toInt()
+        return child.bottom - (scrollView.height + scrollView.scrollY) <= marginPx
+    }
+
     private fun renderLog() {
+        // Mémorise la position AVANT de remplacer le texte : on ne re-scrolle en bas
+        // que si l'utilisateur suivait déjà le bas (sinon on préserve sa lecture).
+        val followBottom = isAtBottom()
+        lastLogCount = AppLogger.entries.size
         val sb = SpannableStringBuilder()
         AppLogger.entries.forEach { entry ->
             val prefix = "[${entry.time}] "
@@ -96,6 +124,6 @@ class ConsoleFragment : Fragment() {
             sb.setSpan(ForegroundColorSpan(color), start + prefix.length + tag.length, sb.length, 0)
         }
         textLog.text = sb
-        scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
+        if (followBottom) scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
     }
 }
