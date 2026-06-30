@@ -3119,35 +3119,67 @@ object MG4Hardware {
         } catch (e: Exception) { AppLogger.w(TAG, "  setLoudnessOldSdk exc: ${e.message}"); false }
     }
 
-    // ── Volume média (SmartSoundManager, old-SDK) — VOL_TYPE_MEDIA=0 ────────────
-    private const val VOL_TYPE_MEDIA = 0
+    // ── Volume média — VOL_TYPE_MEDIA=0 ────────────────────────────────────────
+    // Routage par firmware : old-SDK (133/68/165) → SmartSoundManager (reflection) ;
+    // A9 (69/131/132) → ICarAudioService via binder caradapter (tx getMax=0x5 / getVol=0x6 / setVol=0x7).
+    private const val VOL_TYPE_MEDIA    = 0
+    private const val AUDIO_GET_MAX_VOL = 0x5
+    private const val AUDIO_GET_VOLUME  = 0x6
+    private const val AUDIO_SET_VOLUME  = 0x7
 
     /** Max du volume média (borne le slider). -1 si indisponible. */
-    fun getMediaVolumeMax(): Int {
-        val m = sSmartSound ?: return -1
-        return try {
-            m.javaClass.getMethod("getMaxVolume", Int::class.javaPrimitiveType).invoke(m, VOL_TYPE_MEDIA) as? Int ?: -1
-        } catch (e: Exception) { AppLogger.w(TAG, "getMediaVolumeMax exc: ${e.message}"); -1 }
+    fun getMediaVolumeMax(): Int = when {
+        isOldSdkSound() -> smartSoundGetInt("getMaxVolume", VOL_TYPE_MEDIA)
+        isA9Sound()     -> audioGetArg(AUDIO_GET_MAX_VOL, VOL_TYPE_MEDIA)
+        else            -> -1
     }
 
     /** Volume média courant. -1 si indisponible. */
-    fun getMediaVolume(): Int {
-        val m = sSmartSound ?: return -1
-        return try {
-            m.javaClass.getMethod("getVolume", Int::class.javaPrimitiveType).invoke(m, VOL_TYPE_MEDIA) as? Int ?: -1
-        } catch (e: Exception) { -1 }
+    fun getMediaVolume(): Int = when {
+        isOldSdkSound() -> smartSoundGetInt("getVolume", VOL_TYPE_MEDIA)
+        isA9Sound()     -> audioGetArg(AUDIO_GET_VOLUME, VOL_TYPE_MEDIA)
+        else            -> -1
     }
 
     /** Fixe le volume média. setVolume(type, niveau, flags=0). */
-    fun setMediaVolume(level: Int): Boolean {
+    fun setMediaVolume(level: Int): Boolean = when {
+        isOldSdkSound() -> smartSoundSetVolume(level)
+        isA9Sound()     -> audioSet3(AUDIO_SET_VOLUME, VOL_TYPE_MEDIA, level, 0)
+        else            -> false
+    }
+
+    // old-SDK : SmartSoundManager (reflection)
+    private fun smartSoundGetInt(method: String, arg: Int): Int {
+        val m = sSmartSound ?: return -1
+        return try { m.javaClass.getMethod(method, Int::class.javaPrimitiveType).invoke(m, arg) as? Int ?: -1 }
+        catch (_: Exception) { -1 }
+    }
+    private fun smartSoundSetVolume(level: Int): Boolean {
         val m = sSmartSound ?: return false
         return try {
-            m.javaClass.getMethod(
-                "setVolume",
-                Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType
-            ).invoke(m, VOL_TYPE_MEDIA, level, 0)
-            true
-        } catch (e: Exception) { AppLogger.w(TAG, "setMediaVolume exc: ${e.message}"); false }
+            m.javaClass.getMethod("setVolume", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+                .invoke(m, VOL_TYPE_MEDIA, level, 0); true
+        } catch (e: Exception) { AppLogger.w(TAG, "setMediaVolume oldSdk exc: ${e.message}"); false }
+    }
+
+    // A9 : ICarAudioService via binder. getVolume(usage)/getMaxVolume(usage) = 1 arg ; setVolume(usage,val,flags) = 3 args.
+    private fun audioGetArg(txCode: Int, arg: Int): Int {
+        val h = sAudioHelper ?: return -1
+        if (!h.isBinderAlive) { sAudioHelper = null; return -1 }
+        val data = Parcel.obtain(); val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(sAudioDescriptor); data.writeInt(arg)
+            if (h.transact(txCode, data, reply, 0)) { reply.readException(); reply.readInt() } else -1
+        } catch (_: Exception) { -1 } finally { data.recycle(); reply.recycle() }
+    }
+    private fun audioSet3(txCode: Int, a: Int, b: Int, c: Int): Boolean {
+        val h = sAudioHelper ?: return false
+        if (!h.isBinderAlive) { sAudioHelper = null; return false }
+        val data = Parcel.obtain(); val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(sAudioDescriptor); data.writeInt(a); data.writeInt(b); data.writeInt(c)
+            h.transact(txCode, data, reply, 0).also { if (it) reply.readException() }
+        } catch (_: Exception) { false } finally { data.recycle(); reply.recycle() }
     }
 
     // ── Baisse du volume à l'ouverture d'une porte avant (v1 : SWI133) ──────────
@@ -3169,9 +3201,10 @@ object MG4Hardware {
     @Volatile private var sAnyFrontOpenPrev = false
     @Volatile private var sVolumeBeforeDrop = -1   // volume mémorisé à l'ouverture (pour restauration)
 
-    /** v1 : feature dispo sur SWI133 uniquement. */
+    /** Dispo sur tous les firmwares connus (détection porte = CarPropertyManager AOSP).
+     *  Confirmé SWI133 ; old-SDK 68/165 = même famille ; A9 à valider (dump DISPO en aide). */
     fun hasDoorVolumeFeature(): Boolean =
-        FirmwareInfo.getGeneration() == FirmwareInfo.Gen.SWI133
+        FirmwareInfo.getGeneration() != FirmwareInfo.Gen.UNKNOWN
 
     private fun doorVolumeEnabled(): Boolean =
         sAppContext?.getSharedPreferences("mg4_settings", 0)?.getBoolean("door_volume_enabled", false) ?: false
@@ -3235,6 +3268,7 @@ object MG4Hardware {
         val getInt = try {
             mgr.javaClass.getMethod("getIntProperty", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
         } catch (e: Exception) { AppLogger.w(DOORWATCH_TAG, "getIntProperty introuvable: ${e.message}"); return }
+        dumpDoorProps(mgr)   // découverte ponctuelle : propriétés de zone PORTE dispo (aide multi-firmware)
         AppLogger.i(DOORWATCH_TAG, "watcher porte actif (DLOCK_DOOR_OPEN_STS AV)")
         val h = Handler(Looper.getMainLooper())
         val poll = object : Runnable {
@@ -3273,6 +3307,21 @@ object MG4Hardware {
         }
         h.post(poll)
     }
+
+    /** Dump ponctuel des propriétés de zone PORTE disponibles (aide à l'adaptation par firmware). */
+    private fun dumpDoorProps(mgr: Any) {
+        try {
+            val list = mgr.javaClass.getMethod("getPropertyList").invoke(mgr) as? List<*> ?: return
+            for (cfg in list) {
+                cfg ?: continue
+                val pid = cfg.javaClass.getMethod("getPropertyId").invoke(cfg) as? Int ?: continue
+                if ((pid and 0x0f000000) != 0x06000000) continue   // zone PORTE uniquement
+                val areas = (cfg.javaClass.getMethod("getAreaIds").invoke(cfg) as? IntArray) ?: IntArray(0)
+                AppLogger.i(DOORWATCH_TAG, "DISPO 0x${pid.toString(16)} areas=${areas.joinToString { "0x${it.toString(16)}" }}")
+            }
+        } catch (e: Exception) { AppLogger.w(DOORWATCH_TAG, "dumpDoorProps: ${e.message}") }
+    }
+
     fun getSpeedVolumeLevel(): Int           = audioGet(AUDIO_GET_SPEED_VOL)
     fun setSpeedVolumeLevel(l: Int): Boolean = audioSet(AUDIO_SET_SPEED_VOL, l.coerceIn(AUDIO_TYPE_MIN, AUDIO_TYPE_MAX))
     fun getSoundFieldType(): Int             = -1
