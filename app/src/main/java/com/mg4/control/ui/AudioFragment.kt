@@ -25,24 +25,7 @@ class AudioFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // ── Loudness ───────────────────────────────────────────────────────
-        val switch = view.findViewById<Switch>(R.id.switch_loudness)
-        // Loudness : l'AIDL vendor est BOOLÉEN → 1 = ON, 0 = OFF (et non 2/1).
-        switch.setOnCheckedChangeListener { _, checked ->
-            if (switch.isPressed) {
-                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-                    MG4Hardware.setLoudnessState(if (checked) 1 else 0)
-                }
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-            val state = MG4Hardware.getLoudnessState()
-            withContext(Dispatchers.Main) {
-                if (isAdded && state >= 0) switch.isChecked = (state == 1)
-            }
-        }
-
-        // ── Volume à l'ouverture d'une porte (v1 : SWI133) ──────────────────
+        // ── Volume à l'ouverture d'une porte (SWI132/133) ───────────────────
         setupDoorVolume(view)
     }
 

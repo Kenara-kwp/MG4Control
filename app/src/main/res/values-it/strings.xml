@@ -168,6 +168,9 @@
     <string name="diag_copied">Copiato!</string>
     <string name="diag_loading">Analisi in corso…</string>
     <string name="diag_clear_crash">Cancella crash log</string>
+    <string name="diag_download">Scarica</string>
+    <string name="diag_downloaded">Salvato: %1$s</string>
+    <string name="diag_download_failed">Download non riuscito: %1$s</string>
 
     <!-- Info / Informazioni -->
     <string name="btn_check_update">Controlla aggiornamenti</string>
@@ -271,8 +274,6 @@
     <string name="bt_no_paired_devices">Nessun dispositivo associato</string>
     <!-- Schermata Audio (solo A9) -->
     <string name="nav_audio">Audio</string>
-    <string name="audio_loudness_title">Loudness</string>
-    <string name="audio_loudness_desc">Potenziamento dell\'intensità sonora</string>
     <string name="door_volume_title">Volume all\'apertura della porta</string>
     <string name="door_volume_desc">Abbassa il volume multimediale all\'apertura di una porta anteriore</string>
     <string name="door_volume_level_label">Livello target</string>

@@ -8,6 +8,8 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.Parcel
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Proxy
 import com.mg4.control.debug.AppLogger
 import com.mg4.control.model.DriveMode
 import com.mg4.control.model.RegenLevel
@@ -123,7 +125,7 @@ object MG4Hardware {
     private const val GENERAL_MANAGER_CLASS = "com.saicmotor.sdk.systemsettings.GeneralManager"
     private const val BRIGHTNESS_NATIVE_MAX = 255
 
-    // Loudness — ancien SDK (SWI133/68/165) : SmartSoundManager.setLoudnessState(Boolean)/getLoudnessState().
+    // Volume média — ancien SDK (SWI133/68/165) : SmartSoundManager.getVolume/setVolume/getMaxVolume(type).
     // Même SDK systemsettings/BaseManager que GeneralManager (singleton sInstance + init(Context, listener)).
     private const val SMART_SOUND_MANAGER_CLASS = "com.saicmotor.sdk.systemsettings.SmartSoundManager"
     private const val BRIGHTNESS_MIN_PERCENT = 5   // plancher de sécurité : ne jamais éteindre l'écran
@@ -348,6 +350,12 @@ object MG4Hardware {
             AppLogger.i(TAG, "  ✓ Katman2: vehiclesetting binder OK")
         else
             AppLogger.w(TAG, "  ✗ Katman2: vehiclesetting null (SELinux — expected)")
+
+        // Démarrage auto du watcher porte au boot si la feature est activée (tous firmwares).
+        startDoorWatcherIfEnabled()
+        // Connexion Car établie même si la feature est OFF → la sonde Diagnostic peut lire les portes.
+        if (hasDoorVolumeFeature()) connectCarProperty()
+
         AppLogger.i(TAG, "========================================")
     }
 
@@ -2979,8 +2987,8 @@ object MG4Hardware {
         return gen == FirmwareInfo.Gen.SWI133 || gen == FirmwareInfo.Gen.SWI68 || gen == FirmwareInfo.Gen.SWI165
     }
 
-    /** Le contrôle audio (loudness) est disponible sur A9 ET sur l'ancien SDK. */
-    fun hasAudioControl(): Boolean = isA9Sound() || isOldSdkSound()
+    /** Onglet Audio (baisse volume à l'ouverture de porte) : uniquement là où c'est fonctionnel. */
+    fun hasAudioControl(): Boolean = hasDoorVolumeFeature()
 
     private const val DESCRIPTOR_CARADAPTER = "com.saicmotor.carapi.ICarAdapterService"
     private const val TX_QUERY_AUDIO_CLIENT = 1
@@ -2988,8 +2996,6 @@ object MG4Hardware {
 
     private const val AUDIO_SET_FADER_FRONT   = 12
     private const val AUDIO_SET_BALANCE_RIGHT = 13
-    private const val AUDIO_SET_LOUDNESS      = 15
-    private const val AUDIO_GET_LOUDNESS      = 16
     private const val AUDIO_SET_SPEED_VOL     = 17
     private const val AUDIO_GET_SPEED_VOL     = 18
     private const val AUDIO_SET_3D_EFFECT     = 26
@@ -3089,36 +3095,6 @@ object MG4Hardware {
     fun setAudioBalance(v: Int): Boolean     = audioSet(AUDIO_SET_BALANCE_RIGHT, v.coerceIn(AUDIO_LEVEL_MIN, AUDIO_LEVEL_MAX))
     fun getAudioFader(): Int                 = audioGet(AUDIO_GET_FADER)
     fun setAudioFader(v: Int): Boolean       = audioSet(AUDIO_SET_FADER_FRONT, v.coerceIn(AUDIO_LEVEL_MIN, AUDIO_LEVEL_MAX))
-    // Loudness : l'API réelle est booléenne (1=ON / 0=OFF) — l'appelant (AudioFragment) envoie 1/0.
-    // Routage par firmware : A9 → binder caradapter ; old-SDK → SmartSoundManager (reflection).
-    fun getLoudnessState(): Int = when {
-        isA9Sound()     -> audioGet(AUDIO_GET_LOUDNESS)
-        isOldSdkSound() -> getLoudnessOldSdk()
-        else            -> -1
-    }
-    fun setLoudnessState(s: Int): Boolean = when {
-        isA9Sound()     -> audioSet(AUDIO_SET_LOUDNESS, s)
-        isOldSdkSound() -> setLoudnessOldSdk(s != 0)
-        else            -> false
-    }
-
-    // ── old-SDK : SmartSoundManager.getLoudnessState()/setLoudnessState(boolean) via reflection ──
-    private fun getLoudnessOldSdk(): Int {
-        val m = sSmartSound ?: return -1
-        return try {
-            val on = m.javaClass.getMethod("getLoudnessState").invoke(m) as? Boolean ?: return -1
-            if (on) 1 else 0
-        } catch (e: Exception) { AppLogger.w(TAG, "  getLoudnessOldSdk exc: ${e.message}"); -1 }
-    }
-
-    private fun setLoudnessOldSdk(on: Boolean): Boolean {
-        val m = sSmartSound ?: return false
-        return try {
-            m.javaClass.getMethod("setLoudnessState", Boolean::class.javaPrimitiveType).invoke(m, on)
-            true
-        } catch (e: Exception) { AppLogger.w(TAG, "  setLoudnessOldSdk exc: ${e.message}"); false }
-    }
-
     // ── Volume média — VOL_TYPE_MEDIA=0 ────────────────────────────────────────
     // Routage par firmware : old-SDK (133/68/165) → SmartSoundManager (reflection) ;
     // A9 (69/131/132) → ICarAudioService via binder caradapter (tx getMax=0x5 / getVol=0x6 / setVol=0x7).
@@ -3127,25 +3103,40 @@ object MG4Hardware {
     private const val AUDIO_GET_VOLUME  = 0x6
     private const val AUDIO_SET_VOLUME  = 0x7
 
+    private const val VOL_TAG = "MG4_VOL"
+
     /** Max du volume média (borne le slider). -1 si indisponible. */
-    fun getMediaVolumeMax(): Int = when {
-        isOldSdkSound() -> smartSoundGetInt("getMaxVolume", VOL_TYPE_MEDIA)
-        isA9Sound()     -> audioGetArg(AUDIO_GET_MAX_VOL, VOL_TYPE_MEDIA)
-        else            -> -1
+    fun getMediaVolumeMax(): Int {
+        val v = when {
+            isOldSdkSound() -> smartSoundGetInt("getMaxVolume", VOL_TYPE_MEDIA)
+            isA9Sound()     -> audioGetArg(AUDIO_GET_MAX_VOL, VOL_TYPE_MEDIA)
+            else            -> -1
+        }
+        AppLogger.i(VOL_TAG, "getMediaVolumeMax = $v  [oldSdk=${isOldSdkSound()} a9=${isA9Sound()} smartSound=${sSmartSound != null} audioHelper=${sAudioHelper != null}]")
+        logMediaVolumeDiag()   // A9 : compare type-0 vs group-id (no-op ailleurs)
+        return v
     }
 
     /** Volume média courant. -1 si indisponible. */
-    fun getMediaVolume(): Int = when {
-        isOldSdkSound() -> smartSoundGetInt("getVolume", VOL_TYPE_MEDIA)
-        isA9Sound()     -> audioGetArg(AUDIO_GET_VOLUME, VOL_TYPE_MEDIA)
-        else            -> -1
+    fun getMediaVolume(): Int {
+        val v = when {
+            isOldSdkSound() -> smartSoundGetInt("getVolume", VOL_TYPE_MEDIA)
+            isA9Sound()     -> audioGetArg(AUDIO_GET_VOLUME, VOL_TYPE_MEDIA)
+            else            -> -1
+        }
+        AppLogger.i(VOL_TAG, "getMediaVolume = $v")
+        return v
     }
 
     /** Fixe le volume média. setVolume(type, niveau, flags=0). */
-    fun setMediaVolume(level: Int): Boolean = when {
-        isOldSdkSound() -> smartSoundSetVolume(level)
-        isA9Sound()     -> audioSet3(AUDIO_SET_VOLUME, VOL_TYPE_MEDIA, level, 0)
-        else            -> false
+    fun setMediaVolume(level: Int): Boolean {
+        val ok = when {
+            isOldSdkSound() -> smartSoundSetVolume(level)
+            isA9Sound()     -> audioSet3(AUDIO_SET_VOLUME, VOL_TYPE_MEDIA, level, 0)
+            else            -> false
+        }
+        AppLogger.i(VOL_TAG, "setMediaVolume($level) = $ok")
+        return ok
     }
 
     // old-SDK : SmartSoundManager (reflection)
@@ -3182,6 +3173,20 @@ object MG4Hardware {
         } catch (_: Exception) { false } finally { data.recycle(); reply.recycle() }
     }
 
+    // Diagnostic A9 : le param de getVolume/getMaxVolume est-il un "type" (0=media) ou un
+    // "group id" (AAOS) ? On logge les deux pour comparer au max réel de la voiture.
+    private const val AUDIO_GET_GROUP_FOR_USAGE = 0xe   // getVolumeGroupIdForUsage(usage)
+    private const val USAGE_MEDIA_AAOS = 1              // AudioAttributes.USAGE_MEDIA
+    fun logMediaVolumeDiag() {
+        if (!isA9Sound()) return
+        val maxT = audioGetArg(AUDIO_GET_MAX_VOL, VOL_TYPE_MEDIA)
+        val volT = audioGetArg(AUDIO_GET_VOLUME,  VOL_TYPE_MEDIA)
+        val grp  = audioGetArg(AUDIO_GET_GROUP_FOR_USAGE, USAGE_MEDIA_AAOS)
+        val maxG = if (grp in 0..64) audioGetArg(AUDIO_GET_MAX_VOL, grp) else -1
+        val volG = if (grp in 0..64) audioGetArg(AUDIO_GET_VOLUME,  grp) else -1
+        AppLogger.i(VOL_TAG, "A9 diag: parType0[max=$maxT vol=$volT]  groupForUsage(MEDIA)=$grp  parGroup[max=$maxG vol=$volG]")
+    }
+
     // ── Baisse du volume à l'ouverture d'une porte avant (v1 : SWI133) ──────────
     // Détection via l'API Car AOSP **CarPropertyManager** (service "property") + permission
     // CAR_VENDOR_EXTENSION (déjà déclarée). IDs portes AVANT confirmés par un utilisateur :
@@ -3194,17 +3199,23 @@ object MG4Hardware {
     // areaId 0x1 = porte AV-gauche, 0x4 = AV-droite ; valeur 1 = ouverte, 0 = fermée.
     private const val DOOR_OPEN_PROP = 0x2640c623
     private val DOOR_FRONT_AREAS = intArrayOf(0x1, 0x4)
+    private val sDoorReadLast = HashMap<Int, Int>()
+    @Volatile private var sDoorSubProperty = false   // voie A : property.registerListener attachée
+    @Volatile private var sDoorSubDoorlock = false   // voie B : doorlock.registerCallback attachée
     @Volatile private var sDoorWatcherOn = false
     @Volatile private var sCarInstance: Any? = null
-    @Volatile private var sCarPropMgr: Any? = null
+    @Volatile private var sCarPropMgr: Any? = null   // CarPropertyManager (service "property")
+    @Volatile private var sCarDoorMgr: Any? = null   // CarDoorLockManager (service "doorlock")
     @Volatile private var sDoorConnecting = false
     @Volatile private var sAnyFrontOpenPrev = false
-    @Volatile private var sVolumeBeforeDrop = -1   // volume mémorisé à l'ouverture (pour restauration)
+    @Volatile private var sVolumeBeforeDrop = -1     // volume mémorisé à l'ouverture (pour restauration)
 
-    /** Dispo sur tous les firmwares connus (détection porte = CarPropertyManager AOSP).
-     *  Confirmé SWI133 ; old-SDK 68/165 = même famille ; A9 à valider (dump DISPO en aide). */
-    fun hasDoorVolumeFeature(): Boolean =
-        FirmwareInfo.getGeneration() != FirmwareInfo.Gen.UNKNOWN
+    /** Baisse du volume à l'ouverture de porte : détection DLOCK_DOOR_OPEN_STS via CarPropertyManager.
+     *  Lisible/fonctionnel uniquement sur SWI132 et SWI133 ; ailleurs le prop n'est pas exposé à l'app. */
+    fun hasDoorVolumeFeature(): Boolean {
+        val gen = FirmwareInfo.getGeneration()
+        return gen == FirmwareInfo.Gen.SWI132 || gen == FirmwareInfo.Gen.SWI133
+    }
 
     private fun doorVolumeEnabled(): Boolean =
         sAppContext?.getSharedPreferences("mg4_settings", 0)?.getBoolean("door_volume_enabled", false) ?: false
@@ -3224,6 +3235,11 @@ object MG4Hardware {
         return list.toIntArray()
     }
 
+    /** Démarrage auto au boot (appelé par init) : ne lance le watcher que si la feature est activée. */
+    fun startDoorWatcherIfEnabled() {
+        if (hasDoorVolumeFeature() && doorVolumeEnabled()) startDoorVolumeWatcher()
+    }
+
     fun startDoorVolumeWatcher() {
         if (!hasDoorVolumeFeature()) return
         sDoorWatcherOn = true
@@ -3235,9 +3251,35 @@ object MG4Hardware {
         AppLogger.i(TAG, "  DoorVolumeWatcher: déclenchement désactivé")
     }
 
-    /** Connexion (async) à l'API Car AOSP pour obtenir CarPropertyManager (service "property"). */
+    /** Sonde du bouton Diagnostic : logge le volume + l'état des portes à l'instant du clic. */
+    fun runDoorVolumeDiag() {
+        AppLogger.i(VOL_TAG, "── DIAG (bouton Diagnostic) ──")
+        getMediaVolumeMax()
+        getMediaVolume()
+        connectCarProperty()   // idempotent ; normalement déjà connecté depuis l'init
+        registerDoorCallback() // re-tente la souscription si pas encore posée
+        probeDoorSnapshot()
+    }
+
+    private fun probeDoorSnapshot() {
+        if (sCarPropMgr == null && sCarDoorMgr == null) {
+            AppLogger.w(DOORWATCH_TAG, "DIAG porte: aucun manager Car (createCar échec ?)")
+            return
+        }
+        AppLogger.i(DOORWATCH_TAG, "DIAG porte: property=${sCarPropMgr != null} doorlock=${sCarDoorMgr != null}")
+        for (area in DOOR_FRONT_AREAS) {
+            val v = readDoorOpen(area)
+            AppLogger.i(DOORWATCH_TAG, "DIAG area=0x${area.toString(16)} = ${v ?: "illisible"}")
+        }
+        AppLogger.i(DOORWATCH_TAG, "DIAG souscription: property=$sDoorSubProperty doorlock=$sDoorSubDoorlock état=" +
+            if (sDoorReadLast.isEmpty()) "(aucun event reçu)"
+            else sDoorReadLast.entries.joinToString { "0x${it.key.toString(16)}=${it.value}" })
+    }
+
+    /** Connexion (async) à l'API Car AOSP → CarPropertyManager ("property") ET CarDoorLockManager
+     *  ("doorlock"). Selon le firmware, la porte est exposée par l'un ou l'autre → on lit via les deux. */
     private fun connectCarProperty() {
-        if (sCarPropMgr != null || sDoorConnecting) return
+        if (sCarPropMgr != null || sCarDoorMgr != null || sDoorConnecting) return
         val ctx = sAppContext ?: return
         sDoorConnecting = true
         try {
@@ -3246,80 +3288,175 @@ object MG4Hardware {
                 override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
                     try {
                         val car = sCarInstance ?: return
-                        val mgr = carCls.getMethod("getCarManager", String::class.java).invoke(car, "property")
-                        if (mgr != null) { sCarPropMgr = mgr; startDoorPolling(mgr) }
-                        else AppLogger.w(DOORWATCH_TAG, "getCarManager(property) = null")
+                        val getMgr = carCls.getMethod("getCarManager", String::class.java)
+                        sCarPropMgr = try { getMgr.invoke(car, "property") } catch (_: Exception) { null }
+                        sCarDoorMgr = try { getMgr.invoke(car, "doorlock") } catch (_: Exception) { null }
+                        AppLogger.i(DOORWATCH_TAG, "managers: property=${sCarPropMgr != null} doorlock=${sCarDoorMgr != null}")
+                        if (sCarPropMgr != null || sCarDoorMgr != null) startDoorPolling()
+                        else AppLogger.w(DOORWATCH_TAG, "aucun manager porte disponible")
                     } catch (e: Exception) { AppLogger.w(DOORWATCH_TAG, "getCarManager échec: ${e.message}") }
                 }
-                override fun onServiceDisconnected(name: ComponentName?) { sCarPropMgr = null }
+                override fun onServiceDisconnected(name: ComponentName?) { sCarPropMgr = null; sCarDoorMgr = null; sDoorSubProperty = false; sDoorSubDoorlock = false }
             }
             val car = carCls.getMethod("createCar", Context::class.java, ServiceConnection::class.java)
                 .invoke(null, ctx, conn)
             sCarInstance = car
             try { carCls.getMethod("connect").invoke(car) } catch (_: Exception) {}
-            AppLogger.i(DOORWATCH_TAG, "connexion Car (property)…")
+            AppLogger.i(DOORWATCH_TAG, "connexion Car (property + doorlock)…")
         } catch (e: Exception) {
             sDoorConnecting = false
             AppLogger.w(DOORWATCH_TAG, "Car createCar échec: ${e.message}")
         }
     }
 
-    private fun startDoorPolling(mgr: Any) {
-        val getInt = try {
-            mgr.javaClass.getMethod("getIntProperty", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
-        } catch (e: Exception) { AppLogger.w(DOORWATCH_TAG, "getIntProperty introuvable: ${e.message}"); return }
-        dumpDoorProps(mgr)   // découverte ponctuelle : propriétés de zone PORTE dispo (aide multi-firmware)
-        AppLogger.i(DOORWATCH_TAG, "watcher porte actif (DLOCK_DOOR_OPEN_STS AV)")
+    // Lit DLOCK_DOOR_OPEN_STS(areaId) via CarPropertyManager.getIntProperty puis, en repli,
+    // via CarDoorLockManager.getProperty(Integer, propId, areaId).getValue(). null si aucun.
+    private fun readDoorOpen(area: Int): Int? {
+        sCarPropMgr?.let { m ->
+            try {
+                return m.javaClass.getMethod("getIntProperty", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+                    .invoke(m, DOOR_OPEN_PROP, area) as? Int
+            } catch (_: Exception) {}
+        }
+        sCarDoorMgr?.let { m ->
+            try {
+                val cpv = m.javaClass.getMethod("getProperty", Class::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+                    .invoke(m, Integer::class.java, DOOR_OPEN_PROP, area) ?: return null
+                return cpv.javaClass.getMethod("getValue").invoke(cpv) as? Int
+            } catch (_: Exception) {}
+        }
+        return null
+    }
+
+    private fun startDoorPolling() {
+        registerDoorCallback()   // souscription ON_CHANGE (complète le poll)
+        AppLogger.i(DOORWATCH_TAG, "watcher porte actif (property=${sCarPropMgr != null} doorlock=${sCarDoorMgr != null})")
         val h = Handler(Looper.getMainLooper())
         val poll = object : Runnable {
             override fun run() {
-                if (sCarPropMgr == null) return
-                // Une porte choisie est ouverte si DLOCK_DOOR_OPEN_STS == 1 sur son areaId (0x1/0x4).
-                var anyOpen = false
-                for (area in doorTriggerAreas()) {
-                    val v = try { getInt.invoke(mgr, DOOR_OPEN_PROP, area) as? Int ?: -1 } catch (_: Exception) { -1 }
-                    if (v == 1) anyOpen = true
+                if (sCarPropMgr == null && sCarDoorMgr == null) return
+                // DLOCK_DOOR_OPEN_STS sur les portes avant (0x1 gauche / 0x4 droite).
+                for (area in DOOR_FRONT_AREAS) {
+                    val v = readDoorOpen(area) ?: continue
+                    onDoorAreaValue(area, v)
                 }
-                if (sDoorWatcherOn && doorVolumeEnabled()) {
-                    if (anyOpen && !sAnyFrontOpenPrev) {
-                        // Ouverture : mémorise le volume actuel puis baisse au niveau cible.
-                        val level = doorVolumeLevel()
-                        CoroutineScope(Dispatchers.IO).launch {
-                            sVolumeBeforeDrop = getMediaVolume()
-                            val ok = setMediaVolume(level)
-                            AppLogger.i(DOORWATCH_TAG, "porte ouverte → vol $sVolumeBeforeDrop→$level = $ok")
-                        }
-                    } else if (!anyOpen && sAnyFrontOpenPrev) {
-                        // Fermeture : restaure le volume initial si l'option est activée.
-                        val restore = sVolumeBeforeDrop
-                        sVolumeBeforeDrop = -1
-                        if (doorRestoreEnabled() && restore >= 0) {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                val ok = setMediaVolume(restore)
-                                AppLogger.i(DOORWATCH_TAG, "porte fermée → restauration vol $restore = $ok")
-                            }
-                        }
-                    }
-                }
-                sAnyFrontOpenPrev = anyOpen
                 h.postDelayed(this, 500L)
             }
         }
         h.post(poll)
     }
 
-    /** Dump ponctuel des propriétés de zone PORTE disponibles (aide à l'adaptation par firmware). */
-    private fun dumpDoorProps(mgr: Any) {
-        try {
-            val list = mgr.javaClass.getMethod("getPropertyList").invoke(mgr) as? List<*> ?: return
-            for (cfg in list) {
-                cfg ?: continue
-                val pid = cfg.javaClass.getMethod("getPropertyId").invoke(cfg) as? Int ?: continue
-                if ((pid and 0x0f000000) != 0x06000000) continue   // zone PORTE uniquement
-                val areas = (cfg.javaClass.getMethod("getAreaIds").invoke(cfg) as? IntArray) ?: IntArray(0)
-                AppLogger.i(DOORWATCH_TAG, "DISPO 0x${pid.toString(16)} areas=${areas.joinToString { "0x${it.toString(16)}" }}")
+    /** Point d'entrée unique pour une valeur porte (poll OU événement de souscription).
+     *  Met à jour l'état, log en change-only, puis réévalue le déclenchement volume. */
+    @Synchronized
+    private fun onDoorAreaValue(area: Int, v: Int) {
+        val prev = sDoorReadLast[area]
+        if (prev == null || prev != v) {
+            sDoorReadLast[area] = v
+            AppLogger.i(DOORWATCH_TAG, "area=0x${area.toString(16)} ${prev ?: "?"} → $v")
+        }
+        evaluateDoorTrigger()
+    }
+
+    /** Recalcule "au moins une porte choisie ouverte" à partir de l'état accumulé et applique
+     *  la baisse (front d'ouverture) / la restauration (front de fermeture). Idempotent. */
+    private fun evaluateDoorTrigger() {
+        if (!(sDoorWatcherOn && doorVolumeEnabled())) return
+        val triggerAreas = doorTriggerAreas()
+        val anyOpen = triggerAreas.any { sDoorReadLast[it] == 1 }
+        if (anyOpen && !sAnyFrontOpenPrev) {
+            val level = doorVolumeLevel()
+            CoroutineScope(Dispatchers.IO).launch {
+                sVolumeBeforeDrop = getMediaVolume()
+                val ok = setMediaVolume(level)
+                AppLogger.i(DOORWATCH_TAG, "porte ouverte → vol $sVolumeBeforeDrop→$level = $ok")
             }
-        } catch (e: Exception) { AppLogger.w(DOORWATCH_TAG, "dumpDoorProps: ${e.message}") }
+        } else if (!anyOpen && sAnyFrontOpenPrev) {
+            val restore = sVolumeBeforeDrop
+            sVolumeBeforeDrop = -1
+            if (doorRestoreEnabled() && restore >= 0) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    val ok = setMediaVolume(restore)
+                    AppLogger.i(DOORWATCH_TAG, "porte fermée → restauration vol $restore = $ok")
+                }
+            }
+        }
+        sAnyFrontOpenPrev = anyOpen
+    }
+
+    /** InvocationHandler commun aux deux interfaces de callback (onChangeEvent/onErrorEvent).
+     *  Filtre DLOCK_DOOR_OPEN_STS et alimente onDoorAreaValue. Gère aussi les méthodes Object. */
+    private fun doorEventHandler(src: String) = InvocationHandler { proxy, method, args ->
+        when (method.name) {
+            "onChangeEvent" -> {
+                try {
+                    val cpv = args?.getOrNull(0)
+                    if (cpv != null) {
+                        val pid = cpv.javaClass.getMethod("getPropertyId").invoke(cpv) as? Int
+                        val area = cpv.javaClass.getMethod("getAreaId").invoke(cpv) as? Int ?: 0
+                        val raw = cpv.javaClass.getMethod("getValue").invoke(cpv)
+                        val v = when (raw) {
+                            is Boolean -> if (raw) 1 else 0
+                            is Number  -> raw.toInt()
+                            else       -> null
+                        }
+                        if (pid == DOOR_OPEN_PROP && v != null) {
+                            AppLogger.i(DOORWATCH_TAG, "EVENT[$src] area=0x${area.toString(16)} = $v")
+                            onDoorAreaValue(area, v)
+                        }
+                    }
+                } catch (e: Exception) { AppLogger.w(DOORWATCH_TAG, "onChangeEvent: ${e.message}") }
+                null
+            }
+            "onErrorEvent" -> { AppLogger.w(DOORWATCH_TAG, "EVENT erreur porte"); null }
+            "hashCode"     -> System.identityHashCode(proxy)
+            "equals"       -> proxy === args?.getOrNull(0)
+            "toString"     -> "MG4DoorListener@" + Integer.toHexString(System.identityHashCode(proxy))
+            else           -> null
+        }
+    }
+
+    /**
+     * S'abonne aux changements de DLOCK_DOOR_OPEN_STS. Nécessaire sur SWI69/131/68/165 où le prop
+     * n'est PAS lisible à la demande (getProperty lève IllegalArgumentException "Failed to get value")
+     * mais poussé en ON_CHANGE. IMPORTANT : le Proxy doit être défini par le classloader de l'APP
+     * (android.car est en BootClassLoader → Proxy.newProxyInstance y échoue). On tente DEUX voies :
+     *   A) CarPropertyManager.registerListener (service "property")
+     *   B) CarDoorLockManager.registerCallback   (service "doorlock", comme la SystemUI d'origine)
+     */
+    private fun registerDoorCallback() {
+        val cl = sAppContext?.classLoader ?: return
+
+        // Voie A — CarPropertyManager.registerListener(CarPropertyEventListener, propId, rate).
+        // rate=5f (et non 0f) : si le VHAL déclare la prop CONTINUOUS, un rate 0 = aucune mise à jour.
+        if (!sDoorSubProperty) sCarPropMgr?.let { m ->
+            try {
+                val iface = cl.loadClass("android.car.hardware.property.CarPropertyManager\$CarPropertyEventListener")
+                val proxy = Proxy.newProxyInstance(cl, arrayOf(iface), doorEventHandler("property"))
+                val ok = m.javaClass.getMethod("registerListener", iface,
+                    Int::class.javaPrimitiveType, Float::class.javaPrimitiveType)
+                    .invoke(m, proxy, DOOR_OPEN_PROP, 5f)
+                sDoorSubProperty = true
+                AppLogger.i(DOORWATCH_TAG, "souscription porte (property.registerListener rate=5) OK=$ok")
+            } catch (e: Exception) {
+                val c = e.cause ?: e
+                AppLogger.w(DOORWATCH_TAG, "property.registerListener échec: ${c.javaClass.simpleName}: ${c.message}")
+            }
+        }
+
+        // Voie B — CarDoorLockManager.registerCallback(CarDoorLockEventCallback) — voie de l'OEM
+        if (!sDoorSubDoorlock) sCarDoorMgr?.let { m ->
+            try {
+                val iface = cl.loadClass("android.car.hardware.doorlock.CarDoorLockManager\$CarDoorLockEventCallback")
+                val proxy = Proxy.newProxyInstance(cl, arrayOf(iface), doorEventHandler("doorlock"))
+                m.javaClass.getMethod("registerCallback", iface).invoke(m, proxy)
+                sDoorSubDoorlock = true
+                AppLogger.i(DOORWATCH_TAG, "souscription porte (doorlock.registerCallback) OK")
+            } catch (e: Exception) {
+                val c = e.cause ?: e
+                AppLogger.w(DOORWATCH_TAG, "doorlock.registerCallback échec: ${c.javaClass.simpleName}: ${c.message}")
+            }
+        }
     }
 
     fun getSpeedVolumeLevel(): Int           = audioGet(AUDIO_GET_SPEED_VOL)
