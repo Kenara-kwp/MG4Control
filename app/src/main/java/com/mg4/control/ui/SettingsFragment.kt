@@ -35,6 +35,7 @@ import com.mg4.control.util.QrCode
 import com.mg4.control.debug.AppLogger
 import com.mg4.control.debug.CrashLogger
 import com.mg4.control.hardware.MG4Hardware
+import com.mg4.control.update.ApkCleanup
 import com.mg4.control.update.UpdateChecker
 import com.mg4.control.update.UpdateDialogManager
 import java.io.File
@@ -248,7 +249,7 @@ class SettingsFragment : Fragment() {
                 Environment.DIRECTORY_DOWNLOADS
             )
             val apkFiles = downloadsDir.listFiles { _, name ->
-                name.startsWith("MGControl") && name.endsWith(".apk")
+                ApkCleanup.isAppApk(name)
             } ?: emptyArray()
 
             val count = apkFiles.count { it.delete() }
