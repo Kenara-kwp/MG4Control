@@ -168,6 +168,9 @@
     <string name="diag_copied">Copied!</string>
     <string name="diag_loading">Analysing…</string>
     <string name="diag_clear_crash">Clear crash log</string>
+    <string name="diag_download">Download</string>
+    <string name="diag_downloaded">Saved: %1$s</string>
+    <string name="diag_download_failed">Download failed: %1$s</string>
 
     <!-- Infos / About -->
     <string name="btn_check_update">Check for updates</string>
@@ -271,8 +274,13 @@
     <string name="bt_no_paired_devices">No paired devices</string>
     <!-- Audio screen (A9 only) -->
     <string name="nav_audio">Audio</string>
-    <string name="audio_loudness_title">Loudness</string>
-    <string name="audio_loudness_desc">Sound intensity boost</string>
+    <string name="door_volume_title">Door-open volume</string>
+    <string name="door_volume_desc">Lowers media volume when a front door opens</string>
+    <string name="door_volume_level_label">Target level</string>
+    <string name="door_volume_restore_title">Restore on close</string>
+    <string name="door_volume_doors_label">Trigger doors</string>
+    <string name="door_left">Left</string>
+    <string name="door_right">Right</string>
     <!-- Profile backup / restore -->
     <string name="profile_restore_title">Restore profiles?</string>
     <string name="profile_restore_msg">%d saved profile(s) were found on this vehicle. Restore them?</string>

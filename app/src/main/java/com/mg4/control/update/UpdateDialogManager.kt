@@ -168,7 +168,7 @@ object UpdateDialogManager {
         val fileName = info.apkUrl
             .substringAfterLast('/')
             .substringBefore('?')
-            .ifBlank { "MGControl${info.versionName}.apk" }
+            .ifBlank { "MG4Control-${info.versionName}.apk" }
 
         val request = DownloadManager.Request(Uri.parse(info.apkUrl)).apply {
             setTitle("MG4Control ${info.versionName}")

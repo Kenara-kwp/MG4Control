@@ -170,6 +170,9 @@
     <string name="diag_copied">Copié !</string>
     <string name="diag_loading">Analyse en cours…</string>
     <string name="diag_clear_crash">Effacer le crash</string>
+    <string name="diag_download">Télécharger</string>
+    <string name="diag_downloaded">Enregistré : %1$s</string>
+    <string name="diag_download_failed">Échec du téléchargement : %1$s</string>
 
     <!-- Infos / À propos -->
     <string name="btn_check_update">Vérifier les mises à jour</string>
@@ -273,8 +276,13 @@
     <string name="bt_no_paired_devices">Aucun appareil associé</string>
     <!-- Écran Audio (A9 uniquement) -->
     <string name="nav_audio">Audio</string>
-    <string name="audio_loudness_title">Loudness</string>
-    <string name="audio_loudness_desc">Boost d\'intensité sonore</string>
+    <string name="door_volume_title">Volume à l\'ouverture de porte</string>
+    <string name="door_volume_desc">Baisse le volume média à l\'ouverture d\'une porte avant</string>
+    <string name="door_volume_level_label">Niveau cible</string>
+    <string name="door_volume_restore_title">Restaurer à la fermeture</string>
+    <string name="door_volume_doors_label">Portes déclencheuses</string>
+    <string name="door_left">Gauche</string>
+    <string name="door_right">Droite</string>
     <!-- Sauvegarde / restauration des profils -->
     <string name="profile_restore_title">Restaurer les profils ?</string>
     <string name="profile_restore_msg">%d profil(s) sauvegardé(s) ont été trouvés sur ce véhicule. Les restaurer ?</string>

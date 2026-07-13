@@ -19,6 +19,7 @@ import android.os.Environment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -34,8 +35,10 @@ import com.mg4.control.util.QrCode
 import com.mg4.control.debug.AppLogger
 import com.mg4.control.debug.CrashLogger
 import com.mg4.control.hardware.MG4Hardware
+import com.mg4.control.update.ApkCleanup
 import com.mg4.control.update.UpdateChecker
 import com.mg4.control.update.UpdateDialogManager
+import java.io.File
 import com.mg4.control.util.FirmwareHelper
 import com.mg4.control.util.LocaleHelper
 import kotlinx.coroutines.CoroutineScope
@@ -246,7 +249,7 @@ class SettingsFragment : Fragment() {
                 Environment.DIRECTORY_DOWNLOADS
             )
             val apkFiles = downloadsDir.listFiles { _, name ->
-                name.startsWith("MGControl") && name.endsWith(".apk")
+                ApkCleanup.isAppApk(name)
             } ?: emptyArray()
 
             val count = apkFiles.count { it.delete() }
@@ -351,11 +354,16 @@ class SettingsFragment : Fragment() {
     private fun showDiagnosticDialog() {
         val ctx = requireContext()
 
+        // Sonde diagnostic : logge volume + état des portes AVANT de rendre les logs,
+        // pour que le rapport les contienne (indépendant du toggle / de l'onglet Audio).
+        MG4Hardware.runDoorVolumeDiag()
+
         val appVersion = try {
             ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?"
         } catch (e: Exception) { "?" }
 
         // ── Layout : crash banner (optionnel) + rapport matériel ──────────────
+        var btnClearCrash: Button? = null
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
@@ -387,6 +395,12 @@ class SettingsFragment : Fragment() {
                 setBackgroundColor(ctx.getColor(R.color.dash_border))
             }
             container.addView(divider)
+
+            // "Effacer crash" déplacé dans le contenu (le slot neutre sert au Télécharger)
+            btnClearCrash = Button(ctx).apply {
+                text = getString(R.string.diag_clear_crash)
+            }
+            container.addView(btnClearCrash)
         }
 
         // Section rapport matériel
@@ -429,26 +443,36 @@ class SettingsFragment : Fragment() {
             .setTitle(title)
             .setView(scrollView)
             .setPositiveButton(getString(R.string.diag_copy), null)
-            .setNeutralButton(if (crashLog != null) getString(R.string.diag_clear_crash) else null, null)
+            .setNeutralButton(getString(R.string.diag_download), null)
             .setNegativeButton(getString(R.string.nav_close), null)
             .create()
         dialog.window?.setBackgroundDrawable(ColorDrawable(ctx.getColor(R.color.dash_card)))
 
+        // Rapport court (30 dernières lignes) pour le presse-papier ; rapport complet pour le fichier.
+        fun buildReport(fullLog: Boolean) = buildString {
+            if (crashLog != null) { appendLine(crashLog); appendLine() }
+            appendLine(tvReport.text)
+            appendLine()
+            if (fullLog) {
+                val entries = AppLogger.entries
+                appendLine("─── AppLogger (${entries.size} entrées) ───")
+                entries.forEach { e -> appendLine("${e.time} [${e.level.name[0]}] ${e.tag}: ${e.msg}") }
+            } else appendLine(tvLogs.text)
+        }
+
         dialog.setOnShowListener {
             // "Copier" — copie tout sans fermer le dialog
             dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
-                val fullReport = buildString {
-                    if (crashLog != null) { appendLine(crashLog); appendLine() }
-                    appendLine(tvReport.text)
-                    appendLine()
-                    appendLine(tvLogs.text)
-                }
                 val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("MG4Control Diagnostic", fullReport))
+                cm.setPrimaryClip(ClipData.newPlainText("MG4Control Diagnostic", buildReport(false)))
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.text = getString(R.string.diag_copied)
             }
-            // "Effacer crash" — supprime le fichier et ferme le dialog
+            // "Télécharger" — écrit le rapport complet dans le dossier Download de la voiture
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener {
+                downloadDiagnostic(ctx, buildReport(true))
+            }
+            // "Effacer crash" (dans le contenu) — supprime le fichier et ferme le dialog
+            btnClearCrash?.setOnClickListener {
                 CrashLogger.clear(ctx)
                 dialog.dismiss()
             }
@@ -462,6 +486,21 @@ class SettingsFragment : Fragment() {
             withContext(Dispatchers.Main) {
                 if (isAdded) tvReport.text = report
             }
+        }
+    }
+
+    /** Écrit le rapport de diagnostic dans le dossier Download de la voiture (fichier .txt horodaté). */
+    private fun downloadDiagnostic(ctx: Context, report: String) {
+        try {
+            val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            if (!dir.exists()) dir.mkdirs()
+            val ts = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US)
+                .format(java.util.Date())
+            val file = File(dir, "MG4Control_diag_$ts.txt")
+            file.writeText(report)
+            Toast.makeText(ctx, getString(R.string.diag_downloaded, file.absolutePath), Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(ctx, getString(R.string.diag_download_failed, e.message ?: "?"), Toast.LENGTH_LONG).show()
         }
     }
 
