@@ -24,6 +24,7 @@ import com.mg4.control.util.QrCode
 import com.mg4.control.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Gère l'affichage du dialog de mise à jour.
@@ -163,6 +164,14 @@ object UpdateDialogManager {
         btnCancel: MaterialButton,
         onDownloaded: () -> Unit
     ) {
+        // Deuxième barrière : UpdateChecker a déjà filtré l'URL, on ne fait jamais
+        // confiance à une URL distante au point de la passer telle quelle au système.
+        if (!ApkUrlPolicy.isAllowedLogged(info.apkUrl, "Téléchargement")) {
+            tvStatus.setText(R.string.update_error_download)
+            btnCancel.setText(R.string.update_close)
+            return
+        }
+
         val dm = activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         // On conserve le nom d'origine du fichier tel qu'il est sur GitHub
         val fileName = info.apkUrl
@@ -208,6 +217,17 @@ object UpdateDialogManager {
                 when (status) {
                     DownloadManager.STATUS_SUCCESSFUL -> {
                         progressBar.progress = 100
+                        // L'APK est dans un dossier public : on vérifie qu'il est signé
+                        // par NOTRE clé avant d'inviter l'utilisateur à l'installer.
+                        val downloaded = File(
+                            Environment.getExternalStoragePublicDirectory(
+                                Environment.DIRECTORY_DOWNLOADS), fileName)
+                        if (!ApkSignatureVerifier.matchesRunningApp(activity, downloaded)) {
+                            downloaded.runCatching { delete() }
+                            tvStatus.setText(R.string.update_error_signature)
+                            btnCancel.setText(R.string.update_close)
+                            break
+                        }
                         // Nettoie les anciens APK dans Téléchargements (garde les 5 plus récents)
                         ApkCleanup.cleanIfNeeded()
                         // Ouvre le dossier Téléchargements dans le gestionnaire AAOS

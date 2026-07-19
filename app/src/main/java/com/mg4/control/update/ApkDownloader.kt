@@ -13,6 +13,9 @@ import java.net.URL
  */
 object ApkDownloader {
 
+    /** Plafond de taille : l'APK fait ~10 Mo, au-delà on refuse plutôt que remplir le disque. */
+    private const val MAX_APK_BYTES = 100L * 1024 * 1024
+
     suspend fun download(
         url: String,
         destFile: File,
@@ -22,13 +25,19 @@ object ApkDownloader {
             // Supprimer un éventuel fichier précédent
             if (destFile.exists()) destFile.delete()
 
-            val conn = openConnection(url)
+            if (!ApkUrlPolicy.isAllowedLogged(url, "Téléchargement")) return@withContext false
+
+            val conn = openConnection(url) ?: return@withContext false
             if (conn.responseCode != 200) {
                 conn.disconnect()
                 return@withContext false
             }
 
             val totalBytes = conn.contentLengthLong
+            if (totalBytes > MAX_APK_BYTES) {
+                conn.disconnect()
+                return@withContext false
+            }
             var downloaded = 0L
 
             conn.inputStream.use { input ->
@@ -38,6 +47,11 @@ object ApkDownloader {
                     while (input.read(buffer).also { read = it } != -1) {
                         output.write(buffer, 0, read)
                         downloaded += read
+                        // Le Content-Length est déclaratif : on coupe aussi sur les octets réels.
+                        if (downloaded > MAX_APK_BYTES) {
+                            destFile.delete()
+                            return@withContext false
+                        }
                         if (totalBytes > 0) {
                             val pct = (downloaded * 100L / totalBytes).toInt()
                             withContext(Dispatchers.Main) { onProgress(pct) }
@@ -55,18 +69,24 @@ object ApkDownloader {
         }
     }
 
-    /** Ouvre une connexion en suivant manuellement les redirections (GitHub → CDN). */
-    private fun openConnection(urlStr: String, depth: Int = 0): HttpURLConnection {
+    /**
+     * Ouvre une connexion en suivant manuellement les redirections (GitHub → CDN).
+     * Chaque saut est revalidé : sans cela un `Location:` en http suffit à faire
+     * accepter une rétrogradation https → http ou un hôte arbitraire.
+     * Renvoie null si un saut sort de la liste d'origines autorisées.
+     */
+    private fun openConnection(urlStr: String, depth: Int = 0): HttpURLConnection? {
+        if (!ApkUrlPolicy.isAllowedLogged(urlStr, "Redirection")) return null
         val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
-            instanceFollowRedirects = true
+            // Les redirections sont suivies à la main pour pouvoir contrôler chaque saut.
+            instanceFollowRedirects = false
             setRequestProperty("User-Agent", "MG4Control-Android")
             connectTimeout = 15_000
             readTimeout    = 120_000
             connect()
         }
-        // Fallback de suivi de redirect manuel (au cas où instanceFollowRedirects est ignoré)
         val code = conn.responseCode
-        if ((code == 301 || code == 302 || code == 303) && depth < 5) {
+        if ((code == 301 || code == 302 || code == 303 || code == 307 || code == 308) && depth < 5) {
             val location = conn.getHeaderField("Location") ?: return conn
             conn.disconnect()
             return openConnection(location, depth + 1)

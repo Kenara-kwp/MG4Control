@@ -212,6 +212,7 @@
     <string name="update_installing">A instalar…</string>
     <string name="update_installed">✅ Atualização instalada com sucesso!</string>
     <string name="update_error_download">Transferência falhada. Verifique a ligação.</string>
+    <string name="update_error_signature">Atualização recusada: o APK transferido não está assinado com a chave esperada. Ficheiro eliminado.</string>
     <string name="update_error_install">Instalação falhada.</string>
     <string name="update_install_error">Erro de instalação: %s</string>
     <string name="update_manual_title">Instalação manual</string>

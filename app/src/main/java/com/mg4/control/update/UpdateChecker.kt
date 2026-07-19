@@ -132,6 +132,9 @@ object UpdateChecker {
                 AppLogger.w(TAG, "GitHub : aucun asset .apk trouvé → fallback GitLab")
                 return null
             }
+            // L'URL vient d'un JSON distant : elle n'est pas de confiance tant qu'elle
+            // n'a pas été confrontée à la liste d'origines autorisées.
+            if (!ApkUrlPolicy.isAllowedLogged(apkUrl, "GitHub")) return null
             RawRelease(tagName, apkUrl, notes, "GitHub")
 
         } catch (e: Exception) {
@@ -185,6 +188,7 @@ object UpdateChecker {
                 AppLogger.w(TAG, "GitLab : aucun asset .apk trouvé dans les links")
                 return null
             }
+            if (!ApkUrlPolicy.isAllowedLogged(apkUrl, "GitLab")) return null
             RawRelease(tagName, apkUrl, notes, "GitLab")
 
         } catch (e: Exception) {

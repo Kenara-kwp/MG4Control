@@ -214,6 +214,7 @@
     <string name="update_installing">Installation en cours…</string>
     <string name="update_installed">✅ Mise à jour installée avec succès !</string>
     <string name="update_error_download">Erreur lors du téléchargement. Vérifiez la connexion.</string>
+    <string name="update_error_signature">Mise à jour refusée : la signature de l\'APK téléchargé ne correspond pas. Fichier supprimé.</string>
     <string name="update_error_install">Erreur lors de l\'installation.</string>
     <string name="update_install_error">Erreur d\'installation : %s</string>
     <string name="update_manual_title">Installation manuelle</string>
