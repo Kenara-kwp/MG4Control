@@ -17,6 +17,16 @@
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- [T-902] "com.saic.keyevent.hardkey.report" n'est pas un broadcast protégé :
+         n'importe quelle app installée peut le forger et piloter les raccourcis, donc
+         écrire mode de conduite / régen / ADAS / AEB. Le receiver exige désormais cette
+         permission côté ÉMETTEUR. En protectionLevel="signature", seule une app signée
+         avec la clé plateforme de la ROM l'obtient — c'est le cas de l'émetteur système
+         d'origine, jamais d'une app tierce. -->
+    <permission
+        android:name="com.mg4.control.permission.RECEIVE_HARDKEY"
+        android:protectionLevel="signature" />
+
     <!-- Réseau / auto-update : déclarés UNIQUEMENT dans le flavor online
          (src/online/AndroidManifest.xml). Le flavor offline n'en a aucun, par construction. -->
 
