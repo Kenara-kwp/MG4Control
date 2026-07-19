@@ -213,6 +213,8 @@
     <string name="update_installed">✅ Update installed successfully!</string>
     <string name="update_error_download">Download failed. Check your connection.</string>
     <string name="update_error_signature">Update refused: the downloaded APK is not signed by the expected key. File deleted.</string>
+    <string name="write_refused_moving">Setting refused: vehicle is moving. Stop the car to change this setting.</string>
+    <string name="write_refused_unknown_speed">Setting refused: vehicle speed could not be read.</string>
     <string name="update_error_install">Installation failed.</string>
     <string name="update_install_error">Install error: %s</string>
     <string name="update_manual_title">Manual installation</string>

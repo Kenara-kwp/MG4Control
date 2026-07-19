@@ -213,6 +213,8 @@
     <string name="update_installed">✅ ¡Actualización instalada correctamente!</string>
     <string name="update_error_download">Descarga fallida. Compruebe la conexión.</string>
     <string name="update_error_signature">Actualización rechazada: el APK descargado no está firmado con la clave esperada. Archivo eliminado.</string>
+    <string name="write_refused_moving">Ajuste rechazado: el vehículo está en movimiento. Deténgase para cambiarlo.</string>
+    <string name="write_refused_unknown_speed">Ajuste rechazado: no se puede leer la velocidad del vehículo.</string>
     <string name="update_error_install">Instalación fallida.</string>
     <string name="update_install_error">Error de instalación: %s</string>
     <string name="update_manual_title">Instalación manual</string>

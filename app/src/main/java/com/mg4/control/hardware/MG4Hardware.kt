@@ -151,6 +151,10 @@ object MG4Hardware {
     // Standard AAOS — VehicleProperty.IGNITION_STATE (compatible tous firmwares via CarPropertyManager)
     private const val PROP_IGNITION_STATE = 0x11400409
 
+    // Standard AAOS — VehicleProperty.PERF_VEHICLE_SPEED (float, m/s). Base du verrou
+    // d'écriture à 0 km/h (voir VehicleWriteGate).
+    private const val PROP_VEHICLE_SPEED = 0x11600207
+
     /** Valeurs de IGNITION_STATE (VehicleIgnitionState) — propriété AAOS standard. */
     object IgnitionState {
         const val UNDEFINED = 0
@@ -315,6 +319,22 @@ object MG4Hardware {
         if (v0 > 0) return v0
         return getIntPropertyCPM(PROP_IGNITION_STATE, AREA_GLOBAL)
     }
+
+    /**
+     * Vitesse véhicule en km/h, ou null si elle ne peut pas être lue (CPM non prêt,
+     * propriété non supportée, exception). [VehicleWriteGate] traite null comme un refus.
+     */
+    fun getVehicleSpeedKmh(): Float? {
+        val mps = getFloatPropertyCPM(PROP_VEHICLE_SPEED, AREA_GLOBAL)
+            ?: getFloatPropertyCPM(PROP_VEHICLE_SPEED, 0)
+            ?: return null
+        // PERF_VEHICLE_SPEED est signée (négative en marche arrière) : c'est la vitesse
+        // absolue qui compte pour savoir si le véhicule bouge.
+        return kotlin.math.abs(mps) * 3.6f
+    }
+
+    /** Contexte applicatif, pour les messages utilisateur du verrou d'écriture. */
+    internal fun appContext(): Context? = sAppContext
 
     interface DriveModeListener { fun onDriveModeChanged(mode: DriveMode) }
     interface HvacListener {
@@ -1207,6 +1227,8 @@ object MG4Hardware {
      * Retourne false si sVsm est null ou si une exception est levée (méthode introuvable, etc.).
      */
     private fun callVsmVoid(methodName: String, vararg args: Any?): Boolean {
+        // [T-904] Écriture véhicule : autorisée uniquement à l'arrêt, refus si vitesse illisible.
+        if (!VehicleWriteGate.allow("VSM $methodName")) return false
         val vsm = sVsm ?: return false
         return try {
             val types = args.map { if (it is Int) Int::class.javaPrimitiveType!! else it!!.javaClass }.toTypedArray()
@@ -1227,6 +1249,8 @@ object MG4Hardware {
     }
 
     private fun setIntPropertyVpm(propId: Int, value: Int): Boolean {
+        // [T-904] Écriture véhicule : autorisée uniquement à l'arrêt, refus si vitesse illisible.
+        if (!VehicleWriteGate.allow("VPM 0x${Integer.toHexString(propId)}")) return false
         val vpm = sVpm ?: return false
         return try {
             vpm.javaClass.getMethod("setIntProperty", Int::class.java, Int::class.java)
@@ -1237,6 +1261,8 @@ object MG4Hardware {
 
     /** Variante avec recovery — utilisée par vehiclesettings pour les propriétés FCW/AEB. */
     private fun setIntPropertyVpmRecovery(propId: Int, value: Int): Boolean {
+        // [T-904] Écriture véhicule : autorisée uniquement à l'arrêt, refus si vitesse illisible.
+        if (!VehicleWriteGate.allow("VPM-recovery 0x${Integer.toHexString(propId)}")) return false
         val vpm = sVpm ?: return false
         return try {
             vpm.javaClass.getMethod("setIntPropertyRecovery", Int::class.java, Int::class.java)
@@ -1431,7 +1457,22 @@ object MG4Hardware {
         }
     }
 
+    /** Lecture float via CarPropertyManager. null = illisible (à distinguer de 0). */
+    private fun getFloatPropertyCPM(propId: Int, areaId: Int): Float? {
+        val cpm = sCarPropertyManager ?: return null
+        return try {
+            cpm.javaClass
+                .getMethod("getFloatProperty", Int::class.java, Int::class.java)
+                .invoke(cpm, propId, areaId) as? Float
+        } catch (e: Exception) {
+            AppLogger.d(TAG, "  CPM getFloat 0x${Integer.toHexString(propId)} exc: ${e.message}")
+            null
+        }
+    }
+
     private fun setIntPropertyCPM(propId: Int, areaId: Int, value: Int): Boolean {
+        // [T-904] Écriture véhicule : autorisée uniquement à l'arrêt, refus si vitesse illisible.
+        if (!VehicleWriteGate.allow("CPM 0x${Integer.toHexString(propId)}")) return false
         val cpm = sCarPropertyManager ?: run {
             AppLogger.w(TAG, "  CPM setInt 0x${Integer.toHexString(propId)} — CPM not ready")
             return false
@@ -1471,6 +1512,8 @@ object MG4Hardware {
      * Parcel layout from smali: [interfaceToken, AREA_GLOBAL, 1, value, float[], byte[]]
      */
     private fun binderTransact(binder: IBinder?, descriptor: String, txCode: Int, value: Int): Boolean {
+        // [T-904] Écriture véhicule : autorisée uniquement à l'arrêt, refus si vitesse illisible.
+        if (!VehicleWriteGate.allow("binder tx=0x${Integer.toHexString(txCode)}")) return false
         if (binder == null) {
             AppLogger.w(TAG, "  Binder TX=$txCode — binder null")
             return false
@@ -1924,8 +1967,12 @@ object MG4Hardware {
         !FirmwareInfo.isVsmBased() -> {
             if (sVsm133 != null) {
                 AppLogger.i(TAG, "  ELK SET mode=$mode via VSM133")
-                callVsm133("setLaneKeepingAsstMode", mode)
-                true
+                if (!VehicleWriteGate.allow("VSM133 setLaneKeepingAsstMode")) {
+                    false
+                } else {
+                    callVsm133("setLaneKeepingAsstMode", mode)
+                    true
+                }
             } else elkBinderSet(TX_ELK_SET_MODE, mode)
         }
         FirmwareInfo.isNewGenVsm() || FirmwareInfo.getGeneration() == FirmwareInfo.Gen.SWI132 -> {
@@ -1976,8 +2023,12 @@ object MG4Hardware {
         !FirmwareInfo.isVsmBased() -> {
             if (sVsm133 != null) {
                 AppLogger.i(TAG, "  ELK SET sensitivity=$level via VSM133")
-                callVsm133("setLaneKeepingAsstSen", level)
-                true
+                if (!VehicleWriteGate.allow("VSM133 setLaneKeepingAsstSen")) {
+                    false
+                } else {
+                    callVsm133("setLaneKeepingAsstSen", level)
+                    true
+                }
             } else elkBinderSet(TX_ELK_SET_SEN, level)
         }
         FirmwareInfo.isNewGenVsm() || FirmwareInfo.getGeneration() == FirmwareInfo.Gen.SWI132 -> {
