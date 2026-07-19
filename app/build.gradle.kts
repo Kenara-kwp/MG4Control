@@ -68,6 +68,15 @@ android {
         buildConfig = true
     }
 
+    // Tests unitaires JVM (pas de véhicule, pas d'émulateur) : Robolectric a besoin des
+    // ressources Android pour instancier un Context.
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
+
     applicationVariants.all {
         val variant = this
         outputs.all {
@@ -95,4 +104,8 @@ dependencies {
     // QR code (génération dans le dialog Infos) — flavor online uniquement.
     // Le flavor offline n'embarque PAS ZXing (réduction de surface, pas de dépendance superflue).
     "onlineImplementation"("com.google.zxing:core:3.5.3")
+
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }

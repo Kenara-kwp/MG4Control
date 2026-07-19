@@ -1,6 +1,7 @@
 package com.mg4.control.update
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import com.mg4.control.debug.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -234,7 +235,8 @@ object UpdateChecker {
      * Retourne true si [remote] est une version supérieure à [current].
      * Comparaison sémantique segment par segment (ex: "2.1.3" > "2.1.2").
      */
-    private fun isNewer(remote: String, current: String): Boolean {
+    @VisibleForTesting
+    internal fun isNewer(remote: String, current: String): Boolean {
         fun segments(v: String) =
             v.trimStart('v').split(".").mapNotNull { it.toIntOrNull() }
 
@@ -252,7 +254,8 @@ object UpdateChecker {
     /**
      * Estime le nombre de versions intermédiaires entre [from] et [to].
      */
-    private fun versionHops(from: String, to: String): Int {
+    @VisibleForTesting
+    internal fun versionHops(from: String, to: String): Int {
         fun segments(v: String) =
             v.trimStart('v').split(".").mapNotNull { it.toIntOrNull() }
 
