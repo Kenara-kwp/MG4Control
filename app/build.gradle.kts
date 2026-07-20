@@ -45,7 +45,11 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // [T-909] R8 activé : shrink + obfuscation. Le code est très réflexif —
+            // proguard-rules.pro liste les cibles à conserver. Toute release DOIT passer
+            // le test manuel sur véhicule (Katman1/2/3, HVAC, ADAS/AEB/ELK, allumage, OTA)
+            // avant diffusion.
+            isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfigs.findByName("platform")?.let { signingConfig = it }
         }
