@@ -5,6 +5,8 @@
     <!-- Permissions — same as original DriveHub Dort -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- [T-910] Exigée à partir d'API 34 pour foregroundServiceType="connectedDevice". -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
@@ -52,10 +54,16 @@
             </intent-filter>
         </activity>
 
+        <!-- [T-910] foregroundServiceType est OBLIGATOIRE à partir d'API 34 : sans lui,
+             startForeground() lève MissingForegroundServiceTypeException. Sans effet sur
+             AAOS 9 (API 28), mais le déclarer maintenant évite un crash au premier bump de
+             SDK. "connectedDevice" correspond à ce que fait le service : suivre l'état du
+             véhicule et les connexions Bluetooth. -->
         <service
             android:name=".service.MG4ControlService"
             android:exported="false"
-            android:directBootAware="true" />
+            android:directBootAware="true"
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- FileProvider + InstallReceiver (auto-update) : déclarés UNIQUEMENT dans
              le flavor online (src/online/AndroidManifest.xml). Déplacer le FileProvider
