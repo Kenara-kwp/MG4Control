@@ -27,14 +27,17 @@ class ConsoleFragment : Fragment() {
         activity?.runOnUiThread { if (isAdded) renderLog() }
     }
 
+    /** Total AppLogger déjà rendu — sert à n'ajouter que les nouvelles lignes. */
+    private var renderedTotal = 0L
+
     // Auto-refresh périodique (status + logs) sans casser la position de scroll.
     private val handler = Handler(Looper.getMainLooper())
-    private var lastLogCount = -1
     private val refresh = object : Runnable {
         override fun run() {
             if (isAdded) {
                 renderStatus()
-                if (AppLogger.entries.size != lastLogCount) renderLog()
+                // totalCount et non size : la taille se fige dès que le buffer est plein.
+                if (AppLogger.totalCount != renderedTotal) renderLog()
             }
             handler.postDelayed(this, 800L)
         }
@@ -102,28 +105,42 @@ class ConsoleFragment : Fragment() {
     }
 
     private fun renderLog() {
-        // Mémorise la position AVANT de remplacer le texte : on ne re-scrolle en bas
+        // Mémorise la position AVANT de toucher au texte : on ne re-scrolle en bas
         // que si l'utilisateur suivait déjà le bas (sinon on préserve sa lecture).
         val followBottom = isAtBottom()
-        lastLogCount = AppLogger.entries.size
-        val sb = SpannableStringBuilder()
-        AppLogger.entries.forEach { entry ->
-            val prefix = "[${entry.time}] "
-            val tag    = "${entry.tag}: "
-            val msg    = "${entry.msg}\n"
-            val color  = when (entry.level) {
-                AppLogger.Level.ERROR -> Color.parseColor("#FF5555")
-                AppLogger.Level.WARN  -> Color.parseColor("#FFAA00")
-                AppLogger.Level.DEBUG -> Color.parseColor("#888888")
-                AppLogger.Level.INFO  -> Color.parseColor("#CCCCCC")
-            }
-            val start = sb.length
-            sb.append(prefix).append(tag).append(msg)
-            sb.setSpan(ForegroundColorSpan(Color.parseColor("#666666")), start, start + prefix.length, 0)
-            sb.setSpan(ForegroundColorSpan(Color.parseColor("#AAAAFF")), start + prefix.length, start + prefix.length + tag.length, 0)
-            sb.setSpan(ForegroundColorSpan(color), start + prefix.length + tag.length, sb.length, 0)
+
+        // Rendu incrémental : on n'ajoute que ce qui est arrivé depuis le dernier rendu.
+        // null = des entrées ont été évincées (ou le buffer a été vidé) → rendu complet.
+        val newEntries = AppLogger.entriesSince(renderedTotal)
+        val sb: SpannableStringBuilder
+        if (newEntries == null) {
+            sb = SpannableStringBuilder()
+            AppLogger.entries.forEach { appendEntry(sb, it) }
+        } else {
+            if (newEntries.isEmpty()) return
+            sb = SpannableStringBuilder(textLog.text)
+            newEntries.forEach { appendEntry(sb, it) }
         }
+        renderedTotal = AppLogger.totalCount
         textLog.text = sb
         if (followBottom) scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    /** Ajoute une entrée colorée en fin de [sb]. */
+    private fun appendEntry(sb: SpannableStringBuilder, entry: AppLogger.Entry) {
+        val prefix = "[${entry.time}] "
+        val tag    = "${entry.tag}: "
+        val msg    = "${entry.msg}\n"
+        val color  = when (entry.level) {
+            AppLogger.Level.ERROR -> Color.parseColor("#FF5555")
+            AppLogger.Level.WARN  -> Color.parseColor("#FFAA00")
+            AppLogger.Level.DEBUG -> Color.parseColor("#888888")
+            AppLogger.Level.INFO  -> Color.parseColor("#CCCCCC")
+        }
+        val start = sb.length
+        sb.append(prefix).append(tag).append(msg)
+        sb.setSpan(ForegroundColorSpan(Color.parseColor("#666666")), start, start + prefix.length, 0)
+        sb.setSpan(ForegroundColorSpan(Color.parseColor("#AAAAFF")), start + prefix.length, start + prefix.length + tag.length, 0)
+        sb.setSpan(ForegroundColorSpan(color), start + prefix.length + tag.length, sb.length, 0)
     }
 }
