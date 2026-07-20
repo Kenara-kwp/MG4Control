@@ -189,16 +189,6 @@
 
         </LinearLayout>
 
-        <!-- Hint : N mises à jour non installées (visible si skippedCount > 0) -->
-        <TextView
-            android:id="@+id/tv_skip_hint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/dash_warn"
-            android:textSize="10sp"
-            android:gravity="start"
-            android:layout_marginBottom="6dp"
-            android:visibility="gone" />
 
         <!-- Boutons d'action -->
         <LinearLayout

@@ -223,10 +223,6 @@
     <string name="update_downloaded_instructions">A pasta Transferências foi aberta automaticamente.\n\nToque em MG4Control-*.apk para instalar.\n\nSe a pasta não se abriu, abra o Gestor de Ficheiros e navegue até Transferências.</string>
     <string name="update_gh_releases_link">github.com/SliDeeN/MG4Control/releases</string>
     <string name="update_skip_btn">Não me lembrar mais</string>
-    <plurals name="update_skipped_hint">
-        <item quantity="one">%d atualização não instalada desde a sua versão</item>
-        <item quantity="other">%d atualizações não instaladas desde a sua versão</item>
-    </plurals>
 
     <!-- Consola (debug) -->
     <string name="console_title">⬛  Consola MG4</string>

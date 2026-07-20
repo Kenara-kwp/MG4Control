@@ -79,10 +79,9 @@ object UpdateChecker {
                         withContext(Dispatchers.Main) { onNoUpdate?.invoke() }
                         return@launch
                     }
-                    val skippedCount = versionHops(currentVersion, versionName)
                     val info = UpdateInfo(
                         versionName, release.tagName, release.apkUrl,
-                        release.releaseNotes, skippedCount
+                        release.releaseNotes
                     )
                     withContext(Dispatchers.Main) { onUpdateAvailable(info) }
                 } else {
@@ -237,13 +236,18 @@ object UpdateChecker {
 
     /**
      * Retourne true si [remote] est une version supérieure à [current].
-     * Comparaison sémantique segment par segment (ex: "2.1.3" > "2.1.2").
+     *
+     * Comparaison sur le seul cœur numérique : les suffixes de build ("2.6.4-offline",
+     * "2.7.0-rc1") sont retirés avant comparaison. L'implémentation précédente utilisait
+     * mapNotNull { toIntOrNull() }, qui SUPPRIMAIT le segment mal formé — "2.6.4-offline"
+     * donnait [2, 6], donc toute release distante paraissait plus récente. Ce n'était
+     * masqué que parce que le flavor offline n'a pas la permission INTERNET.
+     *
+     * Deux versions dont les cœurs numériques sont égaux ne sont jamais "plus récentes"
+     * l'une que l'autre : "2.7.0-offline" == "2.7.0".
      */
     @VisibleForTesting
     internal fun isNewer(remote: String, current: String): Boolean {
-        fun segments(v: String) =
-            v.trimStart('v').split(".").mapNotNull { it.toIntOrNull() }
-
         val r = segments(remote)
         val c = segments(current)
         for (i in 0 until maxOf(r.size, c.size)) {
@@ -256,17 +260,18 @@ object UpdateChecker {
     }
 
     /**
-     * Estime le nombre de versions intermédiaires entre [from] et [to].
+     * Cœur numérique d'une version : "v2.6.4-offline" → [2, 6, 4].
+     *
+     * Le préfixe "v" et tout ce qui suit le premier caractère non numérique d'un segment
+     * sont ignorés. Un segment sans aucun chiffre vaut 0 — il n'est PAS supprimé, sinon
+     * les segments suivants remonteraient d'un rang et fausseraient la comparaison.
      */
     @VisibleForTesting
-    internal fun versionHops(from: String, to: String): Int {
-        fun segments(v: String) =
-            v.trimStart('v').split(".").mapNotNull { it.toIntOrNull() }
+    internal fun segments(version: String): List<Int> =
+        version.trimStart('v', 'V')
+            .substringBefore('+')
+            .substringBefore('-')
+            .split('.')
+            .map { part -> part.takeWhile { it.isDigit() }.toIntOrNull() ?: 0 }
 
-        val f = segments(from)
-        val t = segments(to)
-        return (0 until maxOf(f.size, t.size)).sumOf { i ->
-            maxOf(0, t.getOrElse(i) { 0 } - f.getOrElse(i) { 0 })
-        }
-    }
 }

@@ -5,12 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Comparaison de versions — logique pure, aucun accès réseau ni Android.
- *
- * Les versions à suffixe ("2.6.4-beta") ne sont pas couvertes ici : leur
- * traitement actuel est incorrect et fait l'objet de T-907.
- */
+/** Comparaison de versions — logique pure, aucun accès réseau ni Android. */
 class UpdateCheckerTest {
 
     @Test
@@ -54,16 +49,37 @@ class UpdateCheckerTest {
         assertFalse(UpdateChecker.isNewer("2.7", "2.7.1"))
     }
 
+    // ── Suffixes de build (T-907) ────────────────────────────────────────────
+
     @Test
-    fun `versionHops somme les increments par segment`() {
-        assertEquals(1, UpdateChecker.versionHops("2.6.4", "2.6.5"))
-        assertEquals(3, UpdateChecker.versionHops("2.6.4", "2.7.6"))
+    fun `le suffixe de flavor est ignore`() {
+        // Le flavor offline s'appelle "2.6.4-offline". L'ancienne implémentation lisait
+        // [2, 6] et trouvait donc TOUTE release distante plus récente.
+        assertFalse(UpdateChecker.isNewer("2.6.4", "2.6.4-offline"))
+        assertFalse(UpdateChecker.isNewer("2.6.4-offline", "2.6.4"))
+        assertTrue(UpdateChecker.isNewer("2.6.5", "2.6.4-offline"))
+        assertFalse(UpdateChecker.isNewer("2.6.3", "2.6.4-offline"))
     }
 
     @Test
-    fun `versionHops ignore les regressions de segment`() {
-        // Un segment qui recule ne retire pas de sauts : 2.6.9 -> 2.7.0 = 1 saut.
-        assertEquals(1, UpdateChecker.versionHops("2.6.9", "2.7.0"))
-        assertEquals(0, UpdateChecker.versionHops("2.6.4", "2.6.4"))
+    fun `les suffixes de pre-release et de build sont ignores`() {
+        assertFalse(UpdateChecker.isNewer("2.7.0-rc1", "2.7.0"))
+        assertFalse(UpdateChecker.isNewer("2.7.0+build42", "2.7.0"))
+        assertTrue(UpdateChecker.isNewer("2.7.1-rc1", "2.7.0"))
+    }
+
+    @Test
+    fun `un segment non numerique vaut zero sans decaler les suivants`() {
+        // "2.x.5" doit valoir [2, 0, 5] — surtout pas [2, 5], qui ferait passer
+        // le patch pour un minor.
+        assertEquals(listOf(2, 0, 5), UpdateChecker.segments("2.x.5"))
+        assertFalse(UpdateChecker.isNewer("2.x.5", "2.1.0"))
+    }
+
+    @Test
+    fun `segments extrait le coeur numerique`() {
+        assertEquals(listOf(2, 6, 4), UpdateChecker.segments("v2.6.4"))
+        assertEquals(listOf(2, 6, 4), UpdateChecker.segments("2.6.4-offline"))
+        assertEquals(listOf(2, 6, 4), UpdateChecker.segments("2.6.4+build9"))
     }
 }

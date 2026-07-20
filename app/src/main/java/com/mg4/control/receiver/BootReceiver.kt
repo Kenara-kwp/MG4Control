@@ -3,8 +3,6 @@ package com.mg4.control.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Handler
-import android.os.Looper
 import com.mg4.control.debug.AppLogger
 import com.mg4.control.service.MG4ControlService
 
@@ -26,24 +24,12 @@ class BootReceiver : BroadcastReceiver() {
 
         AppLogger.i(TAG, "onReceive: $action — démarrage MG4ControlService")
 
-        val serviceIntent = Intent(context, MG4ControlService::class.java)
-
-        // Essai immédiat
-        val started = tryStart(context, serviceIntent)
+        // Pas de retry différé ici : startForegroundService revient normalement dans les
+        // cas d'échec qui comptent, donc les anciennes relances à 3 s et 8 s ne se
+        // déclenchaient jamais — et un postDelayed survivrait de toute façon à la durée
+        // de vie légitime du receiver. Le service se relance seul (START_STICKY).
+        val started = tryStart(context, Intent(context, MG4ControlService::class.java))
         AppLogger.i(TAG, "startForegroundService → $started")
-
-        // Retry à 3s et 8s au cas où le système n'est pas encore prêt
-        if (!started) {
-            val h = Handler(Looper.getMainLooper())
-            h.postDelayed({
-                val ok = tryStart(context, serviceIntent)
-                AppLogger.i(TAG, "retry 3s → $ok")
-            }, 3_000)
-            h.postDelayed({
-                val ok = tryStart(context, serviceIntent)
-                AppLogger.i(TAG, "retry 8s → $ok")
-            }, 8_000)
-        }
     }
 
     private fun tryStart(context: Context, intent: Intent): Boolean {
