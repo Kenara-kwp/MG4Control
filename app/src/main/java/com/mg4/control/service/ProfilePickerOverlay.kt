@@ -87,10 +87,9 @@ object ProfilePickerOverlay {
     ) {
         // [T-904] L'overlay ne sert qu'à appliquer un profil, donc à écrire dans le
         // véhicule : inutile et dangereux de le poser devant le conducteur en roulant.
-        // Même politique que les écritures — refus aussi si la vitesse est illisible.
-        if (VehicleWriteGate.decide(MG4Hardware.getVehicleSpeedKmh())
-                != VehicleWriteGate.Decision.ALLOWED) {
-            AppLogger.w(TAG, "Overlay non affiché : véhicule non à l'arrêt")
+        // Même politique configurable que les écritures (OFF => toujours affiché).
+        if (!VehicleWriteGate.isAllowedNow()) {
+            AppLogger.w(TAG, "Overlay non affiché : sécurité conduite active à cette vitesse")
             onAutoDismiss?.invoke()
             return
         }
