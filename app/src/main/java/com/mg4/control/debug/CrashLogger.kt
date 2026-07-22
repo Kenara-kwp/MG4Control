@@ -1,6 +1,7 @@
 package com.mg4.control.debug
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -63,16 +64,32 @@ object CrashLogger {
 
         // ── Écriture sur disque ───────────────────────────────────────────
         try {
-            val file = File(context.filesDir, CRASH_FILE)
-            // Tronque à MAX_FILE_BYTES pour ne pas saturer le stockage
-            val content = sb.toString()
-            file.writeText(
-                if (content.length > MAX_FILE_BYTES) content.takeLast(MAX_FILE_BYTES)
-                else content
-            )
+            File(context.filesDir, CRASH_FILE).writeBytes(truncate(sb.toString()))
         } catch (_: Exception) {
             // Dernier recours — on ne peut rien faire de plus ici
         }
+    }
+
+    /**
+     * Tronque le rapport à [MAX_FILE_BYTES] en gardant le DÉBUT.
+     *
+     * L'implémentation précédente gardait la fin (`takeLast`), c'est-à-dire qu'un rapport
+     * trop gros perdait exactement l'en-tête, l'exception et la stack trace — les seules
+     * lignes qui expliquent le crash. Elle comptait aussi des caractères alors que la
+     * constante parle d'octets : en UTF-8 les accents des logs comptent double.
+     */
+    @VisibleForTesting
+    internal fun truncate(content: String): ByteArray {
+        val bytes = content.toByteArray(Charsets.UTF_8)
+        if (bytes.size <= MAX_FILE_BYTES) return bytes
+
+        val marker = "\n… rapport tronqué (${bytes.size} octets) …\n".toByteArray(Charsets.UTF_8)
+        val keep = MAX_FILE_BYTES - marker.size
+        // Ne pas couper au milieu d'un caractère multi-octets : on recule jusqu'au
+        // début du caractère suivant (les octets de continuation UTF-8 valent 10xxxxxx).
+        var end = keep
+        while (end > 0 && (bytes[end].toInt() and 0xC0) == 0x80) end--
+        return bytes.copyOfRange(0, end) + marker
     }
 
     // ── Lecture (appelé depuis SettingsFragment) ──────────────────────────────

@@ -23,14 +23,6 @@
                 android:resource="@xml/file_provider_paths" />
         </provider>
 
-        <!-- Récepteur résultat d'installation silencieuse (auto-update) -->
-        <receiver
-            android:name=".update.InstallReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.mg4.control.ACTION_INSTALL_STATUS" />
-            </intent-filter>
-        </receiver>
 
     </application>
 </manifest>

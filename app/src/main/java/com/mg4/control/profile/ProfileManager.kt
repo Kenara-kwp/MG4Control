@@ -6,6 +6,7 @@ import com.google.gson.reflect.TypeToken
 import com.mg4.control.model.DrivingProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 class ProfileManager(private val context: Context) {
@@ -15,6 +16,17 @@ class ProfileManager(private val context: Context) {
         private const val KEY_PROFILES = "profiles_json"
         private const val KEY_DEFAULT_ID = "default_profile_id"
         const val MAX_PROFILES = 5
+
+        /**
+         * Verrou de processus, PAS d'instance : l'UI et le service construisent chacun leur
+         * ProfileManager sur le même fichier de préférences. Chaque mutation est un
+         * lire-modifier-écrire sur un blob JSON — sans ce verrou, deux sauvegardes
+         * simultanées en perdent une silencieusement.
+         */
+        private val MUTATION_LOCK = Any()
+
+        /** Scope unique pour les sauvegardes en arrière-plan (un seul par processus). */
+        private val backupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -39,26 +51,30 @@ class ProfileManager(private val context: Context) {
     }
 
     fun save(profile: DrivingProfile): Boolean {
-        val list = getAll().toMutableList()
-        val existing = list.indexOfFirst { it.id == profile.id }
-        if (existing >= 0) {
-            list[existing] = profile
-        } else {
-            if (list.size >= MAX_PROFILES) return false
-            list.add(profile)
+        synchronized(MUTATION_LOCK) {
+            val list = getAll().toMutableList()
+            val existing = list.indexOfFirst { it.id == profile.id }
+            if (existing >= 0) {
+                list[existing] = profile
+            } else {
+                if (list.size >= MAX_PROFILES) return false
+                list.add(profile)
+            }
+            persist(list)
         }
-        persist(list)
         triggerBackup()
         return true
     }
 
     fun delete(profileId: String) {
-        val list = getAll().toMutableList()
-        list.removeAll { it.id == profileId }
-        persist(list)
-        // Clear default if it was this profile
-        if (prefs.getString(KEY_DEFAULT_ID, null) == profileId) {
-            prefs.edit().remove(KEY_DEFAULT_ID).apply()
+        synchronized(MUTATION_LOCK) {
+            val list = getAll().toMutableList()
+            list.removeAll { it.id == profileId }
+            persist(list)
+            // Clear default if it was this profile
+            if (prefs.getString(KEY_DEFAULT_ID, null) == profileId) {
+                prefs.edit().remove(KEY_DEFAULT_ID).apply()
+            }
         }
         triggerBackup()
     }
@@ -102,12 +118,14 @@ class ProfileManager(private val context: Context) {
      */
     fun restoreFrom(backup: com.mg4.control.model.ProfileBackup): Int {
         val restored = backup.profiles.take(MAX_PROFILES)
-        persist(restored)
-        val defId = backup.defaultId
-        if (defId != null && restored.any { it.id == defId }) {
-            prefs.edit().putString(KEY_DEFAULT_ID, defId).apply()
-        } else {
-            prefs.edit().remove(KEY_DEFAULT_ID).apply()
+        synchronized(MUTATION_LOCK) {
+            persist(restored)
+            val defId = backup.defaultId
+            if (defId != null && restored.any { it.id == defId }) {
+                prefs.edit().putString(KEY_DEFAULT_ID, defId).apply()
+            } else {
+                prefs.edit().remove(KEY_DEFAULT_ID).apply()
+            }
         }
         triggerBackup()
         return restored.size
@@ -117,7 +135,7 @@ class ProfileManager(private val context: Context) {
     private fun triggerBackup() {
         val snapshot = getAll()
         val defaultId = getDefaultId()
-        CoroutineScope(Dispatchers.IO).launch {
+        backupScope.launch {
             backupManager.writeBackup(snapshot, defaultId)
         }
     }
@@ -127,6 +145,8 @@ class ProfileManager(private val context: Context) {
     // -------------------------------------------------------------------------
 
     private fun persist(list: List<DrivingProfile>) {
-        prefs.edit().putString(KEY_PROFILES, gson.toJson(list)).apply()
+        // commit() et non apply() : la mutation suivante relit immédiatement le blob,
+        // une écriture asynchrone rouvrirait la fenêtre de perte de mise à jour.
+        prefs.edit().putString(KEY_PROFILES, gson.toJson(list)).commit()
     }
 }

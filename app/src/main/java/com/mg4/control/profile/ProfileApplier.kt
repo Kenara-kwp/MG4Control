@@ -5,13 +5,37 @@ import com.mg4.control.hardware.MG4Hardware
 import com.mg4.control.hardware.MG4Hardware.Swi68Mode
 import com.mg4.control.model.DrivingProfile
 import com.mg4.control.util.FirmwareInfo
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 object ProfileApplier {
 
     private const val TAG = "MG4_PROFILE"
+
+    /**
+     * Scope unique et supervisé pour toutes les applications de profil. Remplace
+     * GlobalScope : une application qui échoue n'emporte pas les suivantes.
+     */
+    private val applierScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Sérialise les applications de profil. Bouton volant, connexion Bluetooth et passage
+     * en READY peuvent se déclencher simultanément ; sans ce verrou les écritures
+     * s'entrelacent et les séquences AEB multi-étapes (setFcwAutoBrakeMode puis
+     * setFcwState) sont coupées par le profil concurrent, laissant l'ADAS dans un état
+     * indéterminé.
+     */
+    private val applyMutex = Mutex()
+
+    /** Application en cours : annulée dès qu'une nouvelle est demandée. */
+    @Volatile
+    private var currentApply: Job? = null
 
     /**
      * Id du dernier profil appliqué MANUELLEMENT (popup volant, bouton dans l'app, raccourci
@@ -42,8 +66,20 @@ object ProfileApplier {
             AppLogger.i(TAG, "  Choix manuel mémorisé : ${profile.name} (id=${profile.id})")
         }
 
-        @Suppress("OPT_IN_USAGE")
-        GlobalScope.launch(Dispatchers.IO) {
+        val previous = currentApply
+        currentApply = applierScope.launch {
+            // Annule l'application précédente avant de prendre le verrou : la nouvelle
+            // demande fait autorité, on ne fait pas la queue derrière une séquence obsolète.
+            previous?.cancelAndJoin()
+            applyMutex.withLock { applyLocked(profile, autoStart, onComplete) }
+        }
+    }
+
+    /**
+     * Corps de l'application, exécuté sous [applyMutex] : une seule séquence d'écritures
+     * véhicule à la fois.
+     */
+    private fun applyLocked(profile: DrivingProfile, autoStart: Boolean, onComplete: ((Boolean) -> Unit)?) {
             var ok = true
 
             // Mode de conduite (rapide — binder call)
@@ -192,7 +228,6 @@ object ProfileApplier {
                     verifyAdasWithRetry(profile)
                 }
             }
-        }
     }
 
     /**

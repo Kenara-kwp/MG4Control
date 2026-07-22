@@ -11,7 +11,5 @@ data class UpdateInfo(
     /** URL de téléchargement directe du fichier .apk */
     val apkUrl: String,
     /** Corps de la release note (tronqué à 400 caractères) */
-    val releaseNotes: String,
-    /** Nombre de versions ignorées depuis la version actuellement installée */
-    val skippedCount: Int = 0
+    val releaseNotes: String
 )

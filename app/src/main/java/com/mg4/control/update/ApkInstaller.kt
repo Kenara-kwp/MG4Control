@@ -31,6 +31,12 @@ object ApkInstaller {
             return "APK manquant ou vide : ${apkFile.absolutePath}"
         }
 
+        // L'app tourne en uid.system : on n'installe que ce qui est signé par notre clé.
+        if (!ApkSignatureVerifier.matchesRunningApp(context, apkFile)) {
+            apkFile.runCatching { delete() }
+            return "Signature non conforme — APK rejeté et supprimé"
+        }
+
         // ── Stratégie 1 : pm install depuis le stockage externe ───────────────
         val extDir = context.getExternalFilesDir(null)
         if (extDir != null) {
@@ -75,7 +81,9 @@ object ApkInstaller {
             dest.runCatching { delete() }
             Log.d(TAG, "pm install [${dest.parent}] exitCode=$exitCode output=$output")
 
-            if (output.contains("Success", ignoreCase = true) || exitCode == 0) {
+            // `pm` renvoie 0 sur certains échecs : les deux conditions doivent tenir,
+            // sinon un échec est rapporté comme un succès.
+            if (output.contains("Success", ignoreCase = true) && exitCode == 0) {
                 null
             } else {
                 "exitCode=$exitCode | $output"

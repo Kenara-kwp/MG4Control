@@ -32,3 +32,8 @@ signing.properties
 # Fichiers de log
 *.log
 
+
+# mise : mise.toml est COMMITÉ (il décrit le build). Seules les surcharges
+# locales, machine-spécifiques, sont ignorées.
+mise.local.toml
+.mise.local.toml

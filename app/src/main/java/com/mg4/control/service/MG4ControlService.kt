@@ -14,6 +14,7 @@ import android.content.IntentFilter
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import androidx.core.content.ContextCompat
 import android.view.ContextThemeWrapper
 import android.view.WindowManager
 import android.widget.Toast
@@ -44,6 +45,14 @@ class MG4ControlService : Service() {
 
         // Intent action broadcast par le système SAIC pour les touches physiques
         private const val HARDKEY_ACTION   = "com.saic.keyevent.hardkey.report"
+
+        /**
+         * [T-902] Permission exigée de l'ÉMETTEUR du broadcast hardkey. Déclarée en
+         * protectionLevel="signature" dans le Manifest : seule une app signée avec la clé
+         * plateforme de la ROM l'obtient, ce qui exclut toute app tierce qui tenterait de
+         * forger l'action pour piloter les raccourcis (et donc l'état du véhicule).
+         */
+        const val HARDKEY_PERMISSION = "com.mg4.control.permission.RECEIVE_HARDKEY"
 
         // Keycodes des boutons ★ du volant
         private const val KEYCODE_BTN1     = 17    // STAR_LEFT
@@ -118,8 +127,14 @@ class MG4ControlService : Service() {
                 handleHardkeyIntent(intent)
             }
         }
-        registerReceiver(hardkeyReceiver, IntentFilter(HARDKEY_ACTION))
-        AppLogger.i(TAG, "HardkeyReceiver enregistré → $HARDKEY_ACTION")
+        // L'émetteur doit détenir HARDKEY_PERMISSION (signature) : un broadcast forgé par
+        // une app tierce n'atteint jamais le receiver. EXPORTED reste nécessaire, l'émetteur
+        // légitime étant une app système externe.
+        ContextCompat.registerReceiver(
+            this, hardkeyReceiver, IntentFilter(HARDKEY_ACTION),
+            HARDKEY_PERMISSION, null, ContextCompat.RECEIVER_EXPORTED
+        )
+        AppLogger.i(TAG, "HardkeyReceiver enregistré → $HARDKEY_ACTION (permission $HARDKEY_PERMISSION)")
     }
 
     // ── Traitement d'un event hardkey ────────────────────────────────────────
@@ -473,7 +488,11 @@ class MG4ControlService : Service() {
             addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
         }
-        registerReceiver(btAclReceiver, filter)
+        // Broadcasts système protégés (seul le système peut les émettre) : pas de permission
+        // supplémentaire à exiger, mais l'export est rendu explicite.
+        ContextCompat.registerReceiver(
+            this, btAclReceiver, filter, ContextCompat.RECEIVER_EXPORTED
+        )
         AppLogger.i(TAG, "[BT] BtAclReceiver enregistré")
     }
 
@@ -584,7 +603,12 @@ class MG4ControlService : Service() {
                 AppLogger.i(TAG, "[THEME] changeSkin reçu → nightMode=$nightMode")
             }
         }
-        registerReceiver(skinChangeReceiver, IntentFilter(ThemeHelper.ACTION_SKIN_CHANGE))
+        // Émis par le launcher SAIC (app externe) : export explicite. N'écrit rien dans le
+        // véhicule — un broadcast forgé ne peut que changer le thème de l'app.
+        ContextCompat.registerReceiver(
+            this, skinChangeReceiver, IntentFilter(ThemeHelper.ACTION_SKIN_CHANGE),
+            ContextCompat.RECEIVER_EXPORTED
+        )
         AppLogger.i(TAG, "[THEME] SkinChangeReceiver enregistré")
     }
 

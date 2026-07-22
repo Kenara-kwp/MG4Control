@@ -5,6 +5,8 @@
     <!-- Permissions — same as original DriveHub Dort -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- [T-910] Exigée à partir d'API 34 pour foregroundServiceType="connectedDevice". -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
@@ -16,6 +18,16 @@
     <!-- [BT-PROFILES] Bluetooth — lecture des appareils appairés et suivi connexions -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- [T-902] "com.saic.keyevent.hardkey.report" n'est pas un broadcast protégé :
+         n'importe quelle app installée peut le forger et piloter les raccourcis, donc
+         écrire mode de conduite / régen / ADAS / AEB. Le receiver exige désormais cette
+         permission côté ÉMETTEUR. En protectionLevel="signature", seule une app signée
+         avec la clé plateforme de la ROM l'obtient — c'est le cas de l'émetteur système
+         d'origine, jamais d'une app tierce. -->
+    <permission
+        android:name="com.mg4.control.permission.RECEIVE_HARDKEY"
+        android:protectionLevel="signature" />
 
     <!-- Réseau / auto-update : déclarés UNIQUEMENT dans le flavor online
          (src/online/AndroidManifest.xml). Le flavor offline n'en a aucun, par construction. -->
@@ -42,10 +54,16 @@
             </intent-filter>
         </activity>
 
+        <!-- [T-910] foregroundServiceType est OBLIGATOIRE à partir d'API 34 : sans lui,
+             startForeground() lève MissingForegroundServiceTypeException. Sans effet sur
+             AAOS 9 (API 28), mais le déclarer maintenant évite un crash au premier bump de
+             SDK. "connectedDevice" correspond à ce que fait le service : suivre l'état du
+             véhicule et les connexions Bluetooth. -->
         <service
             android:name=".service.MG4ControlService"
             android:exported="false"
-            android:directBootAware="true" />
+            android:directBootAware="true"
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- FileProvider + InstallReceiver (auto-update) : déclarés UNIQUEMENT dans
              le flavor online (src/online/AndroidManifest.xml). Déplacer le FileProvider

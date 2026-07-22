@@ -214,6 +214,9 @@
     <string name="update_installing">Installation en cours…</string>
     <string name="update_installed">✅ Mise à jour installée avec succès !</string>
     <string name="update_error_download">Erreur lors du téléchargement. Vérifiez la connexion.</string>
+    <string name="update_error_signature">Mise à jour refusée : la signature de l\'APK téléchargé ne correspond pas. Fichier supprimé.</string>
+    <string name="write_refused_moving">Réglage refusé : véhicule en mouvement. Arrêtez-vous pour modifier ce paramètre.</string>
+    <string name="write_refused_unknown_speed">Réglage refusé : vitesse du véhicule illisible.</string>
     <string name="update_error_install">Erreur lors de l\'installation.</string>
     <string name="update_install_error">Erreur d\'installation : %s</string>
     <string name="update_manual_title">Installation manuelle</string>
@@ -222,10 +225,6 @@
     <string name="update_downloaded_instructions">Le dossier Téléchargements vient de s\'ouvrir.\n\nAppuyez sur MG4Control-*.apk pour lancer l\'installation.\n\nSi le dossier ne s\'est pas ouvert, ouvrez le gestionnaire de fichiers et allez dans Téléchargements.</string>
     <string name="update_gh_releases_link">github.com/SliDeeN/MG4Control/releases</string>
     <string name="update_skip_btn">Ne plus me rappeler</string>
-    <plurals name="update_skipped_hint">
-        <item quantity="one">%d mise à jour non installée depuis votre version</item>
-        <item quantity="other">%d mises à jour non installées depuis votre version</item>
-    </plurals>
 
     <!-- Console (debug) -->
     <string name="console_title">⬛  Console MG4</string>

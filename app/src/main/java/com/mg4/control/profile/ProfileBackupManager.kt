@@ -6,6 +6,8 @@ import com.mg4.control.debug.AppLogger
 import com.mg4.control.model.DrivingProfile
 import com.mg4.control.model.ProfileBackup
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * Lit/écrit le fichier de sauvegarde des profils — et lui seul.
@@ -47,11 +49,20 @@ class ProfileBackupManager {
                 profiles = profiles
             )
             val json = gson.toJson(payload)
-            val tmp = File(backupDir, "$FILE_NAME.tmp")
+            // Fichier temporaire UNIQUE : deux sauvegardes concurrentes écrivaient le même
+            // ".tmp" et entrelaçaient leur contenu.
+            val tmp = File.createTempFile(FILE_NAME, ".tmp", backupDir)
             tmp.writeText(json)
-            if (backupFile.exists()) backupFile.delete()
-            val ok = tmp.renameTo(backupFile)
-            if (!ok) { tmp.copyTo(backupFile, overwrite = true); tmp.delete() }
+            // Remplacement atomique SANS delete() préalable : l'ancienne sauvegarde reste
+            // lisible jusqu'à la seconde près où la nouvelle prend sa place.
+            try {
+                Files.move(tmp.toPath(), backupFile.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: Exception) {
+                // Systèmes de fichiers sans move atomique : copie puis suppression du tmp.
+                tmp.copyTo(backupFile, overwrite = true)
+                tmp.delete()
+            }
             AppLogger.i(TAG, "writeBackup → ${profiles.size} profil(s) @ ${backupFile.absolutePath}")
             true
         } catch (e: Exception) {

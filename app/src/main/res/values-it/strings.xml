@@ -212,6 +212,9 @@
     <string name="update_installing">Installazione in corso…</string>
     <string name="update_installed">✅ Aggiornamento installato con successo!</string>
     <string name="update_error_download">Download fallito. Controlla la connessione.</string>
+    <string name="update_error_signature">Aggiornamento rifiutato: l\'APK scaricato non è firmato con la chiave attesa. File eliminato.</string>
+    <string name="write_refused_moving">Impostazione rifiutata: veicolo in movimento. Fermarsi per modificarla.</string>
+    <string name="write_refused_unknown_speed">Impostazione rifiutata: velocità del veicolo non leggibile.</string>
     <string name="update_error_install">Installazione fallita.</string>
     <string name="update_install_error">Errore di installazione: %s</string>
     <string name="update_manual_title">Installazione manuale</string>
@@ -220,10 +223,6 @@
     <string name="update_downloaded_instructions">La cartella Download è stata aperta automaticamente.\n\nTocca MG4Control-*.apk per installare.\n\nSe la cartella non si è aperta, apri il Gestore file e vai in Download.</string>
     <string name="update_gh_releases_link">github.com/SliDeeN/MG4Control/releases</string>
     <string name="update_skip_btn">Non ricordarmi più</string>
-    <plurals name="update_skipped_hint">
-        <item quantity="one">%d aggiornamento non installato dalla tua versione</item>
-        <item quantity="other">%d aggiornamenti non installati dalla tua versione</item>
-    </plurals>
 
     <!-- Console (debug) -->
     <string name="console_title">⬛  Console MG4</string>

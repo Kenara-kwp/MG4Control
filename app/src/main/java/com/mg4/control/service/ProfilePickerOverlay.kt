@@ -13,6 +13,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
+import com.mg4.control.hardware.VehicleWriteGate
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.google.android.material.button.MaterialButton
@@ -84,6 +85,16 @@ object ProfilePickerOverlay {
         profiles: List<DrivingProfile>?,
         onAutoDismiss: (() -> Unit)?
     ) {
+        // [T-904] L'overlay ne sert qu'à appliquer un profil, donc à écrire dans le
+        // véhicule : inutile et dangereux de le poser devant le conducteur en roulant.
+        // Même politique que les écritures — refus aussi si la vitesse est illisible.
+        if (VehicleWriteGate.decide(MG4Hardware.getVehicleSpeedKmh())
+                != VehicleWriteGate.Decision.ALLOWED) {
+            AppLogger.w(TAG, "Overlay non affiché : véhicule non à l'arrêt")
+            onAutoDismiss?.invoke()
+            return
+        }
+
         // Si déjà affiché → on remplace (sans déclencher l'ancien onAutoDismiss)
         dismissOnMainThread(context, fireAutoDismiss = false)
 

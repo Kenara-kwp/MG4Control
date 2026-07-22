@@ -24,6 +24,7 @@ import com.mg4.control.util.QrCode
 import com.mg4.control.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Gère l'affichage du dialog de mise à jour.
@@ -55,7 +56,6 @@ object UpdateDialogManager {
         val tvFrom       = view.findViewById<TextView>(R.id.tv_version_from)
         val tvTo         = view.findViewById<TextView>(R.id.tv_version_to)
         val tvNotes      = view.findViewById<TextView>(R.id.tv_release_notes)
-        val tvSkipHint   = view.findViewById<TextView>(R.id.tv_skip_hint)
         val rowDataWarn  = view.findViewById<View>(R.id.row_data_warning)
         val btnAuto      = view.findViewById<MaterialButton>(R.id.btn_update_auto)
         val btnManual    = view.findViewById<MaterialButton>(R.id.btn_update_manual)
@@ -86,12 +86,6 @@ object UpdateDialogManager {
         val onWifi = isOnWifi(activity)
         rowDataWarn.visibility = if (onWifi) View.GONE else View.VISIBLE
 
-        // ── Hint : N mises à jour non installées ─────────────────────────────
-        if (info.skippedCount > 0) {
-            tvSkipHint.text = activity.resources.getQuantityString(
-                R.plurals.update_skipped_hint, info.skippedCount, info.skippedCount)
-            tvSkipHint.visibility = View.VISIBLE
-        }
 
         // ── Bouton NE PLUS ME RAPPELER ───────────────────────────────────────
         btnSkip.setOnClickListener {
@@ -163,6 +157,14 @@ object UpdateDialogManager {
         btnCancel: MaterialButton,
         onDownloaded: () -> Unit
     ) {
+        // Deuxième barrière : UpdateChecker a déjà filtré l'URL, on ne fait jamais
+        // confiance à une URL distante au point de la passer telle quelle au système.
+        if (!ApkUrlPolicy.isAllowedLogged(info.apkUrl, "Téléchargement")) {
+            tvStatus.setText(R.string.update_error_download)
+            btnCancel.setText(R.string.update_close)
+            return
+        }
+
         val dm = activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         // On conserve le nom d'origine du fichier tel qu'il est sur GitHub
         val fileName = info.apkUrl
@@ -208,6 +210,17 @@ object UpdateDialogManager {
                 when (status) {
                     DownloadManager.STATUS_SUCCESSFUL -> {
                         progressBar.progress = 100
+                        // L'APK est dans un dossier public : on vérifie qu'il est signé
+                        // par NOTRE clé avant d'inviter l'utilisateur à l'installer.
+                        val downloaded = File(
+                            Environment.getExternalStoragePublicDirectory(
+                                Environment.DIRECTORY_DOWNLOADS), fileName)
+                        if (!ApkSignatureVerifier.matchesRunningApp(activity, downloaded)) {
+                            downloaded.runCatching { delete() }
+                            tvStatus.setText(R.string.update_error_signature)
+                            btnCancel.setText(R.string.update_close)
+                            break
+                        }
                         // Nettoie les anciens APK dans Téléchargements (garde les 5 plus récents)
                         ApkCleanup.cleanIfNeeded()
                         // Ouvre le dossier Téléchargements dans le gestionnaire AAOS

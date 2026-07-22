@@ -212,6 +212,9 @@
     <string name="update_installing">Installieren…</string>
     <string name="update_installed">✅ Update erfolgreich installiert!</string>
     <string name="update_error_download">Download fehlgeschlagen. Verbindung prüfen.</string>
+    <string name="update_error_signature">Update abgelehnt: Die heruntergeladene APK ist nicht mit dem erwarteten Schlüssel signiert. Datei gelöscht.</string>
+    <string name="write_refused_moving">Einstellung abgelehnt: Fahrzeug fährt. Zum Ändern bitte anhalten.</string>
+    <string name="write_refused_unknown_speed">Einstellung abgelehnt: Fahrzeuggeschwindigkeit nicht lesbar.</string>
     <string name="update_error_install">Installation fehlgeschlagen.</string>
     <string name="update_install_error">Installationsfehler: %s</string>
     <string name="update_manual_title">Manuelle Installation</string>
@@ -220,10 +223,6 @@
     <string name="update_downloaded_instructions">Der Download-Ordner wurde automatisch geöffnet.\n\nTippen Sie auf MG4Control-*.apk, um die Installation zu starten.\n\nFalls der Ordner nicht geöffnet wurde, öffnen Sie den Dateimanager und navigieren Sie zu Downloads.</string>
     <string name="update_gh_releases_link">github.com/SliDeeN/MG4Control/releases</string>
     <string name="update_skip_btn">Nicht mehr erinnern</string>
-    <plurals name="update_skipped_hint">
-        <item quantity="one">%d Update seit Ihrer Version nicht installiert</item>
-        <item quantity="other">%d Updates seit Ihrer Version nicht installiert</item>
-    </plurals>
 
     <!-- Konsole (Debug) -->
     <string name="console_title">⬛  MG4 Konsole</string>
