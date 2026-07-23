@@ -3439,6 +3439,17 @@ object MG4Hardware {
         }
     }
 
+    /**
+     * Température extérieure en °C, ou null si illisible. Voie OEM (`getOutCarTemp`) puis
+     * repli CPM (`HVAC_TEMPERATURE_OUTCAR` @ zone 0x75, validé sur SWI133). Sentinelle SAIC
+     * (-10000) et NaN => null. Lecture seule.
+     */
+    fun getOutsideTempCelsius(): Float? {
+        acFloat("getOutCarTemp")?.let { if (!it.isNaN() && it > -1000f) return it }
+        getFloatPropertyCPM(PROP_HVAC_TEMP_OUTCAR, AREA_HVAC)?.let { if (!it.isNaN() && it > -1000f) return it }
+        return null
+    }
+
     /** Connexion (async) à l'API Car AOSP → CarPropertyManager ("property") ET CarDoorLockManager
      *  ("doorlock"). Selon le firmware, la porte est exposée par l'un ou l'autre → on lit via les deux. */
     private fun connectCarProperty() {

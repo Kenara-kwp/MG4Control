@@ -291,4 +291,16 @@
     <string name="profile_restore_msg">%d profil(s) sauvegardé(s) ont été trouvés sur ce véhicule. Les restaurer ?</string>
     <string name="profile_restore_confirm">Restaurer</string>
     <string name="profile_restore_cancel">Ignorer</string>
-    <string name="profile_restore_done">%d profil(s) restauré(s)</string></resources>
+    <string name="profile_restore_done">%d profil(s) restauré(s)</string>
+    <string name="nav_automation">Automatisation</string>
+    <string name="automation_desc">Appliquer un profil selon la température extérieure</string>
+    <string name="automation_threshold_label">Température seuil (°C)</string>
+    <string name="automation_threshold_hint">0–60</string>
+    <string name="automation_profile_label">Profil à appliquer</string>
+    <string name="automation_auto_execute">Exécuter automatiquement</string>
+    <string name="automation_no_profile">Aucun profil</string>
+    <string name="automation_confirm_title">Automatisation température</string>
+    <string name="automation_confirm_msg">La température extérieure est en dessous de %1$d°C\n(%2$s°C température actuelle)\nVoulez-vous appliquer le profil « %3$s » ?</string>
+    <string name="automation_confirm_yes">OUI</string>
+    <string name="automation_confirm_no">NON</string>
+</resources>

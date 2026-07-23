@@ -20,6 +20,8 @@ import android.view.WindowManager
 import android.widget.Toast
 import com.mg4.control.util.LocaleHelper
 import com.mg4.control.R
+import com.mg4.control.automation.AutomationDecision
+import com.mg4.control.automation.AutomationSettings
 import com.mg4.control.bluetooth.BluetoothProfileManager
 import com.mg4.control.debug.AppLogger
 import com.mg4.control.hardware.MG4Hardware
@@ -344,6 +346,12 @@ class MG4ControlService : Service() {
             return
         }
 
+        // Automatisation température (précédence : après choix manuel, avant BT/défaut).
+        tryTemperatureAutomation(onFallback = { resolveBtOrDefaultOnSchedule() })
+    }
+
+    /** Résolution BT (+ fallback HFP) → défaut au démarrage service (corps historique, inchangé). */
+    private fun resolveBtOrDefaultOnSchedule() {
         val pm = ProfileManager(applicationContext)
 
         // [BT-PROFILES] Cherche tous les profils BT parmi les appareils déjà connus en mémoire
@@ -497,6 +505,46 @@ class MG4ControlService : Service() {
     }
 
     /**
+     * Automatisation température — précédence : après choix manuel, avant BT/défaut.
+     * Non applicable (désactivée / temp illisible / < seuil / profil absent) => [onFallback].
+     * Applicable => application directe (case cochée) ou popup de confirmation
+     * (NON/timeout => [onFallback]).
+     */
+    private fun tryTemperatureAutomation(onFallback: () -> Unit) {
+        val ctx = applicationContext
+        val cfg = AutomationSettings.read(ctx)
+        if (!cfg.enabled) { onFallback(); return }
+        val profile = cfg.profileId.takeIf { it.isNotEmpty() }?.let { ProfileManager(ctx).getById(it) }
+
+        MG4Hardware.whenKatman1Ready {
+            val temp = MG4Hardware.getOutsideTempCelsius()
+            val outcome = AutomationDecision.evaluate(cfg.enabled, temp, cfg.threshold, profile != null)
+            if (outcome != AutomationDecision.Outcome.APPLY || profile == null || temp == null) {
+                AppLogger.i(TAG, "Auto temp: non applicable (temp=$temp seuil=${cfg.threshold} profil=${profile?.name}) → fallback")
+                onFallback(); return@whenKatman1Ready
+            }
+            if (cfg.autoExecute) {
+                AppLogger.i(TAG, "Auto temp → application directe '${profile.name}' (temp=$temp ≤ ${cfg.threshold})")
+                ProfileApplier.apply(profile, autoStart = true) { ok -> AppLogger.i(TAG, "Auto temp appliqué — ok=$ok") }
+            } else {
+                AppLogger.i(TAG, "Auto temp → popup confirmation '${profile.name}'")
+                ProfileConfirmOverlay.show(
+                    context     = ctx,
+                    profile     = profile,
+                    threshold   = cfg.threshold,
+                    currentTemp = temp,
+                    onConfirmed = {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            ProfileApplier.apply(profile, autoStart = true) { ok -> AppLogger.i(TAG, "Auto temp OUI '${profile.name}' — ok=$ok") }
+                        }
+                    },
+                    onDeclined  = { onFallback() }
+                )
+            }
+        }
+    }
+
+    /**
      * Applique le profil approprié suite à un événement IGNITION_STATE=RUN.
      * Priorité : choix manuel récent (popup/app) → profil BT associé → profil par défaut.
      */
@@ -529,6 +577,13 @@ class MG4ControlService : Service() {
             }
         }
 
+        // Automatisation température (précédence : après choix manuel, avant BT/défaut).
+        tryTemperatureAutomation(onFallback = { resolveBtOrDefaultOnIgnition() })
+    }
+
+    /** Résolution BT → défaut au passage RUN (corps historique, inchangé). */
+    private fun resolveBtOrDefaultOnIgnition() {
+        val pm = ProfileManager(applicationContext)
         // [BT-PROFILES] Cherche tous les profils BT parmi les appareils connectés
         val btProfiles = BluetoothProfileManager.getConnectedMacs()
             .mapNotNull { mac -> pm.getProfileForBtDevice(mac) }
