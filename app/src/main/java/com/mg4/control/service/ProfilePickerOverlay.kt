@@ -2,6 +2,7 @@ package com.mg4.control.service
 
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.PixelFormat
 import android.os.Handler
@@ -18,6 +19,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.slider.Slider
+import com.mg4.control.MainActivity
 import com.mg4.control.R
 import com.mg4.control.debug.AppLogger
 import com.mg4.control.hardware.MG4Hardware
@@ -189,6 +191,18 @@ object ProfilePickerOverlay {
                 dismissOnMainThread(context)              // ferme le popup profils
                 showVehiclePowerOffConfirm(context)       // P-check + confirmation
             }
+        }
+
+        // ── Bouton « Ouvrir MG4Control » (bas droite, toujours visible) ────
+        view.findViewById<MaterialButton>(R.id.overlay_btn_open_app)?.setOnClickListener {
+            AppLogger.i(TAG, "Ouverture de MG4Control depuis l'overlay")
+            runCatching {
+                context.startActivity(
+                    Intent(context, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }.onFailure { AppLogger.w(TAG, "Lancement MainActivity échoué : ${it.message}") }
+            dismissOnMainThread(context)
         }
 
         // ── Tap sur le fond → fermeture ───────────────────────────────────

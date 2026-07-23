@@ -43,6 +43,7 @@
     <string name="overlay_brightness_mid">Medio</string>
     <string name="overlay_brightness_day">Giorno</string>
 <string name="overlay_profile_title">Profili di guida</string>
+    <string name="overlay_open_app">Apri MG4Control</string>
     <string name="overlay_countdown">Chiusura tra %1$ds</string>
     <string name="shortcuts_profile_prefix">Avvia profilo</string>
     <string name="shortcuts_pick_profile_title">Scegli un profilo</string>
