@@ -366,6 +366,8 @@ object MG4Hardware {
             initKatman5Swi69(context)
         else
             initKatman5(context)
+        // Température (sonde Diagnostic) — bind async du service clim SAIC ; no-op si absent.
+        initAirCondition(context)
         if (sVehicleBinder != null)
             AppLogger.i(TAG, "  ✓ Katman2: vehiclesetting binder OK")
         else
@@ -3325,6 +3327,116 @@ object MG4Hardware {
         AppLogger.i(DOORWATCH_TAG, "DIAG souscription: property=$sDoorSubProperty doorlock=$sDoorSubDoorlock état=" +
             if (sDoorReadLast.isEmpty()) "(aucun event reçu)"
             else sDoorReadLast.entries.joinToString { "0x${it.key.toString(16)}=${it.value}" })
+    }
+
+    // ── Sonde température (bouton Diagnostic) ─────────────────────────────────
+    private const val TEMP_TAG = "MG4_TEMP"
+    // Source RÉELLE de la temp (décompilé SystemUI SWI133) : service clim SAIC, PAS une propriété CPM.
+    private const val AIRCON_CLASS = "com.saicmotor.sdk.vehiclesettings.manager.AirConditionManager"
+    @Volatile private var sAirCondition: Any? = null
+
+    // Voie CPM (secondaire). ⚠ SAIC a INVERSÉ current/set (0x…502/503) par rapport à l'AAOS.
+    private const val PROP_ENV_OUTSIDE_TEMP  = 0x11600703  // ENV_OUTSIDE_TEMPERATURE (AAOS std — renvoie 0 ici)
+    private const val PROP_HVAC_TEMP_OUTCAR  = 0x15602511  // HVAC_TEMPERATURE_OUTCAR (vendor SAIC = temp extérieure)
+    private const val PROP_HVAC_AMBIENT_TEMP = 0x1560252a  // HVAC_AMBIENT_TEMPERATURE (vendor SAIC)
+    private const val PROP_HVAC_TEMP_CURRENT = 0x15600502  // HVAC_TEMPERATURE_CURRENT (SAIC — inversé vs AAOS)
+    private val TEMP_HVAC_AREAS = intArrayOf(0x1, 0x2, 0x4, AREA_HVAC, AREA_GLOBAL, 0)
+
+    private fun fmtTemp(v: Float?): String = when {
+        v == null || v.isNaN() -> "illisible"
+        v <= -1000f            -> "n/c(${"%.0f".format(v)})"   // sentinelle SAIC -10000 = service non connecté
+        else                   -> "%.1f".format(v)
+    }
+
+    /** Lit un getter float sans argument sur le manager clim SAIC (réflexion). */
+    private fun acFloat(name: String): Float? {
+        val ac = sAirCondition ?: return null
+        return try { ac.javaClass.getMethod(name).invoke(ac) as? Float } catch (_: Exception) { null }
+    }
+    /** Lit un getter int sans argument sur le manager clim SAIC (réflexion). */
+    private fun acInt(name: String): Int? {
+        val ac = sAirCondition ?: return null
+        return try { ac.javaClass.getMethod(name).invoke(ac) as? Int } catch (_: Exception) { null }
+    }
+
+    /**
+     * Bind (async) au service clim SAIC — `AirConditionManager`, même SDK que VehicleConditionManager
+     * (Katman5). C'est la VRAIE source de la temp extérieure (`getOutCarTemp`), pas une propriété CPM.
+     * No-op silencieux si le SDK est absent (ex. A9, autre package). Idempotent.
+     */
+    private fun initAirCondition(context: Context) {
+        if (sAirCondition != null) return
+        val launcherCtx = listOf(LAUNCHER68_PKG, LAUNCHER69_PKG).firstNotNullOfOrNull { pkg ->
+            try {
+                context.createPackageContext(
+                    pkg,
+                    android.content.Context.CONTEXT_INCLUDE_CODE or android.content.Context.CONTEXT_IGNORE_SECURITY
+                )
+            } catch (_: Exception) { null }
+        } ?: return
+
+        val acClass = try {
+            launcherCtx.classLoader.loadClass(AIRCON_CLASS)
+        } catch (e: Exception) {
+            AppLogger.d(TEMP_TAG, "AirConditionManager absent: ${e.message}")
+            return
+        }
+        fun singleton(): Any? = try { acClass.getMethod("getInstance").invoke(null) } catch (_: Exception) { null }
+
+        val initMethod = acClass.methods.firstOrNull { m ->
+            m.name == "init" && m.parameterCount == 2 &&
+            Context::class.java.isAssignableFrom(m.parameterTypes[0])
+        }
+        if (initMethod != null) {
+            val listenerType = initMethod.parameterTypes[1]
+            val listenerArg: Any? = if (listenerType.isInterface) try {
+                java.lang.reflect.Proxy.newProxyInstance(
+                    listenerType.classLoader, arrayOf(listenerType)
+                ) { _, method, _ ->
+                    if (method.name == "onServiceConnected") {
+                        AppLogger.i(TEMP_TAG, "AirCondition: onServiceConnected ✓")
+                        sAirCondition = singleton()
+                    }
+                    null
+                }
+            } catch (_: Exception) { null } else null
+            try {
+                initMethod.invoke(null, context.applicationContext, listenerArg)
+                AppLogger.i(TEMP_TAG, "AirCondition.init() appelé")
+            } catch (e: Exception) {
+                AppLogger.w(TEMP_TAG, "AirCondition.init() erreur: ${e.message}")
+            }
+        }
+        // Handle immédiat ; la valeur sera valide dès que le service est connecté (async).
+        if (sAirCondition == null) sAirCondition = singleton()
+    }
+
+    /**
+     * Sonde du bouton Diagnostic (lecture seule). Voie principale = service clim SAIC
+     * (`getOutCarTemp`, ce que fait l'OEM). Voie CPM = secondaire, teste les IDs vendor.
+     */
+    fun runTemperatureDiag() {
+        AppLogger.i(TEMP_TAG, "── DIAG température ──")
+        sAppContext?.let { initAirCondition(it) }   // au cas où l'init au démarrage n'a pas abouti
+
+        // Voie OEM (la bonne).
+        if (sAirCondition == null) {
+            AppLogger.i(TEMP_TAG, "AirConditionManager indisponible (SDK non chargé) — voir voie CPM")
+        } else {
+            AppLogger.i(TEMP_TAG, "OEM getOutCarTemp=${fmtTemp(acFloat("getOutCarTemp"))} " +
+                "drvSet=${acInt("getDrvTemp") ?: "?"} psgSet=${acInt("getPsgTemp") ?: "?"}")
+        }
+
+        // Voie CPM secondaire : IDs vendor SAIC (au cas où certains soient lisibles en direct).
+        AppLogger.i(TEMP_TAG, "CPM EXTstd(0x11600703)=${fmtTemp(getFloatPropertyCPM(PROP_ENV_OUTSIDE_TEMP, AREA_GLOBAL))} " +
+            "OUTCAR(0x15602511)=${fmtTemp(getFloatPropertyCPM(PROP_HVAC_TEMP_OUTCAR, AREA_GLOBAL))} " +
+            "AMBIENT(0x1560252a)=${fmtTemp(getFloatPropertyCPM(PROP_HVAC_AMBIENT_TEMP, AREA_GLOBAL))}")
+        for (area in TEMP_HVAC_AREAS) {
+            val a = "0x${Integer.toHexString(area)}"
+            AppLogger.i(TEMP_TAG, "CPM area=$a OUTCAR=${fmtTemp(getFloatPropertyCPM(PROP_HVAC_TEMP_OUTCAR, area))} " +
+                "AMBIENT=${fmtTemp(getFloatPropertyCPM(PROP_HVAC_AMBIENT_TEMP, area))} " +
+                "CURRENT=${fmtTemp(getFloatPropertyCPM(PROP_HVAC_TEMP_CURRENT, area))}")
+        }
     }
 
     /** Connexion (async) à l'API Car AOSP → CarPropertyManager ("property") ET CarDoorLockManager

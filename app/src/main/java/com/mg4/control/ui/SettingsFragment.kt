@@ -391,6 +391,8 @@ class SettingsFragment : Fragment() {
         // Sonde diagnostic : logge volume + état des portes AVANT de rendre les logs,
         // pour que le rapport les contienne (indépendant du toggle / de l'onglet Audio).
         MG4Hardware.runDoorVolumeDiag()
+        // Sonde température : tente de lire temp extérieure + habitacle et logge le brut.
+        MG4Hardware.runTemperatureDiag()
 
         val appVersion = try {
             ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?"
