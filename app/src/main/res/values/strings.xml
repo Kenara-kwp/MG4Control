@@ -43,6 +43,7 @@
     <string name="overlay_brightness_mid">Moyen</string>
     <string name="overlay_brightness_day">Jour</string>
 <string name="overlay_profile_title">Profils de conduite</string>
+    <string name="overlay_open_app">Ouvrir MG4Control</string>
     <string name="overlay_countdown">Fermeture dans %1$ds</string>
     <string name="shortcuts_profile_prefix">Lancer le profil</string>
     <string name="shortcuts_pick_profile_title">Choisir un profil</string>
@@ -215,8 +216,11 @@
     <string name="update_installed">✅ Mise à jour installée avec succès !</string>
     <string name="update_error_download">Erreur lors du téléchargement. Vérifiez la connexion.</string>
     <string name="update_error_signature">Mise à jour refusée : la signature de l\'APK téléchargé ne correspond pas. Fichier supprimé.</string>
-    <string name="write_refused_moving">Réglage refusé : véhicule en mouvement. Arrêtez-vous pour modifier ce paramètre.</string>
+    <string name="write_refused_moving">Réglage de conduite refusé au-dessus de %1$d km/h. Ralentissez pour modifier.</string>
     <string name="write_refused_unknown_speed">Réglage refusé : vitesse du véhicule illisible.</string>
+    <string name="settings_speed_gate_desc">Bloquer les réglages de conduite au-delà d\'une vitesse</string>
+    <string name="settings_speed_gate_max_label">Vitesse maximale (km/h)</string>
+    <string name="settings_speed_gate_max_hint">0–250</string>
     <string name="update_error_install">Erreur lors de l\'installation.</string>
     <string name="update_install_error">Erreur d\'installation : %s</string>
     <string name="update_manual_title">Installation manuelle</string>
@@ -287,4 +291,16 @@
     <string name="profile_restore_msg">%d profil(s) sauvegardé(s) ont été trouvés sur ce véhicule. Les restaurer ?</string>
     <string name="profile_restore_confirm">Restaurer</string>
     <string name="profile_restore_cancel">Ignorer</string>
-    <string name="profile_restore_done">%d profil(s) restauré(s)</string></resources>
+    <string name="profile_restore_done">%d profil(s) restauré(s)</string>
+    <string name="nav_automation">Automatisation</string>
+    <string name="automation_desc">Appliquer un profil selon la température extérieure</string>
+    <string name="automation_threshold_label">Température seuil (°C)</string>
+    <string name="automation_threshold_hint">0–60</string>
+    <string name="automation_profile_label">Profil à appliquer</string>
+    <string name="automation_auto_execute">Exécuter automatiquement</string>
+    <string name="automation_no_profile">Aucun profil</string>
+    <string name="automation_confirm_title">Automatisation température</string>
+    <string name="automation_confirm_msg">La température extérieure est en dessous de %1$d°C\n(%2$s°C température actuelle)\nVoulez-vous appliquer le profil « %3$s » ?</string>
+    <string name="automation_confirm_yes">OUI</string>
+    <string name="automation_confirm_no">NON</string>
+</resources>

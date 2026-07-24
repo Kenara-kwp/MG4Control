@@ -43,6 +43,7 @@
     <string name="overlay_brightness_mid">Medio</string>
     <string name="overlay_brightness_day">Día</string>
 <string name="overlay_profile_title">Perfiles de conducción</string>
+    <string name="overlay_open_app">Abrir MG4Control</string>
     <string name="overlay_countdown">Cierre en %1$ds</string>
     <string name="shortcuts_profile_prefix">Iniciar perfil</string>
     <string name="shortcuts_pick_profile_title">Elegir un perfil</string>
@@ -213,8 +214,11 @@
     <string name="update_installed">✅ ¡Actualización instalada correctamente!</string>
     <string name="update_error_download">Descarga fallida. Compruebe la conexión.</string>
     <string name="update_error_signature">Actualización rechazada: el APK descargado no está firmado con la clave esperada. Archivo eliminado.</string>
-    <string name="write_refused_moving">Ajuste rechazado: el vehículo está en movimiento. Deténgase para cambiarlo.</string>
+    <string name="write_refused_moving">Ajuste de conducción rechazado por encima de %1$d km/h. Reduzca la velocidad para cambiarlo.</string>
     <string name="write_refused_unknown_speed">Ajuste rechazado: no se puede leer la velocidad del vehículo.</string>
+    <string name="settings_speed_gate_desc">Bloquear los ajustes de conducción por encima de una velocidad</string>
+    <string name="settings_speed_gate_max_label">Velocidad máxima (km/h)</string>
+    <string name="settings_speed_gate_max_hint">0–250</string>
     <string name="update_error_install">Instalación fallida.</string>
     <string name="update_install_error">Error de instalación: %s</string>
     <string name="update_manual_title">Instalación manual</string>
@@ -285,4 +289,16 @@
     <string name="profile_restore_msg">Se encontraron %d perfil(es) guardado(s) en este vehículo. ¿Restaurarlos?</string>
     <string name="profile_restore_confirm">Restaurar</string>
     <string name="profile_restore_cancel">Ignorar</string>
-    <string name="profile_restore_done">%d perfil(es) restaurado(s)</string></resources>
+    <string name="profile_restore_done">%d perfil(es) restaurado(s)</string>
+    <string name="nav_automation">Automatización</string>
+    <string name="automation_desc">Aplicar un perfil según la temperatura exterior</string>
+    <string name="automation_threshold_label">Temperatura umbral (°C)</string>
+    <string name="automation_threshold_hint">0–60</string>
+    <string name="automation_profile_label">Perfil a aplicar</string>
+    <string name="automation_auto_execute">Aplicar automáticamente</string>
+    <string name="automation_no_profile">Ningún perfil</string>
+    <string name="automation_confirm_title">Automatización por temperatura</string>
+    <string name="automation_confirm_msg">La temperatura exterior está por debajo de %1$d°C\n(%2$s°C temperatura actual)\n¿Aplicar el perfil «%3$s»?</string>
+    <string name="automation_confirm_yes">SÍ</string>
+    <string name="automation_confirm_no">NO</string>
+</resources>

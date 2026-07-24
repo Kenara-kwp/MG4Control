@@ -441,6 +441,70 @@
 
                 </LinearLayout>
 
+                <!-- ── Sécurité conduite : verrou d'écriture par vitesse ─────── -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/dash_border" />
+
+                <LinearLayout
+                    android:id="@+id/row_speed_gate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/settings_speed_gate_desc"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <Switch
+                        android:id="@+id/switch_speed_gate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="false" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/row_speed_gate_max"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="12dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/settings_speed_gate_max_label"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/input_speed_gate_max"
+                        android:layout_width="72dp"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:maxLength="3"
+                        android:gravity="end"
+                        android:hint="@string/settings_speed_gate_max_hint"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:imeOptions="actionDone" />
+
+                </LinearLayout>
+
             </LinearLayout>
 
             <!-- ── Boutons MAJ (2 colonnes : Vérifier | Nettoyer) ──────────── -->

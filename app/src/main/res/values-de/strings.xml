@@ -43,6 +43,7 @@
     <string name="overlay_brightness_mid">Mittel</string>
     <string name="overlay_brightness_day">Tag</string>
 <string name="overlay_profile_title">Fahrprofile</string>
+    <string name="overlay_open_app">MG4Control öffnen</string>
     <string name="overlay_countdown">Schließt in %1$ds</string>
     <string name="shortcuts_profile_prefix">Profil starten:</string>
     <string name="shortcuts_pick_profile_title">Profil auswählen</string>
@@ -213,8 +214,11 @@
     <string name="update_installed">✅ Update erfolgreich installiert!</string>
     <string name="update_error_download">Download fehlgeschlagen. Verbindung prüfen.</string>
     <string name="update_error_signature">Update abgelehnt: Die heruntergeladene APK ist nicht mit dem erwarteten Schlüssel signiert. Datei gelöscht.</string>
-    <string name="write_refused_moving">Einstellung abgelehnt: Fahrzeug fährt. Zum Ändern bitte anhalten.</string>
+    <string name="write_refused_moving">Fahreinstellung über %1$d km/h abgelehnt. Zum Ändern langsamer fahren.</string>
     <string name="write_refused_unknown_speed">Einstellung abgelehnt: Fahrzeuggeschwindigkeit nicht lesbar.</string>
+    <string name="settings_speed_gate_desc">Fahreinstellungen oberhalb einer Geschwindigkeit sperren</string>
+    <string name="settings_speed_gate_max_label">Höchstgeschwindigkeit (km/h)</string>
+    <string name="settings_speed_gate_max_hint">0–250</string>
     <string name="update_error_install">Installation fehlgeschlagen.</string>
     <string name="update_install_error">Installationsfehler: %s</string>
     <string name="update_manual_title">Manuelle Installation</string>
@@ -285,4 +289,16 @@
     <string name="profile_restore_msg">%d gespeicherte(s) Profil(e) auf diesem Fahrzeug gefunden. Wiederherstellen?</string>
     <string name="profile_restore_confirm">Wiederherstellen</string>
     <string name="profile_restore_cancel">Ignorieren</string>
-    <string name="profile_restore_done">%d Profil(e) wiederhergestellt</string></resources>
+    <string name="profile_restore_done">%d Profil(e) wiederhergestellt</string>
+    <string name="nav_automation">Automatisierung</string>
+    <string name="automation_desc">Ein Profil je nach Außentemperatur anwenden</string>
+    <string name="automation_threshold_label">Schwellentemperatur (°C)</string>
+    <string name="automation_threshold_hint">0–60</string>
+    <string name="automation_profile_label">Anzuwendendes Profil</string>
+    <string name="automation_auto_execute">Automatisch anwenden</string>
+    <string name="automation_no_profile">Kein Profil</string>
+    <string name="automation_confirm_title">Temperatur-Automatisierung</string>
+    <string name="automation_confirm_msg">Die Außentemperatur liegt unter %1$d°C\n(%2$s°C aktuelle Temperatur)\nProfil „%3$s“ anwenden?</string>
+    <string name="automation_confirm_yes">JA</string>
+    <string name="automation_confirm_no">NEIN</string>
+</resources>
