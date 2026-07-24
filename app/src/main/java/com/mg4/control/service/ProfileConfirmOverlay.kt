@@ -12,6 +12,7 @@ import android.view.WindowManager
 import android.widget.TextView
 import com.google.android.material.button.MaterialButton
 import com.mg4.control.R
+import com.mg4.control.automation.AutomationSettings
 import com.mg4.control.debug.AppLogger
 import com.mg4.control.hardware.VehicleWriteGate
 import com.mg4.control.model.DrivingProfile
@@ -37,10 +38,11 @@ object ProfileConfirmOverlay {
         profile: DrivingProfile,
         threshold: Int,
         currentTemp: Float,
+        direction: AutomationSettings.Direction,
         onConfirmed: () -> Unit,
         onDeclined: () -> Unit
     ) {
-        handler.post { showOnMain(context, profile, threshold, currentTemp, onConfirmed, onDeclined) }
+        handler.post { showOnMain(context, profile, threshold, currentTemp, direction, onConfirmed, onDeclined) }
     }
 
     private fun showOnMain(
@@ -48,6 +50,7 @@ object ProfileConfirmOverlay {
         profile: DrivingProfile,
         threshold: Int,
         currentTemp: Float,
+        direction: AutomationSettings.Direction,
         onConfirmed: () -> Unit,
         onDeclined: () -> Unit
     ) {
@@ -63,8 +66,10 @@ object ProfileConfirmOverlay {
         val view = LayoutInflater.from(themed).inflate(R.layout.overlay_profile_confirm, null)
 
         val tempStr = String.format(java.util.Locale.getDefault(), "%.1f", currentTemp)
+        val msgRes = if (direction == AutomationSettings.Direction.ABOVE)
+            R.string.automation_confirm_msg_above else R.string.automation_confirm_msg
         view.findViewById<TextView>(R.id.confirm_message).text =
-            localized.getString(R.string.automation_confirm_msg, threshold, tempStr, profile.name)
+            localized.getString(msgRes, threshold, tempStr, profile.name)
 
         // Un seul chemin de sortie : garde-fou pour ne déclencher qu'un callback.
         var done = false
