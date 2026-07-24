@@ -303,4 +303,8 @@
     <string name="automation_confirm_msg">La température extérieure est en dessous de %1$d°C\n(%2$s°C température actuelle)\nVoulez-vous appliquer le profil « %3$s » ?</string>
     <string name="automation_confirm_yes">OUI</string>
     <string name="automation_confirm_no">NON</string>
+    <string name="automation_direction_label">Déclencher si la température extérieure est :</string>
+    <string name="automation_dir_below">Inférieure à</string>
+    <string name="automation_dir_above">Supérieure à</string>
+    <string name="automation_confirm_msg_above">La température extérieure est au-dessus de %1$d°C\n(%2$s°C température actuelle)\nVoulez-vous appliquer le profil « %3$s » ?</string>
 </resources>

@@ -301,4 +301,8 @@
     <string name="automation_confirm_msg">A temperatura exterior está abaixo de %1$d°C\n(%2$s°C temperatura atual)\nAplicar o perfil «%3$s»?</string>
     <string name="automation_confirm_yes">SIM</string>
     <string name="automation_confirm_no">NÃO</string>
+    <string name="automation_direction_label">Acionar quando a temperatura exterior for:</string>
+    <string name="automation_dir_below">Inferior a</string>
+    <string name="automation_dir_above">Superior a</string>
+    <string name="automation_confirm_msg_above">A temperatura exterior está acima de %1$d°C\n(%2$s°C temperatura atual)\nAplicar o perfil «%3$s»?</string>
 </resources>

@@ -1,6 +1,7 @@
 package com.mg4.control.ui
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -12,6 +13,7 @@ import android.widget.EditText
 import android.widget.Spinner
 import android.widget.Switch
 import androidx.fragment.app.Fragment
+import com.google.android.material.button.MaterialButton
 import com.mg4.control.R
 import com.mg4.control.automation.AutomationSettings
 import com.mg4.control.model.DrivingProfile
@@ -61,6 +63,27 @@ class AutomationFragment : Fragment() {
         checkAuto.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean(AutomationSettings.KEY_AUTO_EXECUTE, checked).apply()
         }
+
+        // ── Sens du déclenchement (inférieure / supérieure au seuil) ─────────
+        val btnDirBelow = view.findViewById<MaterialButton>(R.id.btn_dir_below)
+        val btnDirAbove = view.findViewById<MaterialButton>(R.id.btn_dir_above)
+        val accentDim   = requireContext().getColor(R.color.dash_accent_dim)
+        val inactive    = requireContext().getColor(R.color.dash_btn)
+
+        fun highlightDirection(dir: AutomationSettings.Direction) {
+            btnDirBelow.backgroundTintList = ColorStateList.valueOf(
+                if (dir == AutomationSettings.Direction.BELOW) accentDim else inactive)
+            btnDirAbove.backgroundTintList = ColorStateList.valueOf(
+                if (dir == AutomationSettings.Direction.ABOVE) accentDim else inactive)
+        }
+        highlightDirection(AutomationSettings.readDirection(requireContext()))
+
+        fun setDirection(dir: AutomationSettings.Direction) {
+            prefs.edit().putString(AutomationSettings.KEY_DIRECTION, dir.name).apply()
+            highlightDirection(dir)
+        }
+        btnDirBelow.setOnClickListener { setDirection(AutomationSettings.Direction.BELOW) }
+        btnDirAbove.setOnClickListener { setDirection(AutomationSettings.Direction.ABOVE) }
 
         setupSpinner(spinner, prefs)
     }

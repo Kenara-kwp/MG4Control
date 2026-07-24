@@ -518,13 +518,13 @@ class MG4ControlService : Service() {
 
         MG4Hardware.whenKatman1Ready {
             val temp = MG4Hardware.getOutsideTempCelsius()
-            val outcome = AutomationDecision.evaluate(cfg.enabled, temp, cfg.threshold, profile != null)
+            val outcome = AutomationDecision.evaluate(cfg.enabled, temp, cfg.threshold, cfg.direction, profile != null)
             if (outcome != AutomationDecision.Outcome.APPLY || profile == null || temp == null) {
                 AppLogger.i(TAG, "Auto temp: non applicable (temp=$temp seuil=${cfg.threshold} profil=${profile?.name}) → fallback")
                 onFallback(); return@whenKatman1Ready
             }
             if (cfg.autoExecute) {
-                AppLogger.i(TAG, "Auto temp → application directe '${profile.name}' (temp=$temp ≤ ${cfg.threshold})")
+                AppLogger.i(TAG, "Auto temp → application directe '${profile.name}' (temp=$temp dir=${cfg.direction} seuil=${cfg.threshold})")
                 ProfileApplier.apply(profile, autoStart = true) { ok -> AppLogger.i(TAG, "Auto temp appliqué — ok=$ok") }
             } else {
                 AppLogger.i(TAG, "Auto temp → popup confirmation '${profile.name}'")
@@ -533,6 +533,7 @@ class MG4ControlService : Service() {
                     profile     = profile,
                     threshold   = cfg.threshold,
                     currentTemp = temp,
+                    direction   = cfg.direction,
                     onConfirmed = {
                         CoroutineScope(Dispatchers.IO).launch {
                             ProfileApplier.apply(profile, autoStart = true) { ok -> AppLogger.i(TAG, "Auto temp OUI '${profile.name}' — ok=$ok") }

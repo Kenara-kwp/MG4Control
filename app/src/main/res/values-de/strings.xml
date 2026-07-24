@@ -301,4 +301,8 @@
     <string name="automation_confirm_msg">Die Außentemperatur liegt unter %1$d°C\n(%2$s°C aktuelle Temperatur)\nProfil „%3$s“ anwenden?</string>
     <string name="automation_confirm_yes">JA</string>
     <string name="automation_confirm_no">NEIN</string>
+    <string name="automation_direction_label">Auslösen, wenn die Außentemperatur ist:</string>
+    <string name="automation_dir_below">Unter</string>
+    <string name="automation_dir_above">Über</string>
+    <string name="automation_confirm_msg_above">Die Außentemperatur liegt über %1$d°C\n(%2$s°C aktuelle Temperatur)\nProfil „%3$s“ anwenden?</string>
 </resources>
