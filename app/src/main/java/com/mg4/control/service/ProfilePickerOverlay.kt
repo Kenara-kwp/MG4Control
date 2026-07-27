@@ -14,7 +14,6 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
-import com.mg4.control.hardware.VehicleWriteGate
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.google.android.material.button.MaterialButton
@@ -87,14 +86,11 @@ object ProfilePickerOverlay {
         profiles: List<DrivingProfile>?,
         onAutoDismiss: (() -> Unit)?
     ) {
-        // [T-904] L'overlay ne sert qu'à appliquer un profil, donc à écrire dans le
-        // véhicule : inutile et dangereux de le poser devant le conducteur en roulant.
-        // Même politique configurable que les écritures (OFF => toujours affiché).
-        if (!VehicleWriteGate.isAllowedNow()) {
-            AppLogger.w(TAG, "Overlay non affiché : sécurité conduite active à cette vitesse")
-            onAutoDismiss?.invoke()
-            return
-        }
+        // L'overlay s'affiche TOUJOURS, quelle que soit la vitesse : il sert aussi à la
+        // luminosité et à l'extinction, et masquer le sélecteur sans rien dire donnait
+        // l'impression que le raccourci volant était cassé. C'est l'ÉCRITURE qui est
+        // filtrée : si la sécurité conduite refuse, ProfileApplier échoue et VehicleWriteGate
+        // affiche le toast « vitesse (limite) » au moment du choix du profil.
 
         // Si déjà affiché → on remplace (sans déclencher l'ancien onAutoDismiss)
         dismissOnMainThread(context, fireAutoDismiss = false)

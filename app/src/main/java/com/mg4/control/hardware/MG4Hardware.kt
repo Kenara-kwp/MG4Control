@@ -325,12 +325,17 @@ object MG4Hardware {
      * propriété non supportée, exception). [VehicleWriteGate] traite null comme un refus.
      */
     fun getVehicleSpeedKmh(): Float? {
-        val mps = getFloatPropertyCPM(PROP_VEHICLE_SPEED, AREA_GLOBAL)
+        val raw = getFloatPropertyCPM(PROP_VEHICLE_SPEED, AREA_GLOBAL)
             ?: getFloatPropertyCPM(PROP_VEHICLE_SPEED, 0)
             ?: return null
-        // PERF_VEHICLE_SPEED est signée (négative en marche arrière) : c'est la vitesse
-        // absolue qui compte pour savoir si le véhicule bouge.
-        return kotlin.math.abs(mps) * 3.6f
+        // ⚠️ La spec AOSP dit m/s, mais le VHAL SAIC renvoie DÉJÀ des km/h. Confirmé par
+        // deux voies : (1) mesures terrain (refus à 30 km/h réels avec un seuil à 50, la
+        // bascule tombait à ~14 = 50/3,6) ; (2) code OEM — CustomKeyHandler compare
+        // getCarSpeed() à 15.0f pour couper la caméra 360, seuil qui n'a de sens qu'en km/h.
+        // Un ancien `* 3.6f` triplait donc la vitesse et bloquait bien trop tôt.
+        // La valeur est signée (négative en marche arrière) : c'est la vitesse absolue qui
+        // compte pour savoir si le véhicule bouge.
+        return kotlin.math.abs(raw)
     }
 
     /** Contexte applicatif, pour les messages utilisateur du verrou d'écriture. */
@@ -3448,6 +3453,37 @@ object MG4Hardware {
         acFloat("getOutCarTemp")?.let { if (!it.isNaN() && it > -1000f) return it }
         getFloatPropertyCPM(PROP_HVAC_TEMP_OUTCAR, AREA_HVAC)?.let { if (!it.isNaN() && it > -1000f) return it }
         return null
+    }
+
+    // ── Sonde vitesse (bouton Diagnostic) ─────────────────────────────────────
+    private const val SPEED_TAG = "MG4_SPEED"
+
+    private fun fmtSpeed(v: Float?): String =
+        if (v == null || v.isNaN()) "illisible" else "%.1f".format(v)
+
+    /** Lit un getter float sans argument sur VehicleConditionManager (Katman5, old-SDK). */
+    private fun vcmFloat(name: String): Float? {
+        val vcm = sVcm ?: return null
+        return try { vcm.javaClass.getMethod(name).invoke(vcm) as? Float } catch (_: Exception) { null }
+    }
+
+    /**
+     * Sonde du bouton Diagnostic : logge la vitesse BRUTE telle que rendue par le véhicule,
+     * pour valider l'unité firmware par firmware. Lecture seule.
+     *
+     * Mode d'emploi : rouler à une vitesse connue (ex. 50 au compteur) et cliquer Diagnostic.
+     *  - valeur brute ≈ compteur  → km/h (ce que l'app suppose désormais) ✓
+     *  - valeur brute ≈ compteur/3,6 → m/s (il faudrait reconvertir sur ce firmware)
+     */
+    fun runSpeedDiag() {
+        AppLogger.i(SPEED_TAG, "── DIAG vitesse ──")
+        val rawGlobal = getFloatPropertyCPM(PROP_VEHICLE_SPEED, AREA_GLOBAL)
+        val rawZero   = getFloatPropertyCPM(PROP_VEHICLE_SPEED, 0)
+        val oem       = vcmFloat("getCarSpeed")   // sentinelle OEM -1.0f = indisponible
+        AppLogger.i(SPEED_TAG, "CPM brut(0x11600207) area=GLOBAL: ${fmtSpeed(rawGlobal)} | area=0: ${fmtSpeed(rawZero)}")
+        AppLogger.i(SPEED_TAG, "OEM getCarSpeed (VCM): ${fmtSpeed(oem)} (-1,0 = service indispo)")
+        AppLogger.i(SPEED_TAG, "→ vitesse retenue par l'app: ${fmtSpeed(getVehicleSpeedKmh())} km/h")
+        AppLogger.i(SPEED_TAG, "Comparer au compteur : identique = km/h OK ; ~3,6x plus petit = m/s")
     }
 
     /** Connexion (async) à l'API Car AOSP → CarPropertyManager ("property") ET CarDoorLockManager

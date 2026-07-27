@@ -62,15 +62,16 @@ object VehicleWriteGate {
     /** Clampe une saisie utilisateur dans [0, MAX_SPEED_KMH]. null/vide => 0. */
     fun clampSpeed(raw: Int?): Int = (raw ?: 0).coerceIn(0, MAX_SPEED_KMH)
 
-    /** Décision + seuil courants, lus en direct dans les prefs (sans effet de bord). */
-    private data class Eval(val decision: Decision, val maxKmh: Int)
+    /** Décision + seuil + vitesse mesurée, lus en direct dans les prefs (sans effet de bord). */
+    private data class Eval(val decision: Decision, val maxKmh: Int, val speedKmh: Float?)
 
     private fun evaluate(): Eval {
-        val context = MG4Hardware.appContext() ?: return Eval(Decision.ALLOWED, 0)
+        val context = MG4Hardware.appContext() ?: return Eval(Decision.ALLOWED, 0, null)
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (!prefs.getBoolean(KEY_ENABLED, false)) return Eval(Decision.ALLOWED, 0)
+        if (!prefs.getBoolean(KEY_ENABLED, false)) return Eval(Decision.ALLOWED, 0, null)
         val maxKmh = prefs.getInt(KEY_MAX_KMH, 0)
-        return Eval(decide(MG4Hardware.getVehicleSpeedKmh(), enabled = true, maxKmh = maxKmh), maxKmh)
+        val speedKmh = MG4Hardware.getVehicleSpeedKmh()
+        return Eval(decide(speedKmh, enabled = true, maxKmh = maxKmh), maxKmh, speedKmh)
     }
 
     /**
@@ -79,11 +80,11 @@ object VehicleWriteGate {
      * journalise et prévient l'utilisateur.
      */
     fun allow(operation: String): Boolean {
-        val (decision, maxKmh) = evaluate()
+        val (decision, maxKmh, speedKmh) = evaluate()
         if (decision == Decision.ALLOWED) return true
 
-        AppLogger.w(TAG, "Écriture refusée ($operation) : $decision (max=$maxKmh km/h)")
-        notifyUser(decision, maxKmh)
+        AppLogger.w(TAG, "Écriture refusée ($operation) : $decision (vitesse=${speedKmh ?: "?"} max=$maxKmh km/h)")
+        notifyUser(decision, maxKmh, speedKmh)
         return false
     }
 
@@ -94,14 +95,19 @@ object VehicleWriteGate {
      */
     fun isAllowedNow(): Boolean = evaluate().decision == Decision.ALLOWED
 
-    private fun notifyUser(decision: Decision, maxKmh: Int) {
+    private fun notifyUser(decision: Decision, maxKmh: Int, speedKmh: Float?) {
         val context: Context = MG4Hardware.appContext() ?: return
         val now = System.currentTimeMillis()
         if (now - lastToastMs < TOAST_THROTTLE_MS) return
         lastToastMs = now
 
         val message = when (decision) {
-            Decision.REFUSED_MOVING        -> context.getString(R.string.write_refused_moving, maxKmh)
+            Decision.REFUSED_MOVING        -> {
+                // Vitesse actuelle affichée à côté de la limite : l'utilisateur voit d'un
+                // coup d'œil ce que l'app mesure (et peut signaler un écart au compteur).
+                val speedStr = String.format(java.util.Locale.getDefault(), "%.0f", speedKmh ?: 0f)
+                context.getString(R.string.write_refused_moving, speedStr, maxKmh)
+            }
             Decision.REFUSED_UNKNOWN_SPEED -> context.getString(R.string.write_refused_unknown_speed)
             Decision.ALLOWED               -> return
         }

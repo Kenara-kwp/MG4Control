@@ -393,6 +393,8 @@ class SettingsFragment : Fragment() {
         MG4Hardware.runDoorVolumeDiag()
         // Sonde température : tente de lire temp extérieure + habitacle et logge le brut.
         MG4Hardware.runTemperatureDiag()
+        // Sonde vitesse : logge la vitesse brute (validation de l'unité par firmware).
+        MG4Hardware.runSpeedDiag()
 
         val appVersion = try {
             ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?"

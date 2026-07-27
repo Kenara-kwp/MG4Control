@@ -214,7 +214,7 @@
     <string name="update_installed">✅ ¡Actualización instalada correctamente!</string>
     <string name="update_error_download">Descarga fallida. Compruebe la conexión.</string>
     <string name="update_error_signature">Actualización rechazada: el APK descargado no está firmado con la clave esperada. Archivo eliminado.</string>
-    <string name="write_refused_moving">Ajuste de conducción rechazado por encima de %1$d km/h. Reduzca la velocidad para cambiarlo.</string>
+    <string name="write_refused_moving">Ajuste de conducción rechazado: %1$s km/h (límite %2$d km/h). Reduzca la velocidad para cambiarlo.</string>
     <string name="write_refused_unknown_speed">Ajuste rechazado: no se puede leer la velocidad del vehículo.</string>
     <string name="settings_speed_gate_desc">Bloquear los ajustes de conducción por encima de una velocidad</string>
     <string name="settings_speed_gate_max_label">Velocidad máxima (km/h)</string>
