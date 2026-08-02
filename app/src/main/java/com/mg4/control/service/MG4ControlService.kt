@@ -513,14 +513,21 @@ class MG4ControlService : Service() {
     private fun tryTemperatureAutomation(onFallback: () -> Unit) {
         val ctx = applicationContext
         val cfg = AutomationSettings.read(ctx)
-        if (!cfg.enabled) { onFallback(); return }
+        // Sortie silencieuse = impossible de diagnostiquer à distance : on trace TOUJOURS
+        // la config, y compris quand la feature est simplement désactivée.
+        if (!cfg.enabled) {
+            AppLogger.i(TAG, "Auto temp: DÉSACTIVÉE dans Réglages → fallback BT/défaut")
+            onFallback(); return
+        }
         val profile = cfg.profileId.takeIf { it.isNotEmpty() }?.let { ProfileManager(ctx).getById(it) }
 
         MG4Hardware.whenKatman1Ready {
             val temp = MG4Hardware.getOutsideTempCelsius()
             val outcome = AutomationDecision.evaluate(cfg.enabled, temp, cfg.threshold, cfg.direction, profile != null)
+            AppLogger.i(TAG, "Auto temp: config → dir=${cfg.direction} seuil=${cfg.threshold}°C " +
+                "profil='${profile?.name ?: "AUCUN"}' auto=${cfg.autoExecute} | temp lue=${temp ?: "illisible"} → $outcome")
             if (outcome != AutomationDecision.Outcome.APPLY || profile == null || temp == null) {
-                AppLogger.i(TAG, "Auto temp: non applicable (temp=$temp seuil=${cfg.threshold} profil=${profile?.name}) → fallback")
+                AppLogger.i(TAG, "Auto temp: non applicable → fallback BT/défaut")
                 onFallback(); return@whenKatman1Ready
             }
             if (cfg.autoExecute) {

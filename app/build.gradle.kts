@@ -11,8 +11,8 @@ android {
         applicationId = "com.mg4.control"
         minSdk = 28
         targetSdk = 34
-        versionCode = 16
-        versionName = "2.6.4"
+        versionCode = 17
+        versionName = "2.6.5"
     }
 
     // Signature avec la clé plateforme de la ROM (requise par sharedUserId=android.uid.system).
