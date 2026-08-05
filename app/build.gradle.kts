@@ -25,6 +25,14 @@ android {
                 storePassword = System.getenv("MG4_KEYSTORE_PASSWORD") ?: (project.findProperty("mg4.keystore.password") as String?)
                 keyAlias = System.getenv("MG4_KEY_ALIAS") ?: (project.findProperty("mg4.key.alias") as String?) ?: "platform"
                 keyPassword = System.getenv("MG4_KEY_PASSWORD") ?: (project.findProperty("mg4.key.password") as String?)
+                // v1 (JAR) OBLIGATOIRE : AGP le désactive par défaut dès minSdk >= 24, or sur
+                // AAOS 9 le contrôle OTA lit l'archive via getPackageArchiveInfo(), qui ne
+                // remonte pas de façon fiable un APK signé v2 sans v1 → signature jugée
+                // illisible → mise à jour refusée. Les APK signés à la main (v1) passaient,
+                // ceux de la CI (v2 seul) non. On pose donc les trois schémas.
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
