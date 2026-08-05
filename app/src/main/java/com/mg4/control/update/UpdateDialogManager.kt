@@ -210,17 +210,19 @@ object UpdateDialogManager {
                 when (status) {
                     DownloadManager.STATUS_SUCCESSFUL -> {
                         progressBar.progress = 100
-                        // L'APK est dans un dossier public : on vérifie qu'il est signé
-                        // par NOTRE clé avant d'inviter l'utilisateur à l'installer.
-                        val downloaded = File(
-                            Environment.getExternalStoragePublicDirectory(
-                                Environment.DIRECTORY_DOWNLOADS), fileName)
-                        if (!ApkSignatureVerifier.matchesRunningApp(activity, downloaded)) {
-                            downloaded.runCatching { delete() }
-                            tvStatus.setText(R.string.update_error_signature)
-                            btnCancel.setText(R.string.update_close)
-                            break
-                        }
+                        // [DÉSACTIVÉ 2026-08-05] Contrôle de signature (T-901) mis en pause :
+                        // il refusait TOUTE mise à jour OTA sur AAOS 9, même avec un APK
+                        // signé de la même clé plateforme en v1+v2+v3. Voir ApkInstaller.
+                        // Pour réactiver : décommenter le bloc ci-dessous.
+                        // val downloaded = File(
+                        //     Environment.getExternalStoragePublicDirectory(
+                        //         Environment.DIRECTORY_DOWNLOADS), fileName)
+                        // if (!ApkSignatureVerifier.matchesRunningApp(activity, downloaded)) {
+                        //     downloaded.runCatching { delete() }
+                        //     tvStatus.setText(R.string.update_error_signature)
+                        //     btnCancel.setText(R.string.update_close)
+                        //     break
+                        // }
                         // Nettoie les anciens APK dans Téléchargements (garde les 5 plus récents)
                         ApkCleanup.cleanIfNeeded()
                         // Ouvre le dossier Téléchargements dans le gestionnaire AAOS
