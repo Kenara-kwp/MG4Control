@@ -172,6 +172,20 @@ object UpdateDialogManager {
             .substringBefore('?')
             .ifBlank { "MG4Control-${info.versionName}.apk" }
 
+        // DownloadManager n'écrase JAMAIS un fichier existant : si "…-2.6.5.apk" est déjà là
+        // (téléchargement précédent de la même version), il écrit "…-2.6.5-1.apk". Or le code
+        // relit ensuite le nom d'origine → il vérifierait/installerait l'ANCIEN fichier.
+        // On supprime donc la cible avant d'enfiler la requête, pour garantir que le fichier
+        // téléchargé, le fichier vérifié et le fichier installé soient bien le même.
+        val target = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            fileName
+        )
+        if (target.exists()) {
+            val deleted = target.runCatching { delete() }.getOrDefault(false)
+            Log.i(TAG, "Ancien APK homonyme trouvé (${target.name}) → suppression=$deleted")
+        }
+
         val request = DownloadManager.Request(Uri.parse(info.apkUrl)).apply {
             setTitle("MG4Control ${info.versionName}")
             setDescription(activity.getString(R.string.update_downloading))
