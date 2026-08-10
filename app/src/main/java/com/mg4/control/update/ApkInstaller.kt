@@ -31,17 +31,14 @@ object ApkInstaller {
             return "APK manquant ou vide : ${apkFile.absolutePath}"
         }
 
-        // [DÉSACTIVÉ 2026-08-05] Contrôle de signature (T-901) mis en pause : il refusait
-        // TOUTE mise à jour OTA sur AAOS 9, y compris avec un APK signé de la même clé
-        // plateforme en v1+v2+v3. Cause non encore élucidée (getPackageArchiveInfo ne
-        // remonte probablement pas la signature de l'archive sur cette ROM).
-        // Garde-fous restants : Android refuse une MAJ signée d'une autre clé, et
-        // ApkUrlPolicy restreint toujours l'origine du téléchargement (github/gitlab, https).
-        // Pour réactiver : décommenter le bloc ci-dessous.
-        // if (!ApkSignatureVerifier.matchesRunningApp(context, apkFile)) {
-        //     apkFile.runCatching { delete() }
-        //     return "Signature non conforme — APK rejeté et supprimé"
-        // }
+        // [RÉACTIVÉ 2026-08-05] Contrôle de signature (T-901). Les échecs précédents ont eu
+        // lieu avec une app installée signée à la main (v1 seul) face à un APK CI (v2/v3) :
+        // on retente avec les DEUX côtés produits par la CI, donc signés à l'identique.
+        // L'app tourne en uid.system : on n'installe que ce qui est signé par notre clé.
+        if (!ApkSignatureVerifier.matchesRunningApp(context, apkFile)) {
+            apkFile.runCatching { delete() }
+            return "Signature non conforme — APK rejeté et supprimé"
+        }
 
         // ── Stratégie 1 : pm install depuis le stockage externe ───────────────
         val extDir = context.getExternalFilesDir(null)
