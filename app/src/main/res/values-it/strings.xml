@@ -305,4 +305,20 @@
     <string name="automation_dir_below">Inferiore a</string>
     <string name="automation_dir_above">Superiore a</string>
     <string name="automation_confirm_msg_above">La temperatura esterna è sopra i %1$d°C\n(%2$s°C temperatura attuale)\nApplicare il profilo «%3$s»?</string>
+    <string name="clim_card_title">Climatizzazione</string>
+    <string name="clim_temperature">Temperatura</string>
+    <string name="clim_fan">Ventilazione</string>
+    <string name="clim_modes_title">Modalità</string>
+    <string name="clim_section_switches">Acceso</string>
+    <string name="clim_power">Clima</string>
+    <string name="clim_ac">A/C</string>
+    <string name="clim_auto">Auto</string>
+    <string name="clim_section_loop">Ricircolo</string>
+    <string name="clim_loop_inner">Interno</string>
+    <string name="clim_loop_outside">Esterno</string>
+    <string name="clim_loop_auto">Auto</string>
+    <string name="clim_section_defrost">Sbrinamento</string>
+    <string name="clim_defrost_front">Anteriore</string>
+    <string name="clim_defrost_rear">Posteriore</string>
+    <string name="clim_write_failed">Impostazione clima rifiutata dal veicolo</string>
 </resources>

@@ -2,15 +2,21 @@ package com.mg4.control.ui
 
 import android.content.res.ColorStateList
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.Switch
+import android.widget.TextView
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.slider.Slider
 import com.mg4.control.R
 import com.mg4.control.hardware.MG4Hardware
 import com.mg4.control.hardware.MG4Hardware.AebMode
@@ -23,6 +29,7 @@ import com.mg4.control.model.RegenLevel
 import com.mg4.control.util.FirmwareInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -138,6 +145,8 @@ class DashboardFragment : Fragment() {
         super.onResume()
         refreshDriveRegen()
         refreshClimate()
+        refreshClimatePage(force = true)   // page 2 — no-op si elle n'a pas été créée (A9)
+        if (pager?.currentItem == 2) startClimatePolling()
         MG4Hardware.whenKatman4Ready {
             if (isAdded) {
                 refreshAdas()
@@ -145,6 +154,11 @@ class DashboardFragment : Fragment() {
             }
         }
         refreshElk()  // SWI133 — sVsm133 indépendant de Katman4
+    }
+
+    override fun onPause() {
+        super.onPause()
+        stopClimatePolling()   // pas de sondage binder quand l'écran n'est plus visible
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -158,8 +172,8 @@ class DashboardFragment : Fragment() {
         pager?.adapter = DashboardPagerAdapter()
         pager?.offscreenPageLimit = 1  // garde les 2 pages en mémoire
 
-        // Dots
-        val dotCount = 2
+        // Dots — suit le nombre réel de pages (2 ou 3 selon le support clim)
+        val dotCount = pager?.adapter?.itemCount ?: 2
         val dotViews = Array(dotCount) { i ->
             View(requireContext()).apply {
                 val size = 10
@@ -178,6 +192,10 @@ class DashboardFragment : Fragment() {
                 dots?.forEachIndexed { i, dot -> dot.isSelected = i == position }
                 // Refresh ELK quand on arrive sur la page 1
                 if (position == 1) refreshElk()
+                // Page clim : synchro immédiate + suivi périodique tant qu'elle est visible
+                // (la clim peut aussi être modifiée depuis l'écran du véhicule).
+                if (position == 2) { refreshClimatePage(force = true); startClimatePolling() }
+                else stopClimatePolling()
             }
         })
     }
@@ -187,12 +205,17 @@ class DashboardFragment : Fragment() {
 
         inner class PageHolder(val view: View) : RecyclerView.ViewHolder(view)
 
-        override fun getItemCount() = 2
+        // 3e page (climatisation) seulement si le manager SAIC répond : sur A9 il est absent,
+        // la page n'est alors pas créée du tout (et les points de pagination suivent).
+        override fun getItemCount() = if (MG4Hardware.hasClimateControl()) 3 else 2
         override fun getItemViewType(position: Int) = position
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageHolder {
-            val layoutId = if (viewType == 0) R.layout.page_dashboard_main
-                           else               R.layout.page_dashboard_elk
+            val layoutId = when (viewType) {
+                0    -> R.layout.page_dashboard_main
+                1    -> R.layout.page_dashboard_elk
+                else -> R.layout.page_dashboard_climate
+            }
             val v = LayoutInflater.from(parent.context).inflate(layoutId, parent, false)
             return PageHolder(v)
         }
@@ -201,6 +224,7 @@ class DashboardFragment : Fragment() {
             when (position) {
                 0 -> bindMainPage(holder.view)
                 1 -> bindElkPage(holder.view)
+                2 -> bindClimatePage(holder.view)
             }
         }
     }
@@ -965,5 +989,187 @@ class DashboardFragment : Fragment() {
         switchElkSound?.alpha = if (enabled) 1f else 0.35f
         switchElkVibration?.isEnabled = enabled
         switchElkVibration?.alpha = if (enabled) 1f else 0.35f
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    //  Page 2 — Climatisation (old-SDK : voie AirConditionManager)
+    //  Confort : ces écritures ne passent PAS par le verrou de vitesse (T-904).
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /** Délai laissé au véhicule pour propager une écriture avant de relire son état. */
+    private val CLIM_SETTLE_MS = 700L
+    /** Période de suivi tant que la page clim est affichée. */
+    private val CLIM_POLL_MS = 2_000L
+
+    private var climTempSlider: Slider? = null
+    private var climFanSlider: Slider? = null
+    private var climTempValue: TextView? = null
+    private var climFanValue: TextView? = null
+    private var climSwitchPower: Switch? = null
+    private var climSwitchAc: Switch? = null
+    private var climSwitchAuto: Switch? = null
+    private var climSwitchDefFront: Switch? = null
+    private var climLoopButtons: Map<Int, MaterialButton?> = emptyMap()
+
+    /** Anti-rebond des sliders : un glissement enverrait sinon des dizaines d'écritures binder. */
+    private val climHandler = Handler(Looper.getMainLooper())
+    private var climPendingWrite: Runnable? = null
+    /** Vrai entre l'envoi d'une écriture et la relecture : bloque tout rafraîchissement. */
+    @Volatile private var climWriteInFlight = false
+    /** Vrai pendant qu'un doigt tient un slider : ne pas lui réimposer une valeur. */
+    private var climSliderTouched = false
+
+    /** Suivi périodique tant que la page clim est affichée (changements faits sur l'écran voiture). */
+    private val climPollRunnable = object : Runnable {
+        override fun run() {
+            refreshClimatePage()
+            climHandler.postDelayed(this, CLIM_POLL_MS)
+        }
+    }
+
+    private fun startClimatePolling() {
+        stopClimatePolling()
+        climHandler.postDelayed(climPollRunnable, CLIM_POLL_MS)
+    }
+
+    private fun stopClimatePolling() = climHandler.removeCallbacks(climPollRunnable)
+
+    private fun bindClimatePage(view: View) {
+        climTempSlider     = view.findViewById(R.id.clim_temp_slider)
+        climFanSlider      = view.findViewById(R.id.clim_fan_slider)
+        climTempValue      = view.findViewById(R.id.clim_temp_value)
+        climFanValue       = view.findViewById(R.id.clim_fan_value)
+        climSwitchPower    = view.findViewById(R.id.clim_switch_power)
+        climSwitchAc       = view.findViewById(R.id.clim_switch_ac)
+        climSwitchAuto     = view.findViewById(R.id.clim_switch_auto)
+        climSwitchDefFront = view.findViewById(R.id.clim_switch_defrost_front)
+        climLoopButtons = mapOf(
+            MG4Hardware.LoopMode.INNER   to view.findViewById<MaterialButton>(R.id.clim_btn_loop_inner),
+            MG4Hardware.LoopMode.OUTSIDE to view.findViewById<MaterialButton>(R.id.clim_btn_loop_outside),
+            MG4Hardware.LoopMode.AUTO    to view.findViewById<MaterialButton>(R.id.clim_btn_loop_auto)
+        )
+        setupClimateListeners()
+        refreshClimatePage()
+    }
+
+    /**
+     * Écrit en IO puis rafraîchit — mais **après un délai**. Le véhicule met un instant à
+     * propager la nouvelle valeur : relire immédiatement renvoyait l'ANCIENNE et la
+     * réappliquait à l'UI, d'où le slider qui revenait en arrière avec un cran de retard.
+     */
+    private fun climateWrite(action: () -> Boolean) {
+        climWriteInFlight = true
+        CoroutineScope(Dispatchers.IO).launch {
+            val ok = action()
+            withContext(Dispatchers.Main) {
+                if (isAdded && !ok)
+                    Toast.makeText(requireContext(), R.string.clim_write_failed, Toast.LENGTH_SHORT).show()
+            }
+            delay(CLIM_SETTLE_MS)
+            climWriteInFlight = false
+            refreshClimatePage(force = true)
+        }
+    }
+
+    /** Écriture différée (anti-rebond) — une seule requête part à la fin du glissement. */
+    private fun climateWriteDebounced(action: () -> Boolean) {
+        climPendingWrite?.let { climHandler.removeCallbacks(it) }
+        val r = Runnable { climateWrite(action) }
+        climPendingWrite = r
+        climHandler.postDelayed(r, 200L)
+    }
+
+    private fun setupClimateListeners() {
+        // Pendant qu'un doigt tient le slider, aucun rafraîchissement ne doit le déplacer.
+        val touchGuard = object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(s: Slider) { climSliderTouched = true }
+            override fun onStopTrackingTouch(s: Slider) { climSliderTouched = false }
+        }
+        climTempSlider?.addOnSliderTouchListener(touchGuard)
+        climFanSlider?.addOnSliderTouchListener(touchGuard)
+
+        climTempSlider?.addOnChangeListener { _, value, fromUser ->
+            climTempValue?.text = "${value.toInt()}°"
+            if (fromUser && !isRefreshing) {
+                val target = value.toInt()
+                climateWriteDebounced { MG4Hardware.setClimateTemp(target) }
+            }
+        }
+        climFanSlider?.addOnChangeListener { _, value, fromUser ->
+            climFanValue?.text = value.toInt().toString()
+            if (fromUser && !isRefreshing) {
+                val target = value.toInt()
+                climateWriteDebounced { MG4Hardware.setClimateFan(target) }
+            }
+        }
+        climSwitchPower?.setOnCheckedChangeListener { _, checked ->
+            if (!isRefreshing) climateWrite { MG4Hardware.setClimatePower(checked) }
+        }
+        climSwitchAc?.setOnCheckedChangeListener { _, checked ->
+            if (!isRefreshing) climateWrite { MG4Hardware.setClimateAc(checked) }
+        }
+        climSwitchAuto?.setOnCheckedChangeListener { _, checked ->
+            if (!isRefreshing) climateWrite { MG4Hardware.setClimateAuto(checked) }
+        }
+        climSwitchDefFront?.setOnCheckedChangeListener { _, checked ->
+            if (!isRefreshing) climateWrite { MG4Hardware.setClimateDefrostFront(checked) }
+        }
+        climLoopButtons.forEach { (mode, btn) ->
+            btn?.setOnClickListener { climateWrite { MG4Hardware.setClimateLoopMode(mode) } }
+        }
+    }
+
+    /**
+     * [force] = rafraîchissement explicite (arrivée sur la page, fin d'écriture). Sinon on
+     * s'abstient si une écriture est en vol ou si l'utilisateur tient un slider — lui
+     * réimposer une valeur pendant qu'il agit serait le pire des comportements.
+     */
+    private fun refreshClimatePage(force: Boolean = false) {
+        if (climTempSlider == null) return
+        if (!force && (climWriteInFlight || climSliderTouched)) return
+        CoroutineScope(Dispatchers.IO).launch {
+            val s = MG4Hardware.getClimateState()
+            withContext(Dispatchers.Main) {
+                if (!isAdded || s == null) return@withContext
+                isRefreshing = true
+
+                // Bornes lues sur le véhicule — jamais celles du XML.
+                climTempSlider?.apply {
+                    valueFrom = s.tempMin.toFloat()
+                    valueTo   = s.tempMax.toFloat()
+                    s.tempC?.let { value = it.coerceIn(s.tempMin, s.tempMax).toFloat() }
+                    isEnabled = s.tempC != null
+                }
+                climTempValue?.text = s.tempC?.let { "$it°" } ?: "--°"
+
+                climFanSlider?.apply {
+                    valueFrom = s.fanMin.toFloat()
+                    valueTo   = s.fanMax.toFloat()
+                    s.fanLevel?.let { value = it.coerceIn(s.fanMin, s.fanMax).toFloat() }
+                    isEnabled = s.fanLevel != null
+                }
+                climFanValue?.text = s.fanLevel?.toString() ?: "--"
+
+                bindClimSwitch(climSwitchPower, s.powerOn)
+                bindClimSwitch(climSwitchAc, s.acOn)
+                bindClimSwitch(climSwitchAuto, s.autoOn)
+                bindClimSwitch(climSwitchDefFront, s.defrostFront)
+
+                climLoopButtons.forEach { (mode, btn) ->
+                    val active = s.loopMode == mode
+                    btn?.backgroundTintList = ColorStateList.valueOf(if (active) colorActive else colorInactive)
+                    btn?.setTextColor(if (active) colorTextActive else colorTextInactive)
+                }
+
+                isRefreshing = false
+            }
+        }
+    }
+
+    /** Un état null = non lisible sur ce firmware → contrôle grisé plutôt que menteur. */
+    private fun bindClimSwitch(sw: Switch?, state: Boolean?) {
+        sw?.isChecked = state ?: false
+        sw?.isEnabled = state != null
+        sw?.alpha = if (state != null) 1f else 0.35f
     }
 }

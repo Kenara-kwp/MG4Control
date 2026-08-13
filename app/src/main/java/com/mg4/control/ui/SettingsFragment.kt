@@ -317,6 +317,19 @@ class SettingsFragment : Fragment() {
             showDiagnosticDialog()
         }
 
+        // [TEST TEMPORAIRE] Appui LONG sur Diagnostic → test d'écriture climatisation.
+        // Délibérément pas sur le clic simple : le Diagnostic s'ouvre souvent et ce test
+        // modifie brièvement la clim de la voiture (puis restaure l'état d'origine).
+        btnDiagnostic.setOnLongClickListener {
+            Toast.makeText(
+                requireContext(),
+                "Test écriture climatisation lancé — voir les logs MG4_CLIM (~4 s)",
+                Toast.LENGTH_LONG
+            ).show()
+            CoroutineScope(Dispatchers.IO).launch { MG4Hardware.runClimateWriteTest() }
+            true
+        }
+
         // ── Bouton Infos ─────────────────────────────────────────────────────
         view.findViewById<MaterialButton>(R.id.btn_infos).setOnClickListener {
             showInfosDialog()
@@ -395,6 +408,10 @@ class SettingsFragment : Fragment() {
         MG4Hardware.runTemperatureDiag()
         // Sonde vitesse : logge la vitesse brute (validation de l'unité par firmware).
         MG4Hardware.runSpeedDiag()
+        // Sonde climatisation : lecture seule, repère ce qui répond avant tout pilotage.
+        MG4Hardware.runClimateDiag()
+        // Chasse à la consigne de température (candidats × zones + voie OEM).
+        MG4Hardware.runClimateSetpointHunt()
 
         val appVersion = try {
             ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?"

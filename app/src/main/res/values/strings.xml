@@ -307,4 +307,20 @@
     <string name="automation_dir_below">Inférieure à</string>
     <string name="automation_dir_above">Supérieure à</string>
     <string name="automation_confirm_msg_above">La température extérieure est au-dessus de %1$d°C\n(%2$s°C température actuelle)\nVoulez-vous appliquer le profil « %3$s » ?</string>
+    <string name="clim_card_title">Climatisation</string>
+    <string name="clim_temperature">Température</string>
+    <string name="clim_fan">Ventilation</string>
+    <string name="clim_modes_title">Modes</string>
+    <string name="clim_section_switches">Marche</string>
+    <string name="clim_power">Clim</string>
+    <string name="clim_ac">A/C</string>
+    <string name="clim_auto">Auto</string>
+    <string name="clim_section_loop">Recirculation</string>
+    <string name="clim_loop_inner">Intérieur</string>
+    <string name="clim_loop_outside">Extérieur</string>
+    <string name="clim_loop_auto">Auto</string>
+    <string name="clim_section_defrost">Dégivrage</string>
+    <string name="clim_defrost_front">Avant</string>
+    <string name="clim_defrost_rear">Arrière</string>
+    <string name="clim_write_failed">Réglage climatisation refusé par le véhicule</string>
 </resources>

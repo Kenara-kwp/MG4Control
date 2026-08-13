@@ -305,4 +305,20 @@
     <string name="automation_dir_below">Unter</string>
     <string name="automation_dir_above">Über</string>
     <string name="automation_confirm_msg_above">Die Außentemperatur liegt über %1$d°C\n(%2$s°C aktuelle Temperatur)\nProfil „%3$s“ anwenden?</string>
+    <string name="clim_card_title">Klimaanlage</string>
+    <string name="clim_temperature">Temperatur</string>
+    <string name="clim_fan">Gebläse</string>
+    <string name="clim_modes_title">Modi</string>
+    <string name="clim_section_switches">Ein</string>
+    <string name="clim_power">Klima</string>
+    <string name="clim_ac">A/C</string>
+    <string name="clim_auto">Auto</string>
+    <string name="clim_section_loop">Umluft</string>
+    <string name="clim_loop_inner">Innen</string>
+    <string name="clim_loop_outside">Außen</string>
+    <string name="clim_loop_auto">Auto</string>
+    <string name="clim_section_defrost">Entfrosten</string>
+    <string name="clim_defrost_front">Vorne</string>
+    <string name="clim_defrost_rear">Hinten</string>
+    <string name="clim_write_failed">Klimaeinstellung vom Fahrzeug abgelehnt</string>
 </resources>

@@ -305,4 +305,20 @@
     <string name="automation_dir_below">Below</string>
     <string name="automation_dir_above">Above</string>
     <string name="automation_confirm_msg_above">The outside temperature is above %1$d°C\n(%2$s°C current temperature)\nApply profile “%3$s”?</string>
+    <string name="clim_card_title">Climate</string>
+    <string name="clim_temperature">Temperature</string>
+    <string name="clim_fan">Fan</string>
+    <string name="clim_modes_title">Modes</string>
+    <string name="clim_section_switches">Power</string>
+    <string name="clim_power">Climate</string>
+    <string name="clim_ac">A/C</string>
+    <string name="clim_auto">Auto</string>
+    <string name="clim_section_loop">Recirculation</string>
+    <string name="clim_loop_inner">Inside</string>
+    <string name="clim_loop_outside">Outside</string>
+    <string name="clim_loop_auto">Auto</string>
+    <string name="clim_section_defrost">Defrost</string>
+    <string name="clim_defrost_front">Front</string>
+    <string name="clim_defrost_rear">Rear</string>
+    <string name="clim_write_failed">Climate setting refused by the vehicle</string>
 </resources>
