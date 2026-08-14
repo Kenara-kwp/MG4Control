@@ -361,6 +361,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1"
+                    android:layout_marginBottom="4dp"
                     android:text="@string/clim_defrost_front"
                     android:textColor="@color/text_secondary"
                     android:textSize="11sp"
@@ -370,8 +371,22 @@
                     app:strokeColor="@color/dash_border"
                     app:cornerRadius="8dp" />
 
-                <!-- Dégivrage arrière retiré : non exposé par ce véhicule (testé SWI133). -->
-                <!-- Colonne volontairement à un seul bouton : garde l'alignement en 3 colonnes. -->
+                <!-- Dégivrage arrière : commandé par un bouton PHYSIQUE sur le véhicule.
+                     Reste ici pour vérifier si le service l'expose aussi ; il se grise
+                     automatiquement si l'état n'est pas lisible. -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/clim_btn_defrost_rear"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:text="@string/clim_defrost_rear"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:textAllCaps="true"
+                    app:backgroundTint="@color/dash_btn"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/dash_border"
+                    app:cornerRadius="8dp" />
 
             </LinearLayout>
 

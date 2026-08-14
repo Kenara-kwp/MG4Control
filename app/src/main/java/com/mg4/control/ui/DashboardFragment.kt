@@ -1009,6 +1009,7 @@ class DashboardFragment : Fragment() {
     private var climBtnAc: MaterialButton? = null
     private var climBtnAuto: MaterialButton? = null
     private var climBtnDefFront: MaterialButton? = null
+    private var climBtnDefRear: MaterialButton? = null
     private var climLoopButtons: Map<Int, MaterialButton?> = emptyMap()
     /** Dernier état connu — sert à savoir vers quoi basculer au clic d'un bouton. */
     private var climLastState: MG4Hardware.ClimateState? = null
@@ -1045,6 +1046,7 @@ class DashboardFragment : Fragment() {
         climBtnAc          = view.findViewById(R.id.clim_btn_ac)
         climBtnAuto        = view.findViewById(R.id.clim_btn_auto)
         climBtnDefFront    = view.findViewById(R.id.clim_btn_defrost_front)
+        climBtnDefRear     = view.findViewById(R.id.clim_btn_defrost_rear)
         climLoopButtons = mapOf(
             MG4Hardware.LoopMode.INNER   to view.findViewById<MaterialButton>(R.id.clim_btn_loop_inner),
             MG4Hardware.LoopMode.OUTSIDE to view.findViewById<MaterialButton>(R.id.clim_btn_loop_outside),
@@ -1118,6 +1120,9 @@ class DashboardFragment : Fragment() {
         climBtnDefFront?.setOnClickListener {
             climLastState?.defrostFront?.let { cur -> climateWrite { MG4Hardware.setClimateDefrostFront(!cur) } }
         }
+        climBtnDefRear?.setOnClickListener {
+            climLastState?.defrostRear?.let { cur -> climateWrite { MG4Hardware.setClimateDefrostRear(!cur) } }
+        }
         climLoopButtons.forEach { (mode, btn) ->
             btn?.setOnClickListener { climateWrite { MG4Hardware.setClimateLoopMode(mode) } }
         }
@@ -1159,6 +1164,7 @@ class DashboardFragment : Fragment() {
                 bindClimToggle(climBtnAc, s.acOn)
                 bindClimToggle(climBtnAuto, s.autoOn)
                 bindClimToggle(climBtnDefFront, s.defrostFront)
+                bindClimToggle(climBtnDefRear, s.defrostRear)
 
                 climLoopButtons.forEach { (mode, btn) ->
                     val active = s.loopMode == mode
