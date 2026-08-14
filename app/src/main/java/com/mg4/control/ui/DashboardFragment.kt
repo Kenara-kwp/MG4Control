@@ -1005,11 +1005,13 @@ class DashboardFragment : Fragment() {
     private var climFanSlider: Slider? = null
     private var climTempValue: TextView? = null
     private var climFanValue: TextView? = null
-    private var climSwitchPower: Switch? = null
-    private var climSwitchAc: Switch? = null
-    private var climSwitchAuto: Switch? = null
-    private var climSwitchDefFront: Switch? = null
+    private var climBtnPower: MaterialButton? = null
+    private var climBtnAc: MaterialButton? = null
+    private var climBtnAuto: MaterialButton? = null
+    private var climBtnDefFront: MaterialButton? = null
     private var climLoopButtons: Map<Int, MaterialButton?> = emptyMap()
+    /** Dernier état connu — sert à savoir vers quoi basculer au clic d'un bouton. */
+    private var climLastState: MG4Hardware.ClimateState? = null
 
     /** Anti-rebond des sliders : un glissement enverrait sinon des dizaines d'écritures binder. */
     private val climHandler = Handler(Looper.getMainLooper())
@@ -1039,10 +1041,10 @@ class DashboardFragment : Fragment() {
         climFanSlider      = view.findViewById(R.id.clim_fan_slider)
         climTempValue      = view.findViewById(R.id.clim_temp_value)
         climFanValue       = view.findViewById(R.id.clim_fan_value)
-        climSwitchPower    = view.findViewById(R.id.clim_switch_power)
-        climSwitchAc       = view.findViewById(R.id.clim_switch_ac)
-        climSwitchAuto     = view.findViewById(R.id.clim_switch_auto)
-        climSwitchDefFront = view.findViewById(R.id.clim_switch_defrost_front)
+        climBtnPower       = view.findViewById(R.id.clim_btn_power)
+        climBtnAc          = view.findViewById(R.id.clim_btn_ac)
+        climBtnAuto        = view.findViewById(R.id.clim_btn_auto)
+        climBtnDefFront    = view.findViewById(R.id.clim_btn_defrost_front)
         climLoopButtons = mapOf(
             MG4Hardware.LoopMode.INNER   to view.findViewById<MaterialButton>(R.id.clim_btn_loop_inner),
             MG4Hardware.LoopMode.OUTSIDE to view.findViewById<MaterialButton>(R.id.clim_btn_loop_outside),
@@ -1102,17 +1104,19 @@ class DashboardFragment : Fragment() {
                 climateWriteDebounced { MG4Hardware.setClimateFan(target) }
             }
         }
-        climSwitchPower?.setOnCheckedChangeListener { _, checked ->
-            if (!isRefreshing) climateWrite { MG4Hardware.setClimatePower(checked) }
+        // Boutons bascule : on vise l'inverse du dernier état lu. Un état inconnu (null)
+        // signifie « non lisible sur ce firmware » → le bouton est déjà désactivé.
+        climBtnPower?.setOnClickListener {
+            climLastState?.powerOn?.let { cur -> climateWrite { MG4Hardware.setClimatePower(!cur) } }
         }
-        climSwitchAc?.setOnCheckedChangeListener { _, checked ->
-            if (!isRefreshing) climateWrite { MG4Hardware.setClimateAc(checked) }
+        climBtnAc?.setOnClickListener {
+            climLastState?.acOn?.let { cur -> climateWrite { MG4Hardware.setClimateAc(!cur) } }
         }
-        climSwitchAuto?.setOnCheckedChangeListener { _, checked ->
-            if (!isRefreshing) climateWrite { MG4Hardware.setClimateAuto(checked) }
+        climBtnAuto?.setOnClickListener {
+            climLastState?.autoOn?.let { cur -> climateWrite { MG4Hardware.setClimateAuto(!cur) } }
         }
-        climSwitchDefFront?.setOnCheckedChangeListener { _, checked ->
-            if (!isRefreshing) climateWrite { MG4Hardware.setClimateDefrostFront(checked) }
+        climBtnDefFront?.setOnClickListener {
+            climLastState?.defrostFront?.let { cur -> climateWrite { MG4Hardware.setClimateDefrostFront(!cur) } }
         }
         climLoopButtons.forEach { (mode, btn) ->
             btn?.setOnClickListener { climateWrite { MG4Hardware.setClimateLoopMode(mode) } }
@@ -1150,10 +1154,11 @@ class DashboardFragment : Fragment() {
                 }
                 climFanValue?.text = s.fanLevel?.toString() ?: "--"
 
-                bindClimSwitch(climSwitchPower, s.powerOn)
-                bindClimSwitch(climSwitchAc, s.acOn)
-                bindClimSwitch(climSwitchAuto, s.autoOn)
-                bindClimSwitch(climSwitchDefFront, s.defrostFront)
+                climLastState = s
+                bindClimToggle(climBtnPower, s.powerOn)
+                bindClimToggle(climBtnAc, s.acOn)
+                bindClimToggle(climBtnAuto, s.autoOn)
+                bindClimToggle(climBtnDefFront, s.defrostFront)
 
                 climLoopButtons.forEach { (mode, btn) ->
                     val active = s.loopMode == mode
@@ -1166,10 +1171,15 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    /** Un état null = non lisible sur ce firmware → contrôle grisé plutôt que menteur. */
-    private fun bindClimSwitch(sw: Switch?, state: Boolean?) {
-        sw?.isChecked = state ?: false
-        sw?.isEnabled = state != null
-        sw?.alpha = if (state != null) 1f else 0.35f
+    /**
+     * Bouton bascule : accentué quand actif, comme les boutons de recirculation.
+     * Un état null = non lisible sur ce firmware → bouton grisé et inerte, plutôt que menteur.
+     */
+    private fun bindClimToggle(btn: MaterialButton?, state: Boolean?) {
+        val active = state == true
+        btn?.backgroundTintList = ColorStateList.valueOf(if (active) colorActive else colorInactive)
+        btn?.setTextColor(if (active) colorTextActive else colorTextInactive)
+        btn?.isEnabled = state != null
+        btn?.alpha = if (state != null) 1f else 0.35f
     }
 }

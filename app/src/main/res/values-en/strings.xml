@@ -309,8 +309,8 @@
     <string name="clim_temperature">Temperature</string>
     <string name="clim_fan">Fan</string>
     <string name="clim_modes_title">Modes</string>
-    <string name="clim_section_switches">Power</string>
-    <string name="clim_power">Climate</string>
+    <string name="clim_section_switches">Controls</string>
+    <string name="clim_power">System</string>
     <string name="clim_ac">A/C</string>
     <string name="clim_auto">Auto</string>
     <string name="clim_section_loop">Recirculation</string>
