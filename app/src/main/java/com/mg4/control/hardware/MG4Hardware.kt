@@ -3687,6 +3687,39 @@ object MG4Hardware {
 
     /** Mode de recirculation — seule source fiable (l'OEM getLoopMode n'est pas vérifié). */
     private const val PROP_HVAC_LOOP_MODE = 0x15402507
+    /** État A/C — encodage mesuré sur véhicule : 1 = allumé, 0 = éteint. */
+    private const val PROP_HVAC_AC_ON = 0x15402500
+
+    /**
+     * Amène une commande **cyclique** du HVAC SAIC jusqu'à un état voulu.
+     *
+     * Plusieurs commandes de ce service ignorent leur argument et se contentent d'avancer d'un
+     * cran (constaté pour la recirculation, et l'A9 le nomme explicitement `switch…()`). La
+     * seule façon fiable d'atteindre un état précis est donc : lire, comparer, avancer, relire.
+     *
+     * [maxSteps] borne la boucle au nombre d'états du cycle : au-delà, la commande n'agit pas
+     * sur ce firmware et on abandonne en le journalisant plutôt que de tourner en rond.
+     * ⚠️ Bloquant (~400 ms par cran) → hors du thread principal.
+     */
+    private fun hvacCycleTo(label: String, propId: Int, target: Int, maxSteps: Int, advance: () -> Unit): Boolean {
+        var steps = 0
+        while (steps <= maxSteps) {
+            val current = getIntPropertyHvac(propId, AREA_HVAC)
+            if (current == target) {
+                climLog("$label=$target atteint ($steps avance(s))", true)
+                return true
+            }
+            if (current < 0) {
+                climLog("$label=$target — état courant illisible", false)
+                return false
+            }
+            advance()
+            steps++
+            try { Thread.sleep(400) } catch (_: InterruptedException) {}
+        }
+        climLog("$label=$target NON atteint (lu=${getIntPropertyHvac(propId, AREA_HVAC)})", false)
+        return false
+    }
 
     /**
      * Instantané complet de la climatisation, bornes incluses — lu en une passe pour éviter
@@ -3780,26 +3813,42 @@ object MG4Hardware {
     fun setClimateFan(level: Int): Boolean =
         acSet("setAirVolumeLevel", level).also { climLog("fan=$level", it) }
 
+    /**
+     * A/C — bascule, comme la recirculation. L'encodage de lecture (1=ON, 0=OFF) a été mesuré
+     * sur véhicule ; envoyer `setAcStatus(0)` restait sans effet, ce qui trahit un argument
+     * ignoré. On avance donc jusqu'à l'état voulu. Deux états ⇒ une bascule suffit.
+     */
     fun setClimateAc(on: Boolean): Boolean =
-        acSet("setAcStatus", if (on) 1 else 0).also { climLog("ac=$on", it) }
+        hvacCycleTo("ac", PROP_HVAC_AC_ON, if (on) 1 else 0, maxSteps = 2) {
+            acSet("setAcStatus", 1)
+        }
 
     fun setClimateAuto(on: Boolean): Boolean =
         acSet("setAutoStatus", if (on) 1 else 0).also { climLog("auto=$on (lu avant=${acInt("getAutoStatus")})", it) }
 
     /**
-     * Recirculation. On écrit via `setLoopMode(mode)` avec l'encodage **mesuré sur véhicule**
-     * (0=intérieur, 1=extérieur, 2=auto), symétrique de la lecture.
+     * Recirculation — commande **CYCLIQUE**, pas une affectation.
      *
-     * ⚠️ Les méthodes `openLoopInner/Outside/Auto()` ont été essayées d'abord et se sont
-     * révélées non fiables : la voiture partait souvent sur un mode différent de celui demandé
-     * (extérieur → intérieur donnait auto). Leur sémantique réelle ne correspond pas à leur nom.
+     * Constaté sur véhicule (SWI133) : `setLoopMode(n)` **ignore son argument** et fait avancer
+     * d'un cran dans le cycle extérieur → intérieur → auto → extérieur… Les méthodes
+     * `openLoopInner/Outside/Auto()` avaient le même défaut (on demandait « intérieur » et la
+     * voiture passait en « auto »). Même sémantique que `switchAirCirculationStatus()` sur A9.
+     *
+     * On procède donc comme les sièges chauffants ([setHvacLevelWithToggle]) : avancer d'un cran
+     * puis relire, jusqu'à atteindre la cible. La lecture se fait sur la PROPRIÉTÉ, dont
+     * l'encodage a été mesuré (0/1/2) ; l'avance utilise la seule commande observée efficace.
+     *
+     * Trois modes ⇒ deux avances suffisent depuis n'importe quel état ; au-delà de 3 on
+     * abandonne, c'est que la commande n'agit pas sur ce firmware.
+     *
+     * ⚠️ Bloquant (jusqu'à ~1,2 s) → appeler hors du thread principal.
      */
-    fun setClimateLoopMode(mode: Int): Boolean {
-        if (mode !in LoopMode.INNER..LoopMode.AUTO) return false
-        val before = getIntPropertyHvac(PROP_HVAC_LOOP_MODE, AREA_HVAC)
-        val ok = acSet("setLoopMode", mode)
-        climLog("loopMode=$mode (lu avant=$before)", ok)
-        return ok
+    fun setClimateLoopMode(target: Int): Boolean {
+        if (target !in LoopMode.INNER..LoopMode.AUTO) return false
+        // 3 modes ⇒ 2 avances suffisent depuis n'importe quel état.
+        return hvacCycleTo("loopMode", PROP_HVAC_LOOP_MODE, target, maxSteps = 3) {
+            acSet("setLoopMode", 1)   // l'argument est ignoré : avance d'un cran
+        }
     }
 
     fun setClimateDefrostFront(on: Boolean): Boolean =
