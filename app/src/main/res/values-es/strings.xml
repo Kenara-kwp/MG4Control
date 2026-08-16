@@ -305,6 +305,23 @@
     <string name="automation_dir_below">Inferior a</string>
     <string name="automation_dir_above">Superior a</string>
     <string name="automation_confirm_msg_above">La temperatura exterior está por encima de %1$d°C\n(%2$s°C temperatura actual)\n¿Aplicar el perfil «%3$s»?</string>
+    <string name="automation_profile_title">Aplicar un perfil según la temperatura</string>
+
+    <!-- Automatización del A/A -->
+    <string name="ac_auto_title">Activación del A/A según la temperatura</string>
+    <string name="ac_auto_desc">Ajustar la climatización según la temperatura exterior</string>
+    <string name="ac_auto_hot">Cuando hace calor</string>
+    <string name="ac_auto_cold">Cuando hace frío</string>
+    <string name="ac_auto_threshold_hot_label">Si la temperatura es superior a (°C)</string>
+    <string name="ac_auto_threshold_cold_label">Si la temperatura es inferior a (°C)</string>
+    <string name="ac_auto_threshold_hint">-20–60</string>
+    <string name="ac_auto_target_label">Temperatura objetivo (°C)</string>
+    <string name="ac_auto_target_hint">15–33</string>
+    <string name="ac_auto_fan_label">Ventilación</string>
+    <string name="ac_auto_fan_hint">1–10</string>
+    <string name="ac_auto_def_front">Desempañador delantero</string>
+    <string name="ac_auto_def_rear">Desempañador trasero</string>
+    <string name="ac_auto_note">Se aplica al arrancar el vehículo: se encienden la climatización y el A/A, y luego se envían los ajustes anteriores.</string>
     <string name="clim_card_title">Climatización</string>
     <string name="clim_temperature">Temperatura</string>
     <string name="clim_fan">Ventilación</string>

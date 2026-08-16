@@ -4014,6 +4014,35 @@ object MG4Hardware {
             acCall(if (on) "openBackWindowDefroster" else "closeBackWindowDefroster")
                 .also { climLog("defrostRear=$on", it) }
 
+    /**
+     * Applique un préréglage complet de climatisation (automatisation température).
+     *
+     * Met d'abord le système **et l'A/C en marche** : régler une consigne sur une clim éteinte
+     * ne produit rien de visible, et l'automatisation semblerait ne pas fonctionner.
+     *
+     * La consigne et la ventilation sont **clampées aux bornes réelles du véhicule** (lues dans
+     * l'état), pas aux bornes de saisie de l'UI — un firmware peut accepter 17–33 quand un autre
+     * fait 15–31. Les dégivrages ne sont écrits que si leur état est lisible : sinon on
+     * n'enverrait qu'une commande à l'aveugle.
+     *
+     * ⚠️ Bloquant (plusieurs secondes avec les bascules) → appeler depuis un thread IO.
+     */
+    fun applyClimatePreset(targetTemp: Int, fanLevel: Int, defrostFront: Boolean, defrostRear: Boolean): Boolean {
+        val state = getClimateState() ?: run {
+            AppLogger.w(CLIM_TAG, "Préréglage : état clim illisible → abandon")
+            return false
+        }
+        var ok = setClimatePower(true)
+        ok = setClimateAc(true) && ok
+        ok = setClimateTemp(targetTemp.coerceIn(state.tempMin, state.tempMax)) && ok
+        ok = setClimateFan(fanLevel.coerceIn(state.fanMin, state.fanMax)) && ok
+        if (state.defrostFront != null) ok = setClimateDefrostFront(defrostFront) && ok
+        if (state.defrostRear  != null) ok = setClimateDefrostRear(defrostRear) && ok
+        AppLogger.i(CLIM_TAG, "Préréglage appliqué : consigne=$targetTemp vent=$fanLevel " +
+            "dégAV=$defrostFront dégAR=$defrostRear → ok=$ok")
+        return ok
+    }
+
     /** Connexion (async) à l'API Car AOSP → CarPropertyManager ("property") ET CarDoorLockManager
      *  ("doorlock"). Selon le firmware, la porte est exposée par l'un ou l'autre → on lit via les deux. */
     private fun connectCarProperty() {

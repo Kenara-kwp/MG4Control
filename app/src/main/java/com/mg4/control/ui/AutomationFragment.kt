@@ -16,6 +16,8 @@ import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
 import com.mg4.control.R
 import com.mg4.control.automation.AutomationSettings
+import com.mg4.control.automation.ClimateAutomationSettings
+import com.mg4.control.hardware.MG4Hardware
 import com.mg4.control.model.DrivingProfile
 import com.mg4.control.profile.ProfileManager
 
@@ -86,6 +88,128 @@ class AutomationFragment : Fragment() {
         btnDirAbove.setOnClickListener { setDirection(AutomationSettings.Direction.ABOVE) }
 
         setupSpinner(spinner, prefs)
+        bindClimateAutomation(view, prefs)
+    }
+
+    // ══════════ Automatisation « Déclenchement A/C via la température » ══════════
+
+    /**
+     * Les deux règles (chaud / froid) ont exactement la même structure : on les câble via
+     * [bindClimateRule] plutôt que de dupliquer six écouteurs, sinon une correction sur l'une
+     * finit tôt ou tard par manquer sur l'autre.
+     *
+     * Les réglages partagent le fichier de préférences des profils ([AutomationSettings.PREFS])
+     * mais pas leur interrupteur : cette automatisation n'est pas une application de profil.
+     */
+    private fun bindClimateAutomation(view: View, prefs: android.content.SharedPreferences) {
+        val card = view.findViewById<View>(R.id.card_ac_automation)
+        // Firmware inconnu = aucune voie clim → afficher des réglages sans effet serait trompeur.
+        if (!MG4Hardware.hasClimateControl()) {
+            card.visibility = View.GONE
+            return
+        }
+
+        val switchAc = view.findViewById<Switch>(R.id.switch_ac_auto)
+        val rowConfig = view.findViewById<View>(R.id.row_ac_auto_config)
+
+        val enabled = prefs.getBoolean(ClimateAutomationSettings.KEY_ENABLED, false)
+        switchAc.isChecked = enabled
+        rowConfig.visibility = if (enabled) View.VISIBLE else View.GONE
+        switchAc.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean(ClimateAutomationSettings.KEY_ENABLED, checked).apply()
+            rowConfig.visibility = if (checked) View.VISIBLE else View.GONE
+        }
+
+        bindClimateRule(
+            view, prefs, hot = true,
+            checkId = R.id.check_ac_hot, rowId = R.id.row_ac_hot_config,
+            thresholdId = R.id.input_ac_hot_threshold, targetId = R.id.input_ac_hot_target,
+            fanId = R.id.input_ac_hot_fan,
+            defFrontId = R.id.check_ac_hot_def_front, defRearId = R.id.check_ac_hot_def_rear
+        )
+        bindClimateRule(
+            view, prefs, hot = false,
+            checkId = R.id.check_ac_cold, rowId = R.id.row_ac_cold_config,
+            thresholdId = R.id.input_ac_cold_threshold, targetId = R.id.input_ac_cold_target,
+            fanId = R.id.input_ac_cold_fan,
+            defFrontId = R.id.check_ac_cold_def_front, defRearId = R.id.check_ac_cold_def_rear
+        )
+    }
+
+    private fun bindClimateRule(
+        view: View,
+        prefs: android.content.SharedPreferences,
+        hot: Boolean,
+        checkId: Int, rowId: Int,
+        thresholdId: Int, targetId: Int, fanId: Int,
+        defFrontId: Int, defRearId: Int
+    ) {
+        val check     = view.findViewById<CheckBox>(checkId)
+        val row       = view.findViewById<View>(rowId)
+        val threshold = view.findViewById<EditText>(thresholdId)
+        val target    = view.findViewById<EditText>(targetId)
+        val fan       = view.findViewById<EditText>(fanId)
+        val defFront  = view.findViewById<CheckBox>(defFrontId)
+        val defRear   = view.findViewById<CheckBox>(defRearId)
+
+        val active = prefs.getBoolean(ClimateAutomationSettings.keyOn(hot), false)
+        check.isChecked = active
+        row.visibility = if (active) View.VISIBLE else View.GONE
+        check.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean(ClimateAutomationSettings.keyOn(hot), checked).apply()
+            row.visibility = if (checked) View.VISIBLE else View.GONE
+        }
+
+        val defThreshold = if (hot) ClimateAutomationSettings.DEFAULT_HOT_THRESHOLD
+                           else ClimateAutomationSettings.DEFAULT_COLD_THRESHOLD
+        val defTarget    = if (hot) ClimateAutomationSettings.DEFAULT_HOT_TARGET
+                           else ClimateAutomationSettings.DEFAULT_COLD_TARGET
+        threshold.setText(prefs.getInt(ClimateAutomationSettings.keyThreshold(hot), defThreshold).toString())
+        target.setText(prefs.getInt(ClimateAutomationSettings.keyTarget(hot), defTarget).toString())
+        fan.setText(prefs.getInt(ClimateAutomationSettings.keyFan(hot), ClimateAutomationSettings.DEFAULT_FAN).toString())
+
+        bindIntField(threshold, ClimateAutomationSettings.keyThreshold(hot), prefs) {
+            ClimateAutomationSettings.clampThreshold(it, hot)
+        }
+        bindIntField(target, ClimateAutomationSettings.keyTarget(hot), prefs) {
+            ClimateAutomationSettings.clampTarget(it, hot)
+        }
+        bindIntField(fan, ClimateAutomationSettings.keyFan(hot), prefs) {
+            ClimateAutomationSettings.clampFan(it)
+        }
+
+        defFront.isChecked = prefs.getBoolean(ClimateAutomationSettings.keyDefFront(hot), false)
+        defRear.isChecked  = prefs.getBoolean(ClimateAutomationSettings.keyDefRear(hot), false)
+        defFront.setOnCheckedChangeListener { _, c ->
+            prefs.edit().putBoolean(ClimateAutomationSettings.keyDefFront(hot), c).apply()
+        }
+        defRear.setOnCheckedChangeListener { _, c ->
+            prefs.edit().putBoolean(ClimateAutomationSettings.keyDefRear(hot), c).apply()
+        }
+    }
+
+    /**
+     * Enregistre un champ numérique à la perte de focus et sur « Terminé », en réécrivant la
+     * valeur bornée dans le champ : sans ça l'utilisateur voit 99 alors que 33 a été enregistré.
+     * Même motif que le seuil de l'automatisation profil au-dessus.
+     */
+    private fun bindIntField(
+        field: EditText,
+        key: String,
+        prefs: android.content.SharedPreferences,
+        clamp: (Int?) -> Int
+    ) {
+        fun commit() {
+            val clamped = clamp(field.text.toString().toIntOrNull())
+            prefs.edit().putInt(key, clamped).apply()
+            val txt = clamped.toString()
+            if (field.text.toString() != txt) field.setText(txt)
+        }
+        field.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) commit() }
+        field.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) commit()
+            false
+        }
     }
 
     override fun onResume() {

@@ -22,6 +22,8 @@ import com.mg4.control.util.LocaleHelper
 import com.mg4.control.R
 import com.mg4.control.automation.AutomationDecision
 import com.mg4.control.automation.AutomationSettings
+import com.mg4.control.automation.ClimateAutomationDecision
+import com.mg4.control.automation.ClimateAutomationSettings
 import com.mg4.control.bluetooth.BluetoothProfileManager
 import com.mg4.control.debug.AppLogger
 import com.mg4.control.hardware.MG4Hardware
@@ -66,6 +68,12 @@ class MG4ControlService : Service() {
          * Évite le double-apply quand MainActivity et BootReceiver démarrent le service.
          */
         @Volatile private var profileScheduled = false
+
+        /** Dernière exécution de l'automatisation clim — anti-rebond (démarrage service et
+         *  IGNITION_RUN arrivent souvent à quelques secondes d'écart : sans ça, on écraserait
+         *  un réglage que l'utilisateur vient de faire à la main entre les deux). */
+        @Volatile private var climateAutoLastRunMs = 0L
+        private const val CLIMATE_AUTO_DEBOUNCE_MS = 60_000L
 
     }
 
@@ -115,6 +123,7 @@ class MG4ControlService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         AppLogger.i(TAG, "onStartCommand")
+        tryClimateAutomation("démarrage service")
         scheduleDefaultProfileOnce()
         return START_STICKY
     }
@@ -454,6 +463,7 @@ class MG4ControlService : Service() {
                     AppLogger.i(TAG, "Katman5 IGNITION_RUN → application du profil")
                     Handler(Looper.getMainLooper()).postDelayed({
                         applyDefaultProfileOnIgnition()
+                        tryClimateAutomation("IGNITION_RUN")
                     }, 500L)
                 }
                 MG4Hardware.CarIgnitionItem.OFF -> {
@@ -548,6 +558,59 @@ class MG4ControlService : Service() {
                     },
                     onDeclined  = { onFallback() }
                 )
+            }
+        }
+    }
+
+    /**
+     * Automatisation « Déclenchement A/C via la température ».
+     *
+     * Indépendante des profils : elle a son propre interrupteur et n'est donc **pas** soumise à
+     * `auto_apply_profile` (ce n'est pas une application de profil). Elle ne remplace ni ne
+     * retarde la chaîne profil — les deux tournent en parallèle.
+     *
+     * Anti-rebond [CLIMATE_AUTO_DEBOUNCE_MS] : démarrage service et IGNITION_RUN se suivent de
+     * près, et réappliquer écraserait un réglage manuel fait entre les deux.
+     */
+    private fun tryClimateAutomation(origin: String) {
+        val ctx = applicationContext
+        val cfg = ClimateAutomationSettings.read(ctx)
+        // Comme pour l'auto température : on trace toujours, même désactivée — sinon un
+        // utilisateur qui dit « ça ne marche pas » ne laisse aucune trace exploitable.
+        if (!cfg.enabled) {
+            AppLogger.i(TAG, "Auto A/C ($origin) : DÉSACTIVÉE dans Automatisation")
+            return
+        }
+        if (!MG4Hardware.hasClimateControl()) {
+            AppLogger.i(TAG, "Auto A/C ($origin) : clim non pilotable sur ce firmware")
+            return
+        }
+        val since = System.currentTimeMillis() - climateAutoLastRunMs
+        if (climateAutoLastRunMs != 0L && since < CLIMATE_AUTO_DEBOUNCE_MS) {
+            AppLogger.i(TAG, "Auto A/C ($origin) : déjà appliquée il y a ${since / 1000}s — skip")
+            return
+        }
+
+        MG4Hardware.whenKatman1Ready {
+            val temp = MG4Hardware.getOutsideTempCelsius()
+            val outcome = ClimateAutomationDecision.evaluate(cfg, temp)
+            AppLogger.i(TAG, "Auto A/C ($origin) : chaud=${cfg.hot.active}/≥${cfg.hot.threshold}°C " +
+                "froid=${cfg.cold.active}/≤${cfg.cold.threshold}°C | temp lue=${temp ?: "illisible"} → $outcome")
+            val rule = when (outcome) {
+                ClimateAutomationDecision.Outcome.HOT  -> cfg.hot
+                ClimateAutomationDecision.Outcome.COLD -> cfg.cold
+                ClimateAutomationDecision.Outcome.NONE -> return@whenKatman1Ready
+            }
+            climateAutoLastRunMs = System.currentTimeMillis()
+            // applyClimatePreset enchaîne des bascules (plusieurs secondes) → jamais sur le main thread.
+            CoroutineScope(Dispatchers.IO).launch {
+                val ok = MG4Hardware.applyClimatePreset(
+                    targetTemp   = rule.targetTemp,
+                    fanLevel     = rule.fanLevel,
+                    defrostFront = rule.defrostFront,
+                    defrostRear  = rule.defrostRear
+                )
+                AppLogger.i(TAG, "Auto A/C ($origin) : règle $outcome appliquée — ok=$ok")
             }
         }
     }
