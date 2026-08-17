@@ -44,6 +44,7 @@ import com.mg4.control.update.UpdateChecker
 import com.mg4.control.update.UpdateDialogManager
 import java.io.File
 import com.mg4.control.util.FirmwareHelper
+import com.mg4.control.util.FirmwareInfo
 import com.mg4.control.util.LocaleHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
