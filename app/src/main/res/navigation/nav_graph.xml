@@ -17,6 +17,12 @@
         android:name="com.mg4.control.ui.ProfileFragment"
         android:label="@string/nav_profiles" />
 
+    <!-- Création / édition d'un profil — plein écran, empilé sur la liste -->
+    <fragment
+        android:id="@+id/profileEditFragment"
+        android:name="com.mg4.control.ui.ProfileEditFragment"
+        android:label="@string/profile_edit" />
+
     <!-- Réglages (bouton RÉGLAGES dans la top-bar) -->
     <fragment
         android:id="@+id/settingsFragment"

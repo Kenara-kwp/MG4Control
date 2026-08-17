@@ -338,4 +338,22 @@
     <string name="clim_defrost_front">Vorne</string>
     <string name="clim_defrost_rear">Hinten</string>
     <string name="clim_write_failed">Klimaeinstellung vom Fahrzeug abgelehnt</string>
+
+    <!-- Editeur de profil : categories -->
+    <string name="profile_cat_drive">Fahren</string>
+    <string name="profile_cat_safety">Sicherheit</string>
+    <string name="profile_cat_comfort">Komfort</string>
+    <string name="climate_seat_heat">Sitzheizung</string>
+    <string name="profile_heat_toggle_hint">Heizung berücksichtigen: wenn aus, lässt das Profil diese Einstellung unverändert.</string>
+
+    <!-- Reglages : categories -->
+    <string name="settings_cat_lang">Sprachen</string>
+    <string name="settings_cat_ui">Oberfläche</string>
+    <string name="settings_cat_advanced">Erweiterte Einstellungen</string>
+    <string name="settings_cat_info">Info</string>
+    <string name="settings_maintenance">Wartung</string>
+
+    <!-- Raccourcis : categories -->
+    <string name="shortcuts_cat_buttons">Tasten</string>
+    <string name="shortcuts_cat_actions">Aktionen</string>
 </resources>

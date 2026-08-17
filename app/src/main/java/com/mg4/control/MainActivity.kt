@@ -12,9 +12,11 @@ import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import com.google.android.material.button.MaterialButton
+import com.mg4.control.debug.AppLogger
 import com.mg4.control.hardware.MG4Hardware
 import com.mg4.control.profile.ProfileManager
 import com.mg4.control.service.MG4ControlService
@@ -36,6 +38,25 @@ class MainActivity : AppCompatActivity() {
         super.attachBaseContext(LocaleHelper.applyLocale(newBase))
     }
 
+    /**
+     * [THEME-AUTO] Re-resout le theme a chaque retour au premier plan.
+     *
+     * Indispensable sur old-SDK : le launcher change bien le night mode (UiModeManager le reflete)
+     * mais le systeme ne met PAS a jour Configuration.uiMode, donc AUCUN changement de
+     * configuration n'est delivre et l'activite n'est jamais recreee toute seule. Le retour au
+     * premier plan est le bon moment : on ne peut pas changer le theme du launcher sans quitter
+     * MG4Control.
+     */
+    override fun onResume() {
+        super.onResume()
+        val target = ThemeHelper.resolveNightMode(this)
+        if (target != AppCompatDelegate.getDefaultNightMode()) {
+            AppLogger.i("MG4_THEME", "onResume : theme change -> application du mode $target")
+            // Recree les activites vivantes : pas de recreate() manuel a ajouter.
+            AppCompatDelegate.setDefaultNightMode(target)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -44,6 +65,7 @@ class MainActivity : AppCompatActivity() {
         FirmwareInfo.initWithContext(this)
 
         // [THEME-AUTO] Recrée l'activité quand le launcher MG change de thème en mode "auto"
+        // (voie A9 : broadcast com.saicmotor.changeSkin reçu par le service)
         ThemeHelper.onThemeChanged = { recreate() }
 
         // Premier lancement : choix de la langue avant tout

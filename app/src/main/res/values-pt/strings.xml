@@ -338,4 +338,22 @@
     <string name="clim_defrost_front">Frente</string>
     <string name="clim_defrost_rear">Trás</string>
     <string name="clim_write_failed">Definição de climatização recusada pelo veículo</string>
+
+    <!-- Editeur de profil : categories -->
+    <string name="profile_cat_drive">Condução</string>
+    <string name="profile_cat_safety">Segurança</string>
+    <string name="profile_cat_comfort">Conforto</string>
+    <string name="climate_seat_heat">Bancos aquecidos</string>
+    <string name="profile_heat_toggle_hint">Controlo do aquecimento: se desativado, o perfil não altera esta definição.</string>
+
+    <!-- Reglages : categories -->
+    <string name="settings_cat_lang">Idiomas</string>
+    <string name="settings_cat_ui">Interface</string>
+    <string name="settings_cat_advanced">Definições avançadas</string>
+    <string name="settings_cat_info">Informações</string>
+    <string name="settings_maintenance">Manutenção</string>
+
+    <!-- Raccourcis : categories -->
+    <string name="shortcuts_cat_buttons">Botões</string>
+    <string name="shortcuts_cat_actions">Ações</string>
 </resources>

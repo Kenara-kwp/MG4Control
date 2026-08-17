@@ -711,15 +711,19 @@ class MG4ControlService : Service() {
      * l'utilisateur a choisi un thème manuel (mode ≠ "auto").
      */
     private fun registerSkinChangeReceiver() {
-        if (!ThemeHelper.hasSkinThemeConfig(this)) {
-            // SWI133/68 : MODE_NIGHT_FOLLOW_SYSTEM gère la sync automatiquement
-            AppLogger.i(TAG, "[THEME] SKIN_THEME_CONFIG absent — FOLLOW_SYSTEM actif, broadcast non requis")
-            return
-        }
+        // ⚠️ NE PLUS conditionner l'enregistrement à hasSkinThemeConfig(). Le service démarre sur
+        // LOCKED_BOOT_COMPLETED, donc AVANT le déverrouillage et avant que le launcher soit debout :
+        // si SKIN_THEME_CONFIG n'est pas encore lisible à cet instant, l'ancienne sonde one-shot
+        // concluait « firmware sans skin » et le receiver n'était JAMAIS enregistré de toute la vie
+        // du process — le thème auto restait mort jusqu'au prochain redémarrage. Sur un firmware
+        // qui n'émet pas ce broadcast, un receiver inutilisé ne coûte rien.
+        AppLogger.i(TAG, "[THEME] SKIN_THEME_CONFIG lisible au démarrage=${ThemeHelper.hasSkinThemeConfig(this)}")
         skinChangeReceiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
                 val prefs = getSharedPreferences("mg4_settings", MODE_PRIVATE)
-                if (prefs.getString(ThemeHelper.PREF_THEME_MODE, "dark") != "auto") return
+                // Défaut "auto" — cohérent avec ThemeHelper et MG4App. L'ancien défaut "dark"
+                // faisait sortir le receiver si la clé manquait.
+                if (prefs.getString(ThemeHelper.PREF_THEME_MODE, "auto") != "auto") return
 
                 val nightMode = ThemeHelper.getLauncherNightMode(ctx)
                 Handler(Looper.getMainLooper()).post {

@@ -339,6 +339,52 @@ class SettingsFragment : Fragment() {
         view.findViewById<MaterialButton>(R.id.btn_close_settings).setOnClickListener {
             findNavController().popBackStack(R.id.dashboardFragment, false)
         }
+
+        // En dernier : le rail masque un onglet dont la page n'a plus rien de visible, il doit
+        // donc être câblé APRÈS toutes les décisions de visibilité ci-dessus (build offline,
+        // firmware sans extinction véhicule…), sinon le décompte serait faux.
+        bindCategoryRail(view, accentDim, inactiveColor, accentColor, textActive, textInactive)
+    }
+
+    /**
+     * Rail de gauche : une catégorie visible à la fois — même motif que l'éditeur de profil.
+     *
+     * Le bouton Diagnostic reste dans l'arbre même sur une page masquée : [MainActivity] peut donc
+     * continuer à le révéler en direct après les 5 clics sur le logo, quel que soit l'onglet ouvert.
+     */
+    private fun bindCategoryRail(
+        view: View, accentDim: Int, inactive: Int, accent: Int, textOn: Int, textOff: Int
+    ) {
+        val tabs = listOf(
+            view.findViewById<MaterialButton>(R.id.btn_set_cat_lang)     to view.findViewById<ViewGroup>(R.id.page_set_lang),
+            view.findViewById<MaterialButton>(R.id.btn_set_cat_ui)       to view.findViewById<ViewGroup>(R.id.page_set_ui),
+            view.findViewById<MaterialButton>(R.id.btn_set_cat_advanced) to view.findViewById<ViewGroup>(R.id.page_set_advanced),
+            view.findViewById<MaterialButton>(R.id.btn_set_cat_info)     to view.findViewById<ViewGroup>(R.id.page_set_info)
+        )
+        val scroll = view.findViewById<ScrollView>(R.id.scroll_settings)
+
+        fun hasVisibleContent(page: ViewGroup): Boolean =
+            (0 until page.childCount).any { page.getChildAt(it).visibility == View.VISIBLE }
+
+        val usable = tabs.filter { (_, page) -> hasVisibleContent(page) }
+        tabs.forEach { (btn, page) ->
+            btn.visibility = if (usable.any { it.second === page }) View.VISIBLE else View.GONE
+        }
+        if (usable.isEmpty()) return
+
+        fun select(target: ViewGroup) {
+            tabs.forEach { (btn, page) ->
+                val on = page === target
+                page.visibility = if (on) View.VISIBLE else View.GONE
+                btn.backgroundTintList = ColorStateList.valueOf(if (on) accentDim else inactive)
+                btn.setTextColor(if (on) textOn else textOff)
+                btn.strokeColor = ColorStateList.valueOf(
+                    if (on) accent else requireContext().getColor(R.color.dash_border))
+            }
+            scroll?.scrollTo(0, 0)   // changer d'onglet en gardant le scroll précédent désoriente
+        }
+        usable.forEach { (btn, page) -> btn.setOnClickListener { select(page) } }
+        select(usable.first().second)
     }
 
 
@@ -412,6 +458,9 @@ class SettingsFragment : Fragment() {
         MG4Hardware.runClimateDiag()
         // Chasse à la consigne de température (candidats × zones + voie OEM).
         MG4Hardware.runClimateSetpointHunt()
+        // Sonde thème : quelle source de day/night répond sur ce firmware. Contexte d'ACTIVITÉ —
+        // c'est sa configuration qui décide des ressources affichées.
+        ThemeHelper.runDiagnostic(ctx)
 
         val appVersion = try {
             ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?"
