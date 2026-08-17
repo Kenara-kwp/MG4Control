@@ -7,14 +7,13 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ScrollView
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import androidx.recyclerview.widget.RecyclerView
-import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.slider.Slider
 import com.mg4.control.R
@@ -34,15 +33,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Fragment principal du dashboard — ViewPager2 horizontal.
+ * Fragment principal du dashboard — rail de categories a gauche, contenu defilant.
  *   Page 0 : paramètres de conduite, climat, alertes, AEB
  *   Page 1 : Assistant de sortie de voie (ELK)
  */
 class DashboardFragment : Fragment() {
 
     // ── ViewPager ────────────────────────────────────────────────────────────
-    private var pager: ViewPager2? = null
-    private var dots: Array<View>? = null
+    /** Onglet courant du rail : 0=Conduite, 1=Securite, 2=Confort. Remplace pager.currentItem. */
+    private var currentTab = 0
 
     // ── Page 0 — Drive mode ─────────────────────────────────────────────────
     private val driveModeButtons = mutableMapOf<DriveMode, Button>()
@@ -138,7 +137,7 @@ class DashboardFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        setupPager(view)
+        setupDashboard(view)
     }
 
     override fun onResume() {
@@ -146,7 +145,7 @@ class DashboardFragment : Fragment() {
         refreshDriveRegen()
         refreshClimate()
         refreshClimatePage(force = true)   // page 2 — no-op si elle n'a pas été créée (A9)
-        if (pager?.currentItem == 2) startClimatePolling()
+        if (currentTab == TAB_COMFORT) startClimatePolling()
         MG4Hardware.whenKatman4Ready {
             if (isAdded) {
                 refreshAdas()
@@ -162,71 +161,86 @@ class DashboardFragment : Fragment() {
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    //  ViewPager2 — Adapter + Dots
+    //  Rail de categories + binding des trois sections
     // ═════════════════════════════════════════════════════════════════════════
 
-    private fun setupPager(root: View) {
-        pager = root.findViewById(R.id.dashboard_pager)
-        val dotsContainer = root.findViewById<LinearLayout>(R.id.pager_dots)
-
-        pager?.adapter = DashboardPagerAdapter()
-        pager?.offscreenPageLimit = 1  // garde les 2 pages en mémoire
-
-        // Dots — suit le nombre réel de pages (2 ou 3 selon le support clim)
-        val dotCount = pager?.adapter?.itemCount ?: 2
-        val dotViews = Array(dotCount) { i ->
-            View(requireContext()).apply {
-                val size = 10
-                val lp = LinearLayout.LayoutParams(size, size)
-                lp.setMargins(6, 0, 6, 0)
-                layoutParams = lp
-                setBackgroundResource(R.drawable.dot_indicator)
-                isSelected = i == 0
-            }
-        }
-        dotViews.forEach { dotsContainer.addView(it) }
-        dots = dotViews
-
-        pager?.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-            override fun onPageSelected(position: Int) {
-                dots?.forEachIndexed { i, dot -> dot.isSelected = i == position }
-                // Refresh ELK quand on arrive sur la page 1
-                if (position == 1) refreshElk()
-                // Page clim : synchro immédiate + suivi périodique tant qu'elle est visible
-                // (la clim peut aussi être modifiée depuis l'écran du véhicule).
-                if (position == 2) { refreshClimatePage(force = true); startClimatePolling() }
-                else stopClimatePolling()
-            }
-        })
+    private companion object {
+        const val TAB_DRIVE = 0
+        const val TAB_SAFETY = 1
+        const val TAB_COMFORT = 2
     }
 
-    private inner class DashboardPagerAdapter :
-        RecyclerView.Adapter<DashboardPagerAdapter.PageHolder>() {
+    /**
+     * Le ViewPager2 a ete remplace par un rail : les trois anciennes pages vivent desormais
+     * dans le MEME arbre de vues, on peut donc toutes les lier d'un coup sur la racine.
+     * C'est sûr parce que leurs ids ne se recouvrent pas (verifie a la refonte).
+     *
+     * Consequence a ne pas perdre de vue : les visibilites conditionnelles au firmware sont
+     * appliquees par bindMainPage/bindElkPage comme avant — le rail passe APRES, pour que sa
+     * garde d'onglet vide voie l'etat final.
+     */
+    private fun setupDashboard(root: View) {
+        bindMainPage(root)
+        bindElkPage(root)
 
-        inner class PageHolder(val view: View) : RecyclerView.ViewHolder(view)
+        // La clim n'est liee QUE si le firmware l'expose : avant, la page n'etait meme pas
+        // creee par l'adapter. Ici elle existe toujours dans l'arbre, il faut donc la masquer.
+        val hasClim = MG4Hardware.hasClimateControl()
+        root.findViewById<View>(R.id.climate_page_section)?.visibility =
+            if (hasClim) View.VISIBLE else View.GONE
+        if (hasClim) bindClimatePage(root)
 
-        // 3e page (climatisation) seulement si le manager SAIC répond : sur A9 il est absent,
-        // la page n'est alors pas créée du tout (et les points de pagination suivent).
-        override fun getItemCount() = if (MG4Hardware.hasClimateControl()) 3 else 2
-        override fun getItemViewType(position: Int) = position
+        bindCategoryRail(root)
+    }
 
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageHolder {
-            val layoutId = when (viewType) {
-                0    -> R.layout.page_dashboard_main
-                1    -> R.layout.page_dashboard_elk
-                else -> R.layout.page_dashboard_climate
+    /**
+     * Rail de gauche — meme motif que les autres ecrans refondus. Un onglet dont la page n'a
+     * plus aucune section visible sur ce firmware est masque.
+     */
+    private fun bindCategoryRail(root: View) {
+        val tabs = listOf(
+            root.findViewById<MaterialButton>(R.id.btn_dash_cat_drive)   to root.findViewById<ViewGroup>(R.id.page_dash_drive),
+            root.findViewById<MaterialButton>(R.id.btn_dash_cat_safety)  to root.findViewById<ViewGroup>(R.id.page_dash_safety),
+            root.findViewById<MaterialButton>(R.id.btn_dash_cat_comfort) to root.findViewById<ViewGroup>(R.id.page_dash_comfort)
+        )
+        val scroll   = root.findViewById<ScrollView>(R.id.scroll_dashboard)
+        val dimColor = requireContext().getColor(R.color.dash_accent_dim)
+        val accent   = requireContext().getColor(R.color.dash_accent)
+        val offBg    = requireContext().getColor(R.color.dash_btn)
+        val border   = requireContext().getColor(R.color.dash_border)
+        val textOff  = requireContext().getColor(R.color.text_secondary)
+
+        fun hasVisibleContent(page: ViewGroup): Boolean =
+            (0 until page.childCount).any { page.getChildAt(it).visibility == View.VISIBLE }
+
+        val usable = tabs.filterIndexed { _, (_, page) -> hasVisibleContent(page) }
+        tabs.forEach { (btn, page) ->
+            btn.visibility = if (usable.any { it.second === page }) View.VISIBLE else View.GONE
+        }
+        if (usable.isEmpty()) return
+
+        fun select(index: Int) {
+            currentTab = index
+            tabs.forEachIndexed { i, (btn, page) ->
+                val on = i == index
+                page.visibility = if (on) View.VISIBLE else View.GONE
+                btn.backgroundTintList = ColorStateList.valueOf(if (on) dimColor else offBg)
+                btn.setTextColor(if (on) accent else textOff)
+                btn.strokeColor = ColorStateList.valueOf(if (on) accent else border)
             }
-            val v = LayoutInflater.from(parent.context).inflate(layoutId, parent, false)
-            return PageHolder(v)
+            scroll?.scrollTo(0, 0)
+            // Rafraichissements qui etaient declenches par onPageSelected du pager.
+            if (index == TAB_SAFETY) refreshElk()
+            if (index == TAB_COMFORT && MG4Hardware.hasClimateControl()) {
+                refreshClimatePage(force = true)
+                startClimatePolling()
+            } else {
+                stopClimatePolling()
+            }
         }
 
-        override fun onBindViewHolder(holder: PageHolder, position: Int) {
-            when (position) {
-                0 -> bindMainPage(holder.view)
-                1 -> bindElkPage(holder.view)
-                2 -> bindClimatePage(holder.view)
-            }
-        }
+        tabs.forEachIndexed { i, (btn, _) -> btn.setOnClickListener { select(i) } }
+        select(tabs.indexOfFirst { it.second === usable.first().second })
     }
 
     // ═════════════════════════════════════════════════════════════════════════

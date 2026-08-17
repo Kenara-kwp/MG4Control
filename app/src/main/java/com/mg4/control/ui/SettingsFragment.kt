@@ -11,6 +11,7 @@ import com.mg4.control.MainActivity
 import com.mg4.control.util.ThemeHelper
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
@@ -343,6 +344,7 @@ class SettingsFragment : Fragment() {
         // En dernier : le rail masque un onglet dont la page n'a plus rien de visible, il doit
         // donc être câblé APRÈS toutes les décisions de visibilité ci-dessus (build offline,
         // firmware sans extinction véhicule…), sinon le décompte serait faux.
+        setupFirmwareChips(view)
         bindCategoryRail(view, accentDim, inactiveColor, accentColor, textActive, textInactive)
     }
 
@@ -661,4 +663,102 @@ class SettingsFragment : Fragment() {
 
         dialog.show()
     }
+    // ── Indicateur firmware (deplace depuis la barre du haut) ────────────────
+    // Les pastilles affichent la generation detectee et, quand la voiture n'est pas reconnue,
+    // permettent d'en forcer une. Elles vivent desormais dans Reglages > Infos.
+    private fun setupFirmwareChips(view: View) {
+        val chip133 = view.findViewById<TextView>(R.id.chip_swi133)
+        val chip132 = view.findViewById<TextView>(R.id.chip_swi132)
+        val chip68  = view.findViewById<TextView>(R.id.chip_swi68)
+        val chip69  = view.findViewById<TextView>(R.id.chip_swi69)
+        val chip131 = view.findViewById<TextView>(R.id.chip_swi131)
+        val chip165 = view.findViewById<TextView>(R.id.chip_swi165)
+        val gen     = FirmwareInfo.getGeneration()
+        val forced  = FirmwareInfo.isForced(requireContext())
+
+        fun styleChipActive(tv: TextView) {
+            tv.setBackgroundResource(R.drawable.bg_chip_active)
+            tv.setTextColor(requireContext().getColor(R.color.dash_accent))
+            tv.alpha = 1f
+            tv.paintFlags = tv.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
+        }
+
+        fun styleChipInactive(tv: TextView) {
+            tv.setBackgroundResource(R.drawable.bg_chip_inactive)
+            tv.setTextColor(requireContext().getColor(R.color.dash_text_lo))
+            tv.alpha = 0.4f
+            tv.paintFlags = tv.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
+        }
+
+        fun styleChipSelectable(tv: TextView) {
+            // Firmware inconnu sans choix forcé : chip cliquable, surlignée en rouge
+            tv.setBackgroundResource(R.drawable.bg_chip_inactive)
+            tv.setTextColor(requireContext().getColor(R.color.dash_danger))
+            tv.alpha = 0.75f
+            tv.paintFlags = tv.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
+        }
+
+        val isNaturalUnknown = gen == FirmwareInfo.Gen.UNKNOWN && !forced
+        val allChips = listOf(chip133, chip132, chip68, chip69, chip131, chip165)
+
+        when {
+            isNaturalUnknown -> {
+                // Les six chips en mode "à choisir" (rouge dim, aucune barrée)
+                allChips.forEach { styleChipSelectable(it) }
+            }
+            gen == FirmwareInfo.Gen.SWI165 -> {
+                styleChipActive(chip165)
+                listOf(chip133, chip132, chip68, chip69, chip131).forEach { styleChipInactive(it) }
+            }
+            gen == FirmwareInfo.Gen.SWI131 -> {
+                styleChipActive(chip131)
+                listOf(chip133, chip132, chip68, chip69, chip165).forEach { styleChipInactive(it) }
+            }
+            gen == FirmwareInfo.Gen.SWI69 -> {
+                styleChipActive(chip69)
+                listOf(chip133, chip132, chip68, chip131, chip165).forEach { styleChipInactive(it) }
+            }
+            gen == FirmwareInfo.Gen.SWI68 -> {
+                styleChipActive(chip68)
+                listOf(chip133, chip132, chip69, chip131, chip165).forEach { styleChipInactive(it) }
+            }
+            gen == FirmwareInfo.Gen.SWI132 -> {
+                styleChipActive(chip132)
+                listOf(chip133, chip68, chip69, chip131, chip165).forEach { styleChipInactive(it) }
+            }
+            else -> { // SWI133 ou forcé SWI133
+                styleChipActive(chip133)
+                listOf(chip132, chip68, chip69, chip131, chip165).forEach { styleChipInactive(it) }
+            }
+        }
+
+        // Chips cliquables si firmware inconnu (naturel ou forcé) pour changer de mode
+        if (gen == FirmwareInfo.Gen.UNKNOWN || forced) {
+            chip133.setOnClickListener {
+                FirmwareInfo.forceGeneration(requireContext(), FirmwareInfo.Gen.SWI133)
+                requireActivity().recreate()
+            }
+            chip132.setOnClickListener {
+                FirmwareInfo.forceGeneration(requireContext(), FirmwareInfo.Gen.SWI132)
+                requireActivity().recreate()
+            }
+            chip68.setOnClickListener {
+                FirmwareInfo.forceGeneration(requireContext(), FirmwareInfo.Gen.SWI68)
+                requireActivity().recreate()
+            }
+            chip69.setOnClickListener {
+                FirmwareInfo.forceGeneration(requireContext(), FirmwareInfo.Gen.SWI69)
+                requireActivity().recreate()
+            }
+            chip131.setOnClickListener {
+                FirmwareInfo.forceGeneration(requireContext(), FirmwareInfo.Gen.SWI131)
+                requireActivity().recreate()
+            }
+            chip165.setOnClickListener {
+                FirmwareInfo.forceGeneration(requireContext(), FirmwareInfo.Gen.SWI165)
+                requireActivity().recreate()
+            }
+        }
+    }
+
 }
