@@ -387,18 +387,33 @@ Valeurs communes aux écrans refondus, calées sur la lisibilité au volant : ti
 en-têtes de section **13sp**, libellés et boutons **16sp**, hauteur de bouton **52dp**, onglets du
 rail **64dp**, rail **180dp**, padding de carte **14dp**.
 
-### Dark theme — palette de couleurs
+### Palette de couleurs
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `dash_bg` | `#0C0C0E` | Fond général |
-| `dash_card` | `#141416` | Cartes |
-| `dash_section` | `#1C1C1F` | Sections internes |
-| `dash_border` | `#2A2A2E` | Bordures |
-| `dash_accent` | `#38BDF8` | Sélection active (bleu) |
-| `dash_eco` | `#22C55E` | Mode ECO (vert) |
-| `dash_warn` | `#F59E0B` | Mode SPORT (orange) |
-| `dash_danger` | `#F43F5E` | Suppression / danger |
+L'application suit le thème clair ou sombre. Les valeurs claires sont dans
+`res/values/colors.xml`, les sombres dans `res/values-night/colors.xml` — **mêmes noms de token
+des deux côtés**, c'est la seule règle à respecter en ajoutant une couleur.
+
+| Token | Clair | Sombre | Usage |
+|-------|-------|--------|-------|
+| `dash_bg` | `#F2F2F7` | `#0C0C0E` | Fond général |
+| `dash_card` | `#FFFFFF` | `#141416` | Cartes |
+| `dash_section` | `#F2F2F7` | `#1C1C1F` | Sections internes |
+| `dash_border` | `#D1D1D6` | `#2A2A2E` | Bordures et séparateurs |
+| `dash_btn` | `#E5E5EA` | `#222226` | Fond de bouton inactif |
+| `dash_text_lo` | `#8E8E93` | `#52525B` | En-têtes de section |
+| `dash_accent` | `#0284C7` | `#38BDF8` | Sélection active (bleu) |
+| `dash_accent_dim` | `#E0F2FE` | `#0C4A6E` | Fond de la sélection active |
+| `dash_eco` | `#16A34A` | `#22C55E` | Mode ECO (vert) |
+| `dash_warn` | `#D97706` | `#F59E0B` | Avertissement (orange) |
+| `dash_danger` | `#E11D48` | `#F43F5E` | Suppression / danger |
+| `text_primary` | `#1C1C1E` | `#FFFFFF` | Texte principal |
+| `text_secondary` | `#6C6C70` | `#B0B0B0` | Texte secondaire |
+
+Chaque couleur `*_dim` est le fond associé à sa couleur vive : `dash_eco_dim`, `dash_warn_dim` et
+`dash_danger_dim` suivent le même principe que `dash_accent_dim`.
+
+> **Piège de nommage :** `bg_dark` vaut `#FFFFFF` en thème clair. Le nom date d'une époque où
+> l'application n'avait qu'un thème sombre ; il désigne le fond général, pas une couleur foncée.
 
 ---
 
@@ -888,18 +903,33 @@ Values shared by the reworked screens, tuned for readability while driving: titl
 section headers **13sp**, labels and buttons **16sp**, button height **52dp**, rail tabs **64dp**,
 rail width **180dp**, card padding **14dp**.
 
-### Dark Theme — Color Palette
+### Color Palette
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `dash_bg` | `#0C0C0E` | App background |
-| `dash_card` | `#141416` | Cards |
-| `dash_section` | `#1C1C1F` | Inner sections |
-| `dash_border` | `#2A2A2E` | Borders |
-| `dash_accent` | `#38BDF8` | Active selection (blue) |
-| `dash_eco` | `#22C55E` | ECO mode (green) |
-| `dash_warn` | `#F59E0B` | SPORT mode (amber) |
-| `dash_danger` | `#F43F5E` | Delete / danger actions |
+The app follows the light or dark theme. Light values live in `res/values/colors.xml`, dark ones in
+`res/values-night/colors.xml` — **same token names on both sides**, which is the only rule to
+follow when adding a colour.
+
+| Token | Light | Dark | Usage |
+|-------|-------|------|-------|
+| `dash_bg` | `#F2F2F7` | `#0C0C0E` | App background |
+| `dash_card` | `#FFFFFF` | `#141416` | Cards |
+| `dash_section` | `#F2F2F7` | `#1C1C1F` | Inner sections |
+| `dash_border` | `#D1D1D6` | `#2A2A2E` | Borders and dividers |
+| `dash_btn` | `#E5E5EA` | `#222226` | Inactive button background |
+| `dash_text_lo` | `#8E8E93` | `#52525B` | Section headers |
+| `dash_accent` | `#0284C7` | `#38BDF8` | Active selection (blue) |
+| `dash_accent_dim` | `#E0F2FE` | `#0C4A6E` | Active selection background |
+| `dash_eco` | `#16A34A` | `#22C55E` | ECO mode (green) |
+| `dash_warn` | `#D97706` | `#F59E0B` | Warning (amber) |
+| `dash_danger` | `#E11D48` | `#F43F5E` | Delete / danger actions |
+| `text_primary` | `#1C1C1E` | `#FFFFFF` | Primary text |
+| `text_secondary` | `#6C6C70` | `#B0B0B0` | Secondary text |
+
+Every `*_dim` colour is the background paired with its vivid counterpart: `dash_eco_dim`,
+`dash_warn_dim` and `dash_danger_dim` follow the same principle as `dash_accent_dim`.
+
+> **Naming pitfall:** `bg_dark` is `#FFFFFF` in the light theme. The name dates back to when the
+> app only had a dark theme; it means the general background, not a dark colour.
 
 ---
 

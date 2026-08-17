@@ -808,13 +808,26 @@ class SettingsFragment : Fragment() {
      * doute on ne suppose jamais l'accord.
      */
     private fun showExternalApiConfirm(onResult: (Boolean) -> Unit) {
+        val danger = requireContext().getColor(R.color.dash_danger)
         val warn = getString(R.string.external_api_confirm_warn)
         val body = getString(R.string.external_api_confirm_msg)
-        val text = android.text.SpannableStringBuilder("$warn\n\n$body")
-        text.setSpan(android.text.style.ForegroundColorSpan(requireContext().getColor(R.color.dash_danger)),
+        // getText et non getString : la ressource contient un <b> autour de « à vos risques et
+        // périls ». Le gras vient donc du fichier de chaînes, ce qui reste juste dans les six
+        // langues — le localiser en code aurait supposé de connaître la sous-chaîne traduite.
+        val risk = getText(R.string.external_api_confirm_risk)
+
+        val text = android.text.SpannableStringBuilder("$warn\n\n$body\n\n")
+        val riskStart = text.length
+        text.append(risk)
+
+        // Rouge + gras sur l'ouverture, rouge seul sur la clôture : l'avertissement encadre
+        // l'explication, et le gras reste réservé à la phrase la plus forte.
+        text.setSpan(android.text.style.ForegroundColorSpan(danger),
             0, warn.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         text.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
             0, warn.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(android.text.style.ForegroundColorSpan(danger),
+            riskStart, text.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
 
         var answered = false
         AlertDialog.Builder(requireContext())

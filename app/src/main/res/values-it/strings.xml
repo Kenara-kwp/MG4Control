@@ -364,6 +364,7 @@
     <!-- Confirmation d'activation de l'API externe (issue #79) -->
     <string name="external_api_confirm_title">Attivare l\'API esterna?</string>
     <string name="external_api_confirm_warn">QUALSIASI APP INSTALLATA POTRÀ PRENDERE IL CONTROLLO DEL VEICOLO.</string>
-    <string name="external_api_confirm_msg">Modalità di guida, rigenerazione, ADAS, sedili riscaldati e profili diventano controllabili da un\'app di terze parti, senza ulteriore autorizzazione da parte sua.\n\nIl blocco per velocità resta attivo.\n\nAttivi questa opzione solo se usa davvero KeyMapper, Tasker o uno strumento equivalente.</string>
+    <string name="external_api_confirm_msg">Modalità di guida, rigenerazione, sedili e volante riscaldati, climatizzazione e profili diventano controllabili da un\'app di terze parti, senza ulteriore autorizzazione da parte sua.\n\nIl blocco per velocità resta attivo.\n\nAttivi questa opzione solo se usa davvero KeyMapper, Tasker o uno strumento equivalente.</string>
+    <string name="external_api_confirm_risk">Attiva questa opzione <b>a suo rischio e pericolo</b>: resta l\'unico responsabile di ciò che un\'app di terze parti farà al suo veicolo.</string>
     <string name="external_api_confirm_ok">Conferma</string>
 </resources>

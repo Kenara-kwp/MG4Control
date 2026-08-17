@@ -364,6 +364,7 @@
     <!-- Confirmation d'activation de l'API externe (issue #79) -->
     <string name="external_api_confirm_title">Externe API aktivieren?</string>
     <string name="external_api_confirm_warn">JEDE INSTALLIERTE APP KANN DANN DAS FAHRZEUG STEUERN.</string>
-    <string name="external_api_confirm_msg">Fahrmodus, Rekuperation, ADAS, Sitzheizung und Profile werden für Dritt-Apps steuerbar, ohne weitere Zustimmung Ihrerseits.\n\nDie Geschwindigkeitssperre bleibt aktiv.\n\nNur aktivieren, wenn Sie KeyMapper, Tasker oder ein ähnliches Werkzeug wirklich nutzen.</string>
+    <string name="external_api_confirm_msg">Fahrmodus, Rekuperation, Sitz- und Lenkradheizung, Klimaanlage und Profile werden für Dritt-Apps steuerbar, ohne weitere Zustimmung Ihrerseits.\n\nDie Geschwindigkeitssperre bleibt aktiv.\n\nNur aktivieren, wenn Sie KeyMapper, Tasker oder ein ähnliches Werkzeug wirklich nutzen.</string>
+    <string name="external_api_confirm_risk">Sie aktivieren dies <b>auf eigene Gefahr</b>: Sie bleiben allein verantwortlich für alles, was eine Dritt-App mit Ihrem Fahrzeug macht.</string>
     <string name="external_api_confirm_ok">Bestätigen</string>
 </resources>

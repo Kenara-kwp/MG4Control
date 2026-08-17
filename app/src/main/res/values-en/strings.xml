@@ -364,6 +364,7 @@
     <!-- Confirmation d'activation de l'API externe (issue #79) -->
     <string name="external_api_confirm_title">Enable the external API?</string>
     <string name="external_api_confirm_warn">ANY INSTALLED APP WILL BE ABLE TO TAKE CONTROL OF THE VEHICLE.</string>
-    <string name="external_api_confirm_msg">Drive mode, regeneration, ADAS, heated seats and profiles become controllable by a third-party app, with no further approval from you.\n\nThe speed lock stays active.\n\nOnly enable this if you actually use KeyMapper, Tasker or a similar tool.</string>
+    <string name="external_api_confirm_msg">Drive mode, regeneration, heated seats and steering wheel, climate control and profiles become controllable by a third-party app, with no further approval from you.\n\nThe speed lock stays active.\n\nOnly enable this if you actually use KeyMapper, Tasker or a similar tool.</string>
+    <string name="external_api_confirm_risk">You enable this <b>at your own risk</b>: you remain solely responsible for whatever a third-party app does to your vehicle.</string>
     <string name="external_api_confirm_ok">Confirm</string>
 </resources>
