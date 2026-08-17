@@ -356,4 +356,14 @@
     <!-- Raccourcis : categories -->
     <string name="shortcuts_cat_buttons">Botões</string>
     <string name="shortcuts_cat_actions">Ações</string>
+
+    <!-- API externe (issue #79) -->
+    <string name="settings_external_api">API externa (KeyMapper, Tasker…)</string>
+    <string name="settings_external_api_warn">⚠ Permite que qualquer app instalada controle as definições de condução. O bloqueio por velocidade continua ativo. Deixe desativado se não precisar.</string>
+
+    <!-- Confirmation d'activation de l'API externe (issue #79) -->
+    <string name="external_api_confirm_title">Ativar a API externa?</string>
+    <string name="external_api_confirm_warn">QUALQUER APLICAÇÃO INSTALADA PODERÁ ASSUMIR O CONTROLO DO VEÍCULO.</string>
+    <string name="external_api_confirm_msg">Modo de condução, regeneração, ADAS, bancos aquecidos e perfis passam a ser controláveis por uma app de terceiros, sem mais autorização da sua parte.\n\nO bloqueio por velocidade continua ativo.\n\nAtive esta opção apenas se usar realmente o KeyMapper, Tasker ou ferramenta equivalente.</string>
+    <string name="external_api_confirm_ok">Confirmar</string>
 </resources>

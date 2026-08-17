@@ -356,4 +356,14 @@
     <!-- Raccourcis : categories -->
     <string name="shortcuts_cat_buttons">Tasten</string>
     <string name="shortcuts_cat_actions">Aktionen</string>
+
+    <!-- API externe (issue #79) -->
+    <string name="settings_external_api">Externe API (KeyMapper, Tasker…)</string>
+    <string name="settings_external_api_warn">⚠ Erlaubt jeder installierten App, Fahreinstellungen zu steuern. Die Geschwindigkeitssperre bleibt aktiv. Aus lassen, wenn nicht benötigt.</string>
+
+    <!-- Confirmation d'activation de l'API externe (issue #79) -->
+    <string name="external_api_confirm_title">Externe API aktivieren?</string>
+    <string name="external_api_confirm_warn">JEDE INSTALLIERTE APP KANN DANN DAS FAHRZEUG STEUERN.</string>
+    <string name="external_api_confirm_msg">Fahrmodus, Rekuperation, ADAS, Sitzheizung und Profile werden für Dritt-Apps steuerbar, ohne weitere Zustimmung Ihrerseits.\n\nDie Geschwindigkeitssperre bleibt aktiv.\n\nNur aktivieren, wenn Sie KeyMapper, Tasker oder ein ähnliches Werkzeug wirklich nutzen.</string>
+    <string name="external_api_confirm_ok">Bestätigen</string>
 </resources>

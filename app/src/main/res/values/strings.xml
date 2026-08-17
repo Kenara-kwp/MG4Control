@@ -358,4 +358,14 @@
     <!-- Raccourcis : categories -->
     <string name="shortcuts_cat_buttons">Boutons</string>
     <string name="shortcuts_cat_actions">Actions</string>
+
+    <!-- API externe (issue #79) -->
+    <string name="settings_external_api">API externe (KeyMapper, Tasker…)</string>
+    <string name="settings_external_api_warn">⚠ Permet à toute application installée de piloter les réglages de conduite. Le verrou de vitesse reste actif. Laissez désactivé si vous n\'en avez pas l\'usage.</string>
+
+    <!-- Confirmation d'activation de l'API externe (issue #79) -->
+    <string name="external_api_confirm_title">Activer l\'API externe ?</string>
+    <string name="external_api_confirm_warn">N\'IMPORTE QUELLE APPLICATION INSTALLÉE POURRA PRENDRE LE CONTRÔLE DU VÉHICULE.</string>
+    <string name="external_api_confirm_msg">Mode de conduite, régénération, ADAS, sièges chauffants et profils deviennent pilotables par une application tierce, sans autorisation supplémentaire de votre part.\n\nLe blocage au-delà d\'une certaine vitesse reste actif.\n\nN\'activez cette option que si vous utilisez réellement KeyMapper, Tasker ou un outil équivalent.</string>
+    <string name="external_api_confirm_ok">Confirmer</string>
 </resources>

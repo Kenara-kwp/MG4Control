@@ -356,4 +356,14 @@
     <!-- Raccourcis : categories -->
     <string name="shortcuts_cat_buttons">Pulsanti</string>
     <string name="shortcuts_cat_actions">Azioni</string>
+
+    <!-- API externe (issue #79) -->
+    <string name="settings_external_api">API esterna (KeyMapper, Tasker…)</string>
+    <string name="settings_external_api_warn">⚠ Consente a qualsiasi app installata di controllare le impostazioni di guida. Il blocco per velocità resta attivo. Lasciare disattivato se non serve.</string>
+
+    <!-- Confirmation d'activation de l'API externe (issue #79) -->
+    <string name="external_api_confirm_title">Attivare l\'API esterna?</string>
+    <string name="external_api_confirm_warn">QUALSIASI APP INSTALLATA POTRÀ PRENDERE IL CONTROLLO DEL VEICOLO.</string>
+    <string name="external_api_confirm_msg">Modalità di guida, rigenerazione, ADAS, sedili riscaldati e profili diventano controllabili da un\'app di terze parti, senza ulteriore autorizzazione da parte sua.\n\nIl blocco per velocità resta attivo.\n\nAttivi questa opzione solo se usa davvero KeyMapper, Tasker o uno strumento equivalente.</string>
+    <string name="external_api_confirm_ok">Conferma</string>
 </resources>

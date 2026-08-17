@@ -24,6 +24,9 @@ import com.mg4.control.automation.AutomationDecision
 import com.mg4.control.automation.AutomationSettings
 import com.mg4.control.automation.ClimateAutomationDecision
 import com.mg4.control.automation.ClimateAutomationSettings
+import com.mg4.control.api.ExternalApi
+import com.mg4.control.api.ExternalApiReceiver
+import com.mg4.control.model.DriveMode
 import com.mg4.control.bluetooth.BluetoothProfileManager
 import com.mg4.control.debug.AppLogger
 import com.mg4.control.hardware.MG4Hardware
@@ -87,6 +90,9 @@ class MG4ControlService : Service() {
     // ── Receiver sync thème launcher ─────────────────────────────────────────
     private var skinChangeReceiver: BroadcastReceiver? = null
 
+    // ── Receiver API externe (issue #79) ─────────────────────────────────────
+    private var externalApiReceiver: BroadcastReceiver? = null
+
     // ── Listener de cycle d'allumage (Katman5) ──────────────────────────────
     private var vehicleConditionListener: ((Int) -> Unit)? = null
 
@@ -106,7 +112,34 @@ class MG4ControlService : Service() {
         registerHardkeyReceiver()
         registerBtAclReceiver()        // [BT-PROFILES]
         registerSkinChangeReceiver()   // [THEME-AUTO]
+        registerExternalApiReceiver()  // issue #79
         registerIgnitionListener()
+    }
+
+    /**
+     * Deuxième enregistrement du receiver d'API externe, en plus de celui du Manifest.
+     *
+     * ⚠️ INDISPENSABLE, ne pas supprimer en croyant faire un doublon : depuis Android 8, un
+     * receiver déclaré au Manifest ne reçoit plus les broadcasts **implicites**, et une action
+     * personnalisée en est un. KeyMapper ou Tasker enverraient l'intent sans que rien n'arrive,
+     * silencieusement. Un receiver enregistré par code n'a pas cette limite.
+     *
+     * Le Manifest reste utile pour les émetteurs qui ciblent explicitement le paquet
+     * (`setPackage`), y compris quand le service n'est pas encore démarré.
+     */
+    private fun registerExternalApiReceiver() {
+        externalApiReceiver = ExternalApiReceiver()
+        val filter = IntentFilter().apply {
+            addAction(ExternalApi.ACTION_EXECUTE)
+            addAction(ExternalApi.ACTION_SET)
+            // Les actions directes sont construites depuis la même liste que le Manifest :
+            // en ajouter une ne doit se faire qu'à un seul endroit côté code.
+            ExternalApi.DIRECT_ACTIONS.forEach { addAction(ExternalApi.ACTION_PREFIX + it) }
+        }
+        // Émetteurs tiers par nature : l'export est explicite. Le contrôle d'accès est
+        // l'interrupteur des Réglages, vérifié dans le receiver ET dans le service.
+        ContextCompat.registerReceiver(this, externalApiReceiver, filter, ContextCompat.RECEIVER_EXPORTED)
+        AppLogger.i(ExternalApi.LOG_TAG, "receiver API externe enregistré (dynamique + Manifest)")
     }
 
     override fun onDestroy() {
@@ -119,13 +152,106 @@ class MG4ControlService : Service() {
         btAclReceiver = null
         skinChangeReceiver?.let { unregisterReceiver(it) } // [THEME-AUTO]
         skinChangeReceiver = null
+        externalApiReceiver?.let { unregisterReceiver(it) } // issue #79
+        externalApiReceiver = null
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         AppLogger.i(TAG, "onStartCommand")
+        // Relais de l'API externe (issue #79) : traité AVANT la routine de démarrage, sinon un
+        // simple appel tiers relancerait l'application du profil par défaut à chaque commande.
+        if (handleExternalApiIntent(intent)) return START_STICKY
         tryClimateAutomation("démarrage service")
         scheduleDefaultProfileOnce()
         return START_STICKY
+    }
+
+    /**
+     * Exécute une commande venue d'[ExternalApiReceiver]. Retourne vrai si l'intent en était une.
+     *
+     * Le contrôle d'accès a déjà eu lieu dans le receiver ; on le revérifie quand même, parce que
+     * ce service est aussi démarrable autrement et qu'un interrupteur de sécurité ne doit pas
+     * dépendre d'un seul point de passage.
+     */
+    private fun handleExternalApiIntent(intent: Intent?): Boolean {
+        val action = intent?.action ?: return false
+        if (action != ExternalApi.ACTION_EXECUTE && action != ExternalApi.ACTION_SET) return false
+        if (!ExternalApi.isEnabled(this)) {
+            AppLogger.i(ExternalApi.LOG_TAG, "REFUS $action — API externe désactivée")
+            return true
+        }
+
+        if (action == ExternalApi.ACTION_EXECUTE) {
+            val name = intent.getStringExtra(ExternalApi.EXTRA_ACTION).orEmpty()
+            val sc = ShortcutAction.values().firstOrNull { it.name.equals(name, ignoreCase = true) }
+            if (sc == null || sc == ShortcutAction.NONE) {
+                AppLogger.w(ExternalApi.LOG_TAG, "action inconnue : '$name'")
+                return true
+            }
+            // APPLY_PROFILE lit d'ordinaire l'id stocké pour la touche volant. Depuis l'API, le
+            // profil est nommé dans l'intent : on le résout et on l'applique directement.
+            if (sc == ShortcutAction.APPLY_PROFILE) {
+                applyProfileByName(intent.getStringExtra(ExternalApi.EXTRA_PROFILE))
+                return true
+            }
+            AppLogger.i(ExternalApi.LOG_TAG, "EXECUTE ${sc.name}")
+            executeToggle(sc)
+            return true
+        }
+
+        // ── ACTION_SET ────────────────────────────────────────────────────────
+        val key   = intent.getStringExtra(ExternalApi.EXTRA_KEY).orEmpty()
+        val value = intent.getStringExtra(ExternalApi.EXTRA_VALUE).orEmpty()
+        AppLogger.i(ExternalApi.LOG_TAG, "SET $key=$value")
+
+        CoroutineScope(Dispatchers.IO).launch {
+            // Toutes ces écritures passent par MG4Hardware, donc par VehicleWriteGate : refusées
+            // en roulant sans que l'API ait à s'en préoccuper.
+            val ok = when (key) {
+                ExternalApi.SET_DRIVE_MODE -> DriveMode.values()
+                    .firstOrNull { it.name.equals(value, true) }
+                    ?.let { MG4Hardware.setDriveMode(it); true } ?: false
+                ExternalApi.SET_REGEN -> RegenLevel.values()
+                    .firstOrNull { it.name.equals(value, true) }
+                    ?.let { MG4Hardware.setRegenLevel(it); true } ?: false
+                ExternalApi.SET_SEAT_HEAT_LEFT ->
+                    value.toIntOrNull()?.takeIf { it in 0..3 }
+                        ?.let { MG4Hardware.setSeatHeatLeft(it); true } ?: false
+                ExternalApi.SET_SEAT_HEAT_RIGHT ->
+                    value.toIntOrNull()?.takeIf { it in 0..3 }
+                        ?.let { MG4Hardware.setSeatHeatRight(it); true } ?: false
+                ExternalApi.SET_STEERING_HEAT -> {
+                    val on = value.equals("true", true) || value == "1"
+                    MG4Hardware.setSteeringHeat(on); true
+                }
+                ExternalApi.SET_PROFILE -> { applyProfileByName(value); true }
+                else -> false
+            }
+            if (!ok) AppLogger.w(ExternalApi.LOG_TAG, "SET refusé — clé ou valeur invalide ($key=$value)")
+        }
+        return true
+    }
+
+    /** Applique un profil désigné par son NOM (insensible à la casse) ou son id. */
+    private fun applyProfileByName(nameOrId: String?) {
+        val wanted = nameOrId?.trim().orEmpty()
+        if (wanted.isEmpty()) {
+            AppLogger.w(ExternalApi.LOG_TAG, "APPLY_PROFILE sans nom de profil")
+            return
+        }
+        CoroutineScope(Dispatchers.IO).launch {
+            val pm = ProfileManager(applicationContext)
+            val profile = pm.getById(wanted)
+                ?: pm.getAll().firstOrNull { it.name.equals(wanted, ignoreCase = true) }
+            if (profile == null) {
+                AppLogger.w(ExternalApi.LOG_TAG, "profil introuvable : '$wanted'")
+                return@launch
+            }
+            AppLogger.i(ExternalApi.LOG_TAG, "application du profil '${profile.name}'")
+            ProfileApplier.apply(profile, autoStart = true) { ok ->
+                AppLogger.i(ExternalApi.LOG_TAG, "profil '${profile.name}' — ok=$ok")
+            }
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
