@@ -307,4 +307,55 @@
     <string name="automation_dir_below">Inférieure à</string>
     <string name="automation_dir_above">Supérieure à</string>
     <string name="automation_confirm_msg_above">La température extérieure est au-dessus de %1$d°C\n(%2$s°C température actuelle)\nVoulez-vous appliquer le profil « %3$s » ?</string>
+    <string name="automation_profile_title">Application d\'un profil via la température</string>
+
+    <!-- Automatisation A/C -->
+    <string name="ac_auto_title">Déclenchement A/C via la température</string>
+    <string name="ac_auto_desc">Régler la climatisation selon la température extérieure</string>
+    <string name="ac_auto_hot">Température supérieure</string>
+    <string name="ac_auto_cold">Température inférieure</string>
+    <string name="ac_auto_threshold_hot_label">Seuil de déclenchement (°C)</string>
+    <string name="ac_auto_threshold_cold_label">Seuil de déclenchement (°C)</string>
+    <string name="ac_auto_threshold_hint">-20–60</string>
+    <string name="ac_auto_target_label">Température cible (°C)</string>
+    <string name="ac_auto_target_hint">15–33</string>
+    <string name="ac_auto_fan_label">Ventilation</string>
+    <string name="ac_auto_fan_hint">1–10</string>
+    <string name="ac_auto_def_front">Dégivrage avant</string>
+    <string name="ac_auto_def_rear">Dégivrage arrière</string>
+    <string name="ac_auto_note">Appliqué au démarrage du véhicule : la climatisation et l\'A/C sont allumés, puis les réglages ci-dessus sont envoyés.</string>
+    <string name="clim_card_title">Climatisation</string>
+    <string name="clim_temperature">Température</string>
+    <string name="clim_fan">Ventilation</string>
+    <string name="clim_modes_title">Modes</string>
+    <string name="clim_section_switches">Commandes</string>
+    <string name="clim_power">Système</string>
+    <string name="clim_ac">A/C</string>
+    <string name="clim_auto">Auto</string>
+    <string name="clim_section_loop">Recirculation</string>
+    <string name="clim_loop_inner">Intérieur</string>
+    <string name="clim_loop_outside">Extérieur</string>
+    <string name="clim_loop_auto">Auto</string>
+    <string name="clim_section_defrost">Dégivrage</string>
+    <string name="clim_defrost_front">Avant</string>
+    <string name="clim_defrost_rear">Arrière</string>
+    <string name="clim_write_failed">Réglage climatisation refusé par le véhicule</string>
+
+    <!-- Editeur de profil : categories -->
+    <string name="profile_cat_drive">Conduite</string>
+    <string name="profile_cat_safety">Sécurité</string>
+    <string name="profile_cat_comfort">Confort</string>
+    <string name="climate_seat_heat">Sièges chauffants</string>
+    <string name="profile_heat_toggle_hint">Prise en compte du chauffage : si désactivé, le profil ne touche pas à ce réglage.</string>
+
+    <!-- Reglages : categories -->
+    <string name="settings_cat_lang">Langues</string>
+    <string name="settings_cat_ui">Interface</string>
+    <string name="settings_cat_advanced">Réglages avancés</string>
+    <string name="settings_cat_info">Infos</string>
+    <string name="settings_maintenance">Maintenance</string>
+
+    <!-- Raccourcis : categories -->
+    <string name="shortcuts_cat_buttons">Boutons</string>
+    <string name="shortcuts_cat_actions">Actions</string>
 </resources>

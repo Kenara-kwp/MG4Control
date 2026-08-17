@@ -10,6 +10,14 @@ data class DrivingProfile(
     val steeringHeat: Boolean = false,
     val seatHeatLeft: Int = 0,        // 0=off, 1, 2, 3
     val seatHeatRight: Int = 0,
+    // Prise en compte du chauffage : décorrélée de la valeur. `seatHeatLeft=0` voulait dire
+    // « appliquer : éteint » — il manquait un moyen de dire « ne pas y toucher ».
+    // ⚠️ NULLABLES À DESSEIN : Gson n'appelle pas le constructeur Kotlin, donc un défaut `= true`
+    // ne s'appliquerait PAS aux profils déjà enregistrés (champ absent → false) et le chauffage
+    // cesserait silencieusement d'être appliqué. Avec `Boolean?`, un champ absent reste null, et
+    // null se lit « activé » via les accesseurs ci-dessous → aucune migration, aucune régression.
+    val steeringHeatEnabled: Boolean? = null,
+    val seatHeatEnabled: Boolean? = null,
     // ADAS SWI133 (Katman4) — valeurs par défaut OFF pour compatibilité profils existants
     val overspeedAlarm: Boolean = false,
     val speedLimitTone: Boolean = false,
@@ -38,4 +46,10 @@ data class DrivingProfile(
     val isDefault: Boolean = false,
     // [BT-PROFILES] MAC de l'appareil Bluetooth associé à ce profil (null = aucun)
     val btDeviceMac: String? = null
-)
+) {
+    /** Volant chauffant à appliquer ? (profil d'avant la fonction → oui, comportement inchangé) */
+    val appliesSteeringHeat: Boolean get() = steeringHeatEnabled ?: true
+
+    /** Sièges chauffants à appliquer ? (idem) */
+    val appliesSeatHeat: Boolean get() = seatHeatEnabled ?: true
+}

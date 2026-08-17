@@ -94,12 +94,22 @@ object ProfileApplier {
 
             // Volant + Sièges chauffants — uniquement SWI133 et SWI68 (SWI69/SWI131 n'ont pas ces équipements)
             if (FirmwareInfo.hasHeatFeatures()) {
-                val shOk = MG4Hardware.setSteeringHeat(profile.steeringHeat)
-                AppLogger.i(TAG, "  SteeringHeat=${profile.steeringHeat} → $shOk")
-                val slOk = MG4Hardware.setSeatHeatLeft(profile.seatHeatLeft)
-                AppLogger.i(TAG, "  SeatHeatLeft=${profile.seatHeatLeft} → $slOk")
-                val srOk = MG4Hardware.setSeatHeatRight(profile.seatHeatRight)
-                AppLogger.i(TAG, "  SeatHeatRight=${profile.seatHeatRight} → $srOk")
+                // Chauffages décochés dans le profil = on NE TOUCHE À RIEN (ni allumer, ni éteindre),
+                // sinon appliquer un profil écraserait un réglage que le conducteur vient de faire.
+                if (profile.appliesSteeringHeat) {
+                    val shOk = MG4Hardware.setSteeringHeat(profile.steeringHeat)
+                    AppLogger.i(TAG, "  SteeringHeat=${profile.steeringHeat} → $shOk")
+                } else {
+                    AppLogger.i(TAG, "  SteeringHeat non pris en compte par ce profil — inchangé")
+                }
+                if (profile.appliesSeatHeat) {
+                    val slOk = MG4Hardware.setSeatHeatLeft(profile.seatHeatLeft)
+                    AppLogger.i(TAG, "  SeatHeatLeft=${profile.seatHeatLeft} → $slOk")
+                    val srOk = MG4Hardware.setSeatHeatRight(profile.seatHeatRight)
+                    AppLogger.i(TAG, "  SeatHeatRight=${profile.seatHeatRight} → $srOk")
+                } else {
+                    AppLogger.i(TAG, "  SeatHeat non pris en compte par ce profil — inchangé")
+                }
             }
 
             AppLogger.i(TAG, "Profil '${profile.name}' Katman1 terminé — ok=$ok")

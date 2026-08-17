@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ScrollView
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
@@ -105,7 +106,7 @@ class ShortcutsFragment : Fragment() {
 
         // ── Affichage des sections de config selon firmware ───────────────
         // Tous les firmwares connus utilisent la config 5 modes (Off/Lim.Manuel/Lim.Auto/ACC/ICA|TJA).
-        view.findViewById<View>(R.id.config_adas_section)?.visibility = if (isKnown) View.VISIBLE else View.GONE
+        adasSupported = isKnown
         view.findViewById<View>(R.id.config_adas_swi133)?.visibility  = if (isKnown) View.VISIBLE else View.GONE
         view.findViewById<View>(R.id.config_adas_swi68)?.visibility   = View.GONE
 
@@ -117,6 +118,94 @@ class ShortcutsFragment : Fragment() {
         setupSpinners(view)
         setupConfigListeners(view)
         restoreState()
+
+        // En dernier : le rail compte les sections visibles, il doit donc voir l'état final.
+        rootView = view
+        refreshActionConfigVisibility()
+        bindCategoryRail(view)
+    }
+
+    // ── Onglets « Boutons » / « Actions » ────────────────────────────────
+
+    /** Vrai si le firmware expose le cycle ADAS (sinon la section reste masquée en permanence). */
+    private var adasSupported = false
+    private var rootView: View? = null
+    /** Rejoue la sélection d'onglet après un changement de visibilité (le rail peut apparaître
+     *  ou disparaître quand l'utilisateur attribue ou retire une action). */
+    private var reselectTabs: (() -> Unit)? = null
+
+    /**
+     * N'affiche un réglage d'action que si l'action est réellement attribuée à un bouton :
+     * régler le niveau de retour du mode 1 pédale n'a aucun sens si aucun bouton ne le déclenche.
+     *
+     * Appelée au démarrage ET à chaque changement de sélection dans un spinner — sinon le réglage
+     * n'apparaîtrait qu'au prochain passage sur l'écran.
+     */
+    private fun refreshActionConfigVisibility() {
+        val view = rootView ?: return
+        val assigned = slotPressList.map { ShortcutAction.fromId(prefs.getInt("shortcut_$it", 0)) }
+
+        val showOnePedal = assigned.any { it == ShortcutAction.ONE_PEDAL }
+        val showAdas     = adasSupported && assigned.any { it == ShortcutAction.ADAS_CYCLE }
+
+        view.findViewById<View>(R.id.config_onepedal_section)?.visibility =
+            if (showOnePedal) View.VISIBLE else View.GONE
+        view.findViewById<View>(R.id.config_adas_section)?.visibility =
+            if (showAdas) View.VISIBLE else View.GONE
+
+        reselectTabs?.invoke()
+    }
+
+    /**
+     * Rail de gauche — même motif que l'éditeur de profil et les Réglages, à ceci près que le
+     * contenu de l'onglet Actions dépend des choix de l'utilisateur : si plus rien n'y est
+     * visible, l'onglet disparaît et l'écran redevient une page unique.
+     */
+    private fun bindCategoryRail(view: View) {
+        val tabs = listOf(
+            view.findViewById<MaterialButton>(R.id.btn_sc_cat_buttons) to view.findViewById<ViewGroup>(R.id.page_sc_buttons),
+            view.findViewById<MaterialButton>(R.id.btn_sc_cat_actions) to view.findViewById<ViewGroup>(R.id.page_sc_actions)
+        )
+        val scroll = view.findViewById<ScrollView>(R.id.scroll_shortcuts)
+        // Le rail reprend l'accent des deux autres écrans refondus (dash_accent), pas l'accent vert
+        // propre aux boutons de cet écran : c'est le même composant de navigation partout.
+        val dimColor = requireContext().getColor(R.color.dash_accent_dim)
+        val railOn   = requireContext().getColor(R.color.dash_accent)
+        val railOff  = requireContext().getColor(R.color.dash_btn)
+        val border   = requireContext().getColor(R.color.dash_border)
+        val textOff  = requireContext().getColor(R.color.text_secondary)
+
+        fun hasVisibleContent(page: ViewGroup): Boolean =
+            (0 until page.childCount).any { page.getChildAt(it).visibility == View.VISIBLE }
+
+        fun apply() {
+            val usable = tabs.filter { (_, page) -> hasVisibleContent(page) }
+            tabs.forEach { (btn, page) ->
+                btn.visibility = if (usable.any { it.second === page }) View.VISIBLE else View.GONE
+            }
+            // L'onglet courant vient d'être masqué (action retirée) → retomber sur le premier.
+            if (usable.none { it.second.visibility == View.VISIBLE }) {
+                usable.firstOrNull()?.let { (_, page) -> page.visibility = View.VISIBLE }
+            }
+            tabs.forEach { (btn, page) ->
+                val on = page.visibility == View.VISIBLE
+                btn.backgroundTintList = ColorStateList.valueOf(if (on) dimColor else railOff)
+                btn.setTextColor(if (on) railOn else textOff)
+                btn.strokeColor = ColorStateList.valueOf(if (on) railOn else border)
+            }
+        }
+
+        tabs.forEach { (btn, page) ->
+            btn.setOnClickListener {
+                tabs.forEach { (_, p) -> p.visibility = if (p === page) View.VISIBLE else View.GONE }
+                scroll?.scrollTo(0, 0)
+                apply()
+            }
+        }
+        reselectTabs = { apply() }
+        tabs.first().second.visibility = View.VISIBLE
+        tabs.drop(1).forEach { (_, p) -> p.visibility = View.GONE }
+        apply()
     }
 
     // ── Spinners (un adapter par spinner) ────────────────────────────────
@@ -149,6 +238,8 @@ class ShortcutsFragment : Fragment() {
                     override fun onItemSelected(parent: AdapterView<*>, v: View?, pos: Int, id: Long) {
                         val action = baseActionItems[pos].action
                         saveInt("shortcut_$slotKey", action.id)
+                        // Le réglage lié à l'action doit apparaître (ou disparaître) tout de suite.
+                        refreshActionConfigVisibility()
                         if (initialized) {
                             when (action) {
                                 ShortcutAction.OPEN_CUSTOM_APP -> showAppPickerDialog(slotKey)

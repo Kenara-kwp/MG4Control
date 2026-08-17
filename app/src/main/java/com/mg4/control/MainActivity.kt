@@ -4,7 +4,6 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.Paint
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -12,9 +11,11 @@ import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import com.google.android.material.button.MaterialButton
+import com.mg4.control.debug.AppLogger
 import com.mg4.control.hardware.MG4Hardware
 import com.mg4.control.profile.ProfileManager
 import com.mg4.control.service.MG4ControlService
@@ -36,6 +37,25 @@ class MainActivity : AppCompatActivity() {
         super.attachBaseContext(LocaleHelper.applyLocale(newBase))
     }
 
+    /**
+     * [THEME-AUTO] Re-resout le theme a chaque retour au premier plan.
+     *
+     * Indispensable sur old-SDK : le launcher change bien le night mode (UiModeManager le reflete)
+     * mais le systeme ne met PAS a jour Configuration.uiMode, donc AUCUN changement de
+     * configuration n'est delivre et l'activite n'est jamais recreee toute seule. Le retour au
+     * premier plan est le bon moment : on ne peut pas changer le theme du launcher sans quitter
+     * MG4Control.
+     */
+    override fun onResume() {
+        super.onResume()
+        val target = ThemeHelper.resolveNightMode(this)
+        if (target != AppCompatDelegate.getDefaultNightMode()) {
+            AppLogger.i("MG4_THEME", "onResume : theme change -> application du mode $target")
+            // Recree les activites vivantes : pas de recreate() manuel a ajouter.
+            AppCompatDelegate.setDefaultNightMode(target)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -44,6 +64,7 @@ class MainActivity : AppCompatActivity() {
         FirmwareInfo.initWithContext(this)
 
         // [THEME-AUTO] Recrée l'activité quand le launcher MG change de thème en mode "auto"
+        // (voie A9 : broadcast com.saicmotor.changeSkin reçu par le service)
         ThemeHelper.onThemeChanged = { recreate() }
 
         // Premier lancement : choix de la langue avant tout
@@ -61,10 +82,9 @@ class MainActivity : AppCompatActivity() {
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         navController = navHostFragment.navController
 
-        setupFirmwareChips()
         setupNavButtons()
         setupDiagnosticUnlock()
-        checkUnknownFirmware()  // après setupFirmwareChips pour que les chips soient prêtes
+        checkUnknownFirmware()
         navigateToDefaultScreen(savedInstanceState)
         checkForUpdates()
         checkProfileRestore()
@@ -157,103 +177,6 @@ class MainActivity : AppCompatActivity() {
             }
             // onNoUpdate et onError ignorés au démarrage — silencieux si tout va bien
         )
-    }
-
-    // ── Indicateur firmware (chips SWI133 / SWI68 / SWI69 / SWI131 / SWI165) ──
-
-    private fun setupFirmwareChips() {
-        val chip133 = findViewById<TextView>(R.id.chip_swi133)
-        val chip132 = findViewById<TextView>(R.id.chip_swi132)
-        val chip68  = findViewById<TextView>(R.id.chip_swi68)
-        val chip69  = findViewById<TextView>(R.id.chip_swi69)
-        val chip131 = findViewById<TextView>(R.id.chip_swi131)
-        val chip165 = findViewById<TextView>(R.id.chip_swi165)
-        val gen     = FirmwareInfo.getGeneration()
-        val forced  = FirmwareInfo.isForced(this)
-
-        fun styleChipActive(tv: TextView) {
-            tv.setBackgroundResource(R.drawable.bg_chip_active)
-            tv.setTextColor(getColor(R.color.dash_accent))
-            tv.alpha = 1f
-            tv.paintFlags = tv.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
-        }
-
-        fun styleChipInactive(tv: TextView) {
-            tv.setBackgroundResource(R.drawable.bg_chip_inactive)
-            tv.setTextColor(getColor(R.color.dash_text_lo))
-            tv.alpha = 0.4f
-            tv.paintFlags = tv.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
-        }
-
-        fun styleChipSelectable(tv: TextView) {
-            // Firmware inconnu sans choix forcé : chip cliquable, surlignée en rouge
-            tv.setBackgroundResource(R.drawable.bg_chip_inactive)
-            tv.setTextColor(getColor(R.color.dash_danger))
-            tv.alpha = 0.75f
-            tv.paintFlags = tv.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
-        }
-
-        val isNaturalUnknown = gen == FirmwareInfo.Gen.UNKNOWN && !forced
-        val allChips = listOf(chip133, chip132, chip68, chip69, chip131, chip165)
-
-        when {
-            isNaturalUnknown -> {
-                // Les six chips en mode "à choisir" (rouge dim, aucune barrée)
-                allChips.forEach { styleChipSelectable(it) }
-            }
-            gen == FirmwareInfo.Gen.SWI165 -> {
-                styleChipActive(chip165)
-                listOf(chip133, chip132, chip68, chip69, chip131).forEach { styleChipInactive(it) }
-            }
-            gen == FirmwareInfo.Gen.SWI131 -> {
-                styleChipActive(chip131)
-                listOf(chip133, chip132, chip68, chip69, chip165).forEach { styleChipInactive(it) }
-            }
-            gen == FirmwareInfo.Gen.SWI69 -> {
-                styleChipActive(chip69)
-                listOf(chip133, chip132, chip68, chip131, chip165).forEach { styleChipInactive(it) }
-            }
-            gen == FirmwareInfo.Gen.SWI68 -> {
-                styleChipActive(chip68)
-                listOf(chip133, chip132, chip69, chip131, chip165).forEach { styleChipInactive(it) }
-            }
-            gen == FirmwareInfo.Gen.SWI132 -> {
-                styleChipActive(chip132)
-                listOf(chip133, chip68, chip69, chip131, chip165).forEach { styleChipInactive(it) }
-            }
-            else -> { // SWI133 ou forcé SWI133
-                styleChipActive(chip133)
-                listOf(chip132, chip68, chip69, chip131, chip165).forEach { styleChipInactive(it) }
-            }
-        }
-
-        // Chips cliquables si firmware inconnu (naturel ou forcé) pour changer de mode
-        if (gen == FirmwareInfo.Gen.UNKNOWN || forced) {
-            chip133.setOnClickListener {
-                FirmwareInfo.forceGeneration(this, FirmwareInfo.Gen.SWI133)
-                recreate()
-            }
-            chip132.setOnClickListener {
-                FirmwareInfo.forceGeneration(this, FirmwareInfo.Gen.SWI132)
-                recreate()
-            }
-            chip68.setOnClickListener {
-                FirmwareInfo.forceGeneration(this, FirmwareInfo.Gen.SWI68)
-                recreate()
-            }
-            chip69.setOnClickListener {
-                FirmwareInfo.forceGeneration(this, FirmwareInfo.Gen.SWI69)
-                recreate()
-            }
-            chip131.setOnClickListener {
-                FirmwareInfo.forceGeneration(this, FirmwareInfo.Gen.SWI131)
-                recreate()
-            }
-            chip165.setOnClickListener {
-                FirmwareInfo.forceGeneration(this, FirmwareInfo.Gen.SWI165)
-                recreate()
-            }
-        }
     }
 
     // ── Dialog firmware non reconnu ───────────────────────────────────────────

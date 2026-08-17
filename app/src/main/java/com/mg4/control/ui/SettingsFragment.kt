@@ -11,6 +11,7 @@ import com.mg4.control.MainActivity
 import com.mg4.control.util.ThemeHelper
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
@@ -43,6 +44,7 @@ import com.mg4.control.update.UpdateChecker
 import com.mg4.control.update.UpdateDialogManager
 import java.io.File
 import com.mg4.control.util.FirmwareHelper
+import com.mg4.control.util.FirmwareInfo
 import com.mg4.control.util.LocaleHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -317,6 +319,19 @@ class SettingsFragment : Fragment() {
             showDiagnosticDialog()
         }
 
+        // [TEST TEMPORAIRE] Appui LONG sur Diagnostic → test d'écriture climatisation.
+        // Délibérément pas sur le clic simple : le Diagnostic s'ouvre souvent et ce test
+        // modifie brièvement la clim de la voiture (puis restaure l'état d'origine).
+        btnDiagnostic.setOnLongClickListener {
+            Toast.makeText(
+                requireContext(),
+                "Test écriture climatisation lancé — voir les logs MG4_CLIM (~4 s)",
+                Toast.LENGTH_LONG
+            ).show()
+            CoroutineScope(Dispatchers.IO).launch { MG4Hardware.runClimateWriteTest() }
+            true
+        }
+
         // ── Bouton Infos ─────────────────────────────────────────────────────
         view.findViewById<MaterialButton>(R.id.btn_infos).setOnClickListener {
             showInfosDialog()
@@ -326,6 +341,53 @@ class SettingsFragment : Fragment() {
         view.findViewById<MaterialButton>(R.id.btn_close_settings).setOnClickListener {
             findNavController().popBackStack(R.id.dashboardFragment, false)
         }
+
+        // En dernier : le rail masque un onglet dont la page n'a plus rien de visible, il doit
+        // donc être câblé APRÈS toutes les décisions de visibilité ci-dessus (build offline,
+        // firmware sans extinction véhicule…), sinon le décompte serait faux.
+        setupFirmwareChips(view)
+        bindCategoryRail(view, accentDim, inactiveColor, accentColor, textActive, textInactive)
+    }
+
+    /**
+     * Rail de gauche : une catégorie visible à la fois — même motif que l'éditeur de profil.
+     *
+     * Le bouton Diagnostic reste dans l'arbre même sur une page masquée : [MainActivity] peut donc
+     * continuer à le révéler en direct après les 5 clics sur le logo, quel que soit l'onglet ouvert.
+     */
+    private fun bindCategoryRail(
+        view: View, accentDim: Int, inactive: Int, accent: Int, textOn: Int, textOff: Int
+    ) {
+        val tabs = listOf(
+            view.findViewById<MaterialButton>(R.id.btn_set_cat_lang)     to view.findViewById<ViewGroup>(R.id.page_set_lang),
+            view.findViewById<MaterialButton>(R.id.btn_set_cat_ui)       to view.findViewById<ViewGroup>(R.id.page_set_ui),
+            view.findViewById<MaterialButton>(R.id.btn_set_cat_advanced) to view.findViewById<ViewGroup>(R.id.page_set_advanced),
+            view.findViewById<MaterialButton>(R.id.btn_set_cat_info)     to view.findViewById<ViewGroup>(R.id.page_set_info)
+        )
+        val scroll = view.findViewById<ScrollView>(R.id.scroll_settings)
+
+        fun hasVisibleContent(page: ViewGroup): Boolean =
+            (0 until page.childCount).any { page.getChildAt(it).visibility == View.VISIBLE }
+
+        val usable = tabs.filter { (_, page) -> hasVisibleContent(page) }
+        tabs.forEach { (btn, page) ->
+            btn.visibility = if (usable.any { it.second === page }) View.VISIBLE else View.GONE
+        }
+        if (usable.isEmpty()) return
+
+        fun select(target: ViewGroup) {
+            tabs.forEach { (btn, page) ->
+                val on = page === target
+                page.visibility = if (on) View.VISIBLE else View.GONE
+                btn.backgroundTintList = ColorStateList.valueOf(if (on) accentDim else inactive)
+                btn.setTextColor(if (on) textOn else textOff)
+                btn.strokeColor = ColorStateList.valueOf(
+                    if (on) accent else requireContext().getColor(R.color.dash_border))
+            }
+            scroll?.scrollTo(0, 0)   // changer d'onglet en gardant le scroll précédent désoriente
+        }
+        usable.forEach { (btn, page) -> btn.setOnClickListener { select(page) } }
+        select(usable.first().second)
     }
 
 
@@ -395,6 +457,13 @@ class SettingsFragment : Fragment() {
         MG4Hardware.runTemperatureDiag()
         // Sonde vitesse : logge la vitesse brute (validation de l'unité par firmware).
         MG4Hardware.runSpeedDiag()
+        // Sonde climatisation : lecture seule, repère ce qui répond avant tout pilotage.
+        MG4Hardware.runClimateDiag()
+        // Chasse à la consigne de température (candidats × zones + voie OEM).
+        MG4Hardware.runClimateSetpointHunt()
+        // Sonde thème : quelle source de day/night répond sur ce firmware. Contexte d'ACTIVITÉ —
+        // c'est sa configuration qui décide des ressources affichées.
+        ThemeHelper.runDiagnostic(ctx)
 
         val appVersion = try {
             ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?"
@@ -595,4 +664,102 @@ class SettingsFragment : Fragment() {
 
         dialog.show()
     }
+    // ── Indicateur firmware (deplace depuis la barre du haut) ────────────────
+    // Les pastilles affichent la generation detectee et, quand la voiture n'est pas reconnue,
+    // permettent d'en forcer une. Elles vivent desormais dans Reglages > Infos.
+    private fun setupFirmwareChips(view: View) {
+        val chip133 = view.findViewById<TextView>(R.id.chip_swi133)
+        val chip132 = view.findViewById<TextView>(R.id.chip_swi132)
+        val chip68  = view.findViewById<TextView>(R.id.chip_swi68)
+        val chip69  = view.findViewById<TextView>(R.id.chip_swi69)
+        val chip131 = view.findViewById<TextView>(R.id.chip_swi131)
+        val chip165 = view.findViewById<TextView>(R.id.chip_swi165)
+        val gen     = FirmwareInfo.getGeneration()
+        val forced  = FirmwareInfo.isForced(requireContext())
+
+        fun styleChipActive(tv: TextView) {
+            tv.setBackgroundResource(R.drawable.bg_chip_active)
+            tv.setTextColor(requireContext().getColor(R.color.dash_accent))
+            tv.alpha = 1f
+            tv.paintFlags = tv.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
+        }
+
+        fun styleChipInactive(tv: TextView) {
+            tv.setBackgroundResource(R.drawable.bg_chip_inactive)
+            tv.setTextColor(requireContext().getColor(R.color.dash_text_lo))
+            tv.alpha = 0.4f
+            tv.paintFlags = tv.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
+        }
+
+        fun styleChipSelectable(tv: TextView) {
+            // Firmware inconnu sans choix forcé : chip cliquable, surlignée en rouge
+            tv.setBackgroundResource(R.drawable.bg_chip_inactive)
+            tv.setTextColor(requireContext().getColor(R.color.dash_danger))
+            tv.alpha = 0.75f
+            tv.paintFlags = tv.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
+        }
+
+        val isNaturalUnknown = gen == FirmwareInfo.Gen.UNKNOWN && !forced
+        val allChips = listOf(chip133, chip132, chip68, chip69, chip131, chip165)
+
+        when {
+            isNaturalUnknown -> {
+                // Les six chips en mode "à choisir" (rouge dim, aucune barrée)
+                allChips.forEach { styleChipSelectable(it) }
+            }
+            gen == FirmwareInfo.Gen.SWI165 -> {
+                styleChipActive(chip165)
+                listOf(chip133, chip132, chip68, chip69, chip131).forEach { styleChipInactive(it) }
+            }
+            gen == FirmwareInfo.Gen.SWI131 -> {
+                styleChipActive(chip131)
+                listOf(chip133, chip132, chip68, chip69, chip165).forEach { styleChipInactive(it) }
+            }
+            gen == FirmwareInfo.Gen.SWI69 -> {
+                styleChipActive(chip69)
+                listOf(chip133, chip132, chip68, chip131, chip165).forEach { styleChipInactive(it) }
+            }
+            gen == FirmwareInfo.Gen.SWI68 -> {
+                styleChipActive(chip68)
+                listOf(chip133, chip132, chip69, chip131, chip165).forEach { styleChipInactive(it) }
+            }
+            gen == FirmwareInfo.Gen.SWI132 -> {
+                styleChipActive(chip132)
+                listOf(chip133, chip68, chip69, chip131, chip165).forEach { styleChipInactive(it) }
+            }
+            else -> { // SWI133 ou forcé SWI133
+                styleChipActive(chip133)
+                listOf(chip132, chip68, chip69, chip131, chip165).forEach { styleChipInactive(it) }
+            }
+        }
+
+        // Chips cliquables si firmware inconnu (naturel ou forcé) pour changer de mode
+        if (gen == FirmwareInfo.Gen.UNKNOWN || forced) {
+            chip133.setOnClickListener {
+                FirmwareInfo.forceGeneration(requireContext(), FirmwareInfo.Gen.SWI133)
+                requireActivity().recreate()
+            }
+            chip132.setOnClickListener {
+                FirmwareInfo.forceGeneration(requireContext(), FirmwareInfo.Gen.SWI132)
+                requireActivity().recreate()
+            }
+            chip68.setOnClickListener {
+                FirmwareInfo.forceGeneration(requireContext(), FirmwareInfo.Gen.SWI68)
+                requireActivity().recreate()
+            }
+            chip69.setOnClickListener {
+                FirmwareInfo.forceGeneration(requireContext(), FirmwareInfo.Gen.SWI69)
+                requireActivity().recreate()
+            }
+            chip131.setOnClickListener {
+                FirmwareInfo.forceGeneration(requireContext(), FirmwareInfo.Gen.SWI131)
+                requireActivity().recreate()
+            }
+            chip165.setOnClickListener {
+                FirmwareInfo.forceGeneration(requireContext(), FirmwareInfo.Gen.SWI165)
+                requireActivity().recreate()
+            }
+        }
+    }
+
 }

@@ -305,4 +305,55 @@
     <string name="automation_dir_below">Below</string>
     <string name="automation_dir_above">Above</string>
     <string name="automation_confirm_msg_above">The outside temperature is above %1$d°C\n(%2$s°C current temperature)\nApply profile “%3$s”?</string>
+    <string name="automation_profile_title">Apply a profile based on temperature</string>
+
+    <!-- A/C automation -->
+    <string name="ac_auto_title">Trigger A/C based on temperature</string>
+    <string name="ac_auto_desc">Set the climate control according to the outside temperature</string>
+    <string name="ac_auto_hot">Temperature above</string>
+    <string name="ac_auto_cold">Temperature below</string>
+    <string name="ac_auto_threshold_hot_label">Trigger threshold (°C)</string>
+    <string name="ac_auto_threshold_cold_label">Trigger threshold (°C)</string>
+    <string name="ac_auto_threshold_hint">-20–60</string>
+    <string name="ac_auto_target_label">Target temperature (°C)</string>
+    <string name="ac_auto_target_hint">15–33</string>
+    <string name="ac_auto_fan_label">Fan speed</string>
+    <string name="ac_auto_fan_hint">1–10</string>
+    <string name="ac_auto_def_front">Front defrost</string>
+    <string name="ac_auto_def_rear">Rear defrost</string>
+    <string name="ac_auto_note">Applied when the vehicle starts: climate control and A/C are turned on, then the settings above are sent.</string>
+    <string name="clim_card_title">Climate</string>
+    <string name="clim_temperature">Temperature</string>
+    <string name="clim_fan">Fan</string>
+    <string name="clim_modes_title">Modes</string>
+    <string name="clim_section_switches">Controls</string>
+    <string name="clim_power">System</string>
+    <string name="clim_ac">A/C</string>
+    <string name="clim_auto">Auto</string>
+    <string name="clim_section_loop">Recirculation</string>
+    <string name="clim_loop_inner">Inside</string>
+    <string name="clim_loop_outside">Outside</string>
+    <string name="clim_loop_auto">Auto</string>
+    <string name="clim_section_defrost">Defrost</string>
+    <string name="clim_defrost_front">Front</string>
+    <string name="clim_defrost_rear">Rear</string>
+    <string name="clim_write_failed">Climate setting refused by the vehicle</string>
+
+    <!-- Editeur de profil : categories -->
+    <string name="profile_cat_drive">Driving</string>
+    <string name="profile_cat_safety">Safety</string>
+    <string name="profile_cat_comfort">Comfort</string>
+    <string name="climate_seat_heat">Heated seats</string>
+    <string name="profile_heat_toggle_hint">Heating control: when off, the profile leaves this setting untouched.</string>
+
+    <!-- Reglages : categories -->
+    <string name="settings_cat_lang">Languages</string>
+    <string name="settings_cat_ui">Interface</string>
+    <string name="settings_cat_advanced">Advanced settings</string>
+    <string name="settings_cat_info">Info</string>
+    <string name="settings_maintenance">Maintenance</string>
+
+    <!-- Raccourcis : categories -->
+    <string name="shortcuts_cat_buttons">Buttons</string>
+    <string name="shortcuts_cat_actions">Actions</string>
 </resources>

@@ -1,27 +1,2044 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Container dashboard — ViewPager2 horizontal pour naviguer entre les pages.
-    Page 0 : paramètres principaux (conduite, climat, alertes)
-    Page 1 : Assistant de sortie de voie (ELK)
+    Ecran principal — rail de categories a gauche, contenu defilant a droite.
+    Le ViewPager2 a ete retire : une seule vue porte les trois pages, masquees/affichees
+    par le rail. Consequence importante : les trois anciens layouts de page sont fusionnes
+    dans CET arbre, ce qui est sûr car leurs ids ne se recouvrent pas (verifie).
 -->
-<FrameLayout
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/dash_bg">
+    android:orientation="horizontal"
+    android:background="@color/dash_bg"
+    android:padding="14dp">
 
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/dashboard_pager"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <!-- Indicateur de page (dots) — centré en bas -->
     <LinearLayout
-        android:id="@+id/pager_dots"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="3dp"
-        android:orientation="horizontal" />
+        android:layout_width="180dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingEnd="14dp">
 
-</FrameLayout>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_dash_cat_drive"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginBottom="8dp"
+                android:text="@string/profile_cat_drive"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp"
+                android:textAllCaps="true"
+                app:backgroundTint="@color/dash_btn"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/dash_border"
+                app:cornerRadius="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_dash_cat_safety"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginBottom="8dp"
+                android:text="@string/profile_cat_safety"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp"
+                android:textAllCaps="true"
+                app:backgroundTint="@color/dash_btn"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/dash_border"
+                app:cornerRadius="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_dash_cat_comfort"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginBottom="8dp"
+                android:text="@string/profile_cat_comfort"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp"
+                android:textAllCaps="true"
+                app:backgroundTint="@color/dash_btn"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/dash_border"
+                app:cornerRadius="8dp" />
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="@color/dash_border" />
+
+    <ScrollView
+        android:id="@+id/scroll_dashboard"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:overScrollMode="ifContentScrolls">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="14dp">
+
+            <!-- ═══════════ CONDUITE ═══════════ -->
+            <LinearLayout
+                android:id="@+id/page_dash_drive"
+                android:divider="@drawable/spacer_v12"
+                android:showDividers="middle"
+                                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+            <!-- ── Section Mode de conduite ───────────────────────────── -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp"
+                android:layout_marginEnd="5dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/drive_section_mode"
+                    android:textColor="@color/dash_text_lo"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true"
+                    android:paddingBottom="5dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/dash_border"
+                    android:layout_marginBottom="5dp" />
+
+                <!-- Grille 2×2 : ECO / NORMAL / SPORT / SNOW -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginEnd="5dp">
+
+                        <Button
+                            android:id="@+id/btn_eco"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:layout_marginBottom="3dp"
+                            android:text="@string/drive_eco"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_sport"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:text="@string/drive_sport"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="5dp">
+
+                        <Button
+                            android:id="@+id/btn_normal"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:layout_marginBottom="3dp"
+                            android:text="@string/drive_normal"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_snow"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:text="@string/drive_snow"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- CUSTOM pleine largeur -->
+                <Button
+                    android:id="@+id/btn_custom"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="@string/drive_custom"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true"
+                    android:paddingTop="5dp"
+                    android:paddingBottom="5dp" />
+
+                <!-- Économie d'énergie — bouton toggle sous Custom (masqué par défaut) -->
+                <Button
+                    android:id="@+id/btn_energy_saving"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="@string/drive_energy_saving"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true"
+                    android:paddingTop="5dp"
+                    android:paddingBottom="5dp"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+            <!-- ── Section Régénération ────────────────────────────────── -->
+            <LinearLayout
+                android:id="@+id/section_regen"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp"
+                android:layout_marginStart="5dp"
+                android:layout_marginEnd="5dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/drive_section_regen"
+                    android:textColor="@color/dash_text_lo"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true"
+                    android:paddingBottom="5dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/dash_border"
+                    android:layout_marginBottom="5dp" />
+
+                <!-- Grille 2×3 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginEnd="5dp">
+
+                        <Button
+                            android:id="@+id/btn_regen_off"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:layout_marginBottom="3dp"
+                            android:text="@string/regen_off"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_regen_medium"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:layout_marginBottom="3dp"
+                            android:text="@string/regen_medium"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_regen_adaptive"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:text="@string/regen_adaptive_short"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="5dp">
+
+                        <Button
+                            android:id="@+id/btn_regen_low"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:layout_marginBottom="3dp"
+                            android:text="@string/regen_low"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_regen_high"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:layout_marginBottom="3dp"
+                            android:text="@string/regen_high"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_regen_one_pedal"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:text="@string/regen_one_pedal_short"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </LinearLayout>
+            </LinearLayout>
+
+            <!-- ═══════════ SECURITE ═══════════ -->
+            <LinearLayout
+                android:id="@+id/page_dash_safety"
+                android:divider="@drawable/spacer_v12"
+                android:showDividers="middle"
+                                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+            <!-- ── Section ADAS ────────────────────────────────────────── -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp"
+                android:layout_marginStart="5dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="ADAS"
+                    android:textColor="@color/dash_text_lo"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12"
+                    android:paddingBottom="5dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/dash_border"
+                    android:layout_marginBottom="5dp" />
+
+                <!-- SWI133/SWI132 : OFF / LIM.MANUEL / LIM.AUTO / ACC / ICA  (2 rangées) -->
+                <LinearLayout
+                    android:id="@+id/adas_group_swi133"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <!-- Rangée 1 : Off / Lim. Manuel / Lim. Auto -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="3dp">
+
+                        <Button
+                            android:id="@+id/btn_adas_off"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="5dp"
+                            android:text="@string/adas_off"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_adas_limiteur"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginStart="5dp"
+                            android:layout_marginEnd="5dp"
+                            android:text="@string/adas_limiteur_short"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_adas_auto"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginStart="5dp"
+                            android:text="@string/adas_auto"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                    </LinearLayout>
+
+                    <!-- Rangée 2 : ACC / ICA -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btn_adas_acc"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="5dp"
+                            android:text="@string/adas_acc"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_adas_ica"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginStart="5dp"
+                            android:layout_marginEnd="5dp"
+                            android:text="@string/adas_ica"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <!-- Spacer pour aligner sur 3 colonnes -->
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginStart="5dp" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- SWI68/69/131/165 : OFF / LIM.MANUEL / LIM.AUTO / ACC / TJA  (2 rangées) -->
+                <LinearLayout
+                    android:id="@+id/adas_group_swi68"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <!-- Rangée 1 : Off / Lim. Manuel / Lim. Auto -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="3dp">
+
+                        <Button
+                            android:id="@+id/btn_swi68_off"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="5dp"
+                            android:text="@string/adas_off"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_swi68_lim"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginStart="5dp"
+                            android:layout_marginEnd="5dp"
+                            android:text="@string/adas_limiteur_short"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_swi68_auto"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginStart="5dp"
+                            android:text="@string/adas_auto"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                    </LinearLayout>
+
+                    <!-- Rangée 2 : ACC / TJA -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btn_swi68_acc"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="5dp"
+                            android:text="@string/adas_acc"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_swi68_tja"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginStart="5dp"
+                            android:layout_marginEnd="5dp"
+                            android:text="@string/adas_tja"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginStart="5dp" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        <!-- ── Carte SÉCURITÉ & ALERTES ─────────────────────────────── -->
+        <LinearLayout
+                    android:id="@+id/alerts_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card_rounded"
+            android:layout_marginStart="5dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/card_alerts"
+                android:textColor="@color/dash_text_lo"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.12"
+                android:textAllCaps="true"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="7dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/dash_border" />
+
+            <!-- 2 colonnes : Sécurité (gauche) | Alertes (droite) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="14dp">
+
+                <!-- ── Colonne gauche : AEB ── -->
+                <LinearLayout
+                    android:id="@+id/aeb_group"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_section_rounded"
+                    android:padding="9dp"
+                    android:layout_marginEnd="5dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/adas_section_aeb"
+                        android:textColor="@color/dash_text_lo"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.12"
+                        android:textAllCaps="true"
+                        android:paddingBottom="5dp" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/dash_border"
+                        android:layout_marginBottom="6dp" />
+
+                    <!-- Toggle AEB ON/OFF -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="6dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/adas_aeb_switch"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.05"
+                            android:textAllCaps="true" />
+
+                        <Switch
+                            android:scaleX="1.3"
+                            android:scaleY="1.3"
+                            android:layout_marginHorizontal="8dp"
+                            android:id="@+id/switch_aeb"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+
+                    </LinearLayout>
+
+                    <!-- Mode AEB : Alerte / Alerte + Freinage -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btn_aeb_alarm"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="52dp"
+                            android:layout_marginEnd="5dp"
+                            android:text="@string/adas_aeb_alarm"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                        <Button
+                            android:id="@+id/btn_aeb_alarm_brake"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="52dp"
+                            android:layout_marginStart="5dp"
+                            android:text="@string/adas_aeb_alarm_brake"
+                            android:textColor="@color/text_secondary"
+                            android:backgroundTint="@color/dash_btn"
+                            android:textSize="16sp"
+                            android:textAllCaps="true" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- ── Colonne droite : Alertes sonores ── -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_section_rounded"
+                    android:padding="9dp"
+                    android:layout_marginStart="5dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/adas_section_sounds"
+                        android:textColor="@color/dash_text_lo"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.12"
+                        android:textAllCaps="true"
+                        android:paddingBottom="5dp" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/dash_border"
+                        android:layout_marginBottom="6dp" />
+
+                    <!-- 2 colonnes : TSR à gauche, autres alertes à droite -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="horizontal">
+
+                        <!-- Colonne gauche : TSR -->
+                        <LinearLayout
+                            android:id="@+id/section_tsr"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/adas_tsr"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                android:letterSpacing="0.05"
+                                android:textAllCaps="true" />
+
+                            <Switch
+                                android:scaleX="1.3"
+                                android:scaleY="1.3"
+                                android:layout_marginHorizontal="8dp"
+                            android:id="@+id/switch_tsr"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content" />
+
+                        </LinearLayout>
+
+                        <!-- Séparateur vertical -->
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="match_parent"
+                            android:background="@color/dash_border"
+                            android:layout_marginStart="6dp"
+                            android:layout_marginEnd="6dp" />
+
+                        <!-- Colonne droite : alertes spécifiques au firmware -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:gravity="center_vertical">
+
+                            <!-- SWI133 : Survitesse + Chgt vitesse -->
+                            <LinearLayout
+                                android:id="@+id/alerts_group_swi133"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:visibility="gone">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:layout_marginBottom="6dp">
+
+                                    <TextView
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:text="@string/adas_overspeed_alarm"
+                                        android:textColor="@color/text_secondary"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold"
+                                        android:letterSpacing="0.05"
+                                        android:textAllCaps="true" />
+
+                                    <Switch
+                                        android:scaleX="1.3"
+                                        android:scaleY="1.3"
+                                        android:layout_marginHorizontal="8dp"
+                            android:id="@+id/switch_overspeed"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content" />
+
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical">
+
+                                    <TextView
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:text="@string/adas_speed_limit_tone"
+                                        android:textColor="@color/text_secondary"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold"
+                                        android:letterSpacing="0.05"
+                                        android:textAllCaps="true" />
+
+                                    <Switch
+                                        android:scaleX="1.3"
+                                        android:scaleY="1.3"
+                                        android:layout_marginHorizontal="8dp"
+                            android:id="@+id/switch_speed_tone"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content" />
+
+                                </LinearLayout>
+
+                            </LinearLayout>
+
+                            <!-- SWI68/69/131 : Alerte sonore -->
+                            <LinearLayout
+                                android:id="@+id/alerts_group_swi68"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:visibility="gone">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical">
+
+                                    <TextView
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:text="@string/adas_sound_warning"
+                                        android:textColor="@color/text_secondary"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold"
+                                        android:letterSpacing="0.05"
+                                        android:textAllCaps="true" />
+
+                                    <Switch
+                                        android:scaleX="1.3"
+                                        android:scaleY="1.3"
+                                        android:layout_marginHorizontal="8dp"
+                            android:id="@+id/switch_sound_warning"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content" />
+
+                                </LinearLayout>
+
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!--  CARTE : Anticollision avant (AEB) — SWI133 uniquement            -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <LinearLayout
+        android:id="@+id/aeb_card_page2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_card_rounded"
+        android:layout_marginBottom="8dp"
+        android:visibility="gone">
+
+        <!-- Titre -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/aeb_card_title"
+            android:textColor="@color/dash_text_lo"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.12"
+            android:textAllCaps="true"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="7dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/dash_border" />
+
+        <!-- Contenu : 3 colonnes — Toggle | Mode | Sensibilité -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="10dp">
+
+            <!-- ── Colonne 1 : Activation ────────────────────────── -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.8"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp"
+                android:layout_marginEnd="5dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/elk_section_toggle"
+                    android:textColor="@color/dash_text_lo"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true"
+                    android:paddingBottom="5dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/dash_border"
+                    android:layout_marginBottom="5dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center">
+
+                    <Switch
+                        android:scaleX="1.3"
+                        android:scaleY="1.3"
+                        android:layout_marginHorizontal="8dp"
+                            android:id="@+id/switch_aeb_p2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- ── Colonne 2 : Mode ───────────────────────────────── -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1.1"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp"
+                android:layout_marginStart="5dp"
+                android:layout_marginEnd="5dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/elk_section_mode"
+                    android:textColor="@color/dash_text_lo"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true"
+                    android:paddingBottom="5dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/dash_border"
+                    android:layout_marginBottom="5dp" />
+
+                <Button
+                    android:id="@+id/btn_aeb_alarm_p2"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="3dp"
+                    android:text="@string/adas_aeb_alarm"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+                <Button
+                    android:id="@+id/btn_aeb_alarm_brake_p2"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="@string/adas_aeb_alarm_brake"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+            </LinearLayout>
+
+            <!-- ── Colonne 3 : Sensibilité ───────────────────────── -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp"
+                android:layout_marginStart="5dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/aeb_section_sensitivity"
+                    android:textColor="@color/dash_text_lo"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true"
+                    android:paddingBottom="5dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/dash_border"
+                    android:layout_marginBottom="5dp" />
+
+                <Button
+                    android:id="@+id/btn_aeb_sen_low"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="3dp"
+                    android:text="@string/aeb_sensitivity_low"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+                <Button
+                    android:id="@+id/btn_aeb_sen_standard"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="3dp"
+                    android:text="@string/aeb_sensitivity_standard"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+                <Button
+                    android:id="@+id/btn_aeb_sen_high"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="@string/aeb_sensitivity_high"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!--  CARTE : Assistant de sortie de voie (ELK)                       -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_card_rounded">
+
+        <!-- Titre -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/elk_card_title"
+            android:textColor="@color/dash_text_lo"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.12"
+            android:textAllCaps="true"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="7dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/dash_border" />
+
+        <!-- Contenu : 3 colonnes — Toggle | Mode | Sensibilité -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="10dp">
+
+            <!-- ── Colonne 1 : Activation ────────────────────────── -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.8"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp"
+                android:layout_marginEnd="5dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/elk_section_toggle"
+                    android:textColor="@color/dash_text_lo"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true"
+                    android:paddingBottom="5dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/dash_border"
+                    android:layout_marginBottom="5dp" />
+
+                <!-- Non-SWI132 : switch centré (layout par défaut) -->
+                <LinearLayout
+                    android:id="@+id/elk_activation_simple"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center">
+
+                    <Switch
+                        android:scaleX="1.3"
+                        android:scaleY="1.3"
+                        android:layout_marginHorizontal="8dp"
+                            android:id="@+id/switch_elk"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
+
+                <!-- SWI132 : 3 lignes labelisées — visibility=gone par défaut (affiché par code) -->
+                <LinearLayout
+                    android:id="@+id/elk_activation_swi132"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_vertical"
+                    android:visibility="gone">
+
+                    <!-- Ligne ACTIVER -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/elk_label_enable"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="16sp"
+                            android:textAllCaps="false" />
+                        <Switch
+                            android:scaleX="1.3"
+                            android:scaleY="1.3"
+                            android:layout_marginHorizontal="8dp"
+                            android:id="@+id/switch_elk_s132"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+
+                    <!-- Ligne ALERTE SONORE -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/elk_sound_warning"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="16sp"
+                            android:textAllCaps="false" />
+                        <Switch
+                            android:scaleX="1.3"
+                            android:scaleY="1.3"
+                            android:layout_marginHorizontal="8dp"
+                            android:id="@+id/switch_elk_sound"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+
+                    <!-- Ligne VIBRATION -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/elk_vibration_reminder"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="16sp"
+                            android:textAllCaps="false" />
+                        <Switch
+                            android:scaleX="1.3"
+                            android:scaleY="1.3"
+                            android:layout_marginHorizontal="8dp"
+                            android:id="@+id/switch_elk_vibration"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- ── Colonne 2 : Mode d'assistance ─────────────────── -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp"
+                android:layout_marginStart="5dp"
+                android:layout_marginEnd="5dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/elk_section_mode"
+                    android:textColor="@color/dash_text_lo"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true"
+                    android:paddingBottom="5dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/dash_border"
+                    android:layout_marginBottom="5dp" />
+
+                <Button
+                    android:id="@+id/btn_elk_alert"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="3dp"
+                    android:text="@string/elk_mode_alert"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+                <Button
+                    android:id="@+id/btn_elk_assist"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="3dp"
+                    android:text="@string/elk_mode_assist"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+                <Button
+                    android:id="@+id/btn_elk_emergency"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="@string/elk_mode_emergency"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+            </LinearLayout>
+
+            <!-- ── Colonne 3 : Sensibilité des alertes ───────────── -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp"
+                android:layout_marginStart="5dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/elk_section_sensitivity"
+                    android:textColor="@color/dash_text_lo"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true"
+                    android:paddingBottom="5dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/dash_border"
+                    android:layout_marginBottom="5dp" />
+
+                <Button
+                    android:id="@+id/btn_elk_sen_low"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="3dp"
+                    android:text="@string/elk_sensitivity_low"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+                <Button
+                    android:id="@+id/btn_elk_sen_standard"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="3dp"
+                    android:text="@string/elk_sensitivity_standard"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+                <Button
+                    android:id="@+id/btn_elk_sen_high"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="@string/elk_sensitivity_high"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- ═══════════ CONFORT ═══════════ -->
+            <LinearLayout
+                android:id="@+id/page_dash_comfort"
+                android:divider="@drawable/spacer_v12"
+                android:showDividers="middle"
+                                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+        <!-- ── Carte CLIMAT (masquée en SWI69 — pas de sièges/volant chauffant) -->
+        <LinearLayout
+            android:id="@+id/climate_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_card_rounded"
+            android:layout_marginEnd="5dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/card_climate"
+                android:textColor="@color/dash_text_lo"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.12"
+                android:textAllCaps="true"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="7dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/dash_border" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="10dp">
+
+                <!-- Volant chauffant -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="0.65"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_section_rounded"
+                    android:padding="9dp"
+                    android:layout_marginEnd="5dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/climate_steering_heat"
+                        android:textColor="@color/dash_text_lo"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.12"
+                        android:textAllCaps="true"
+                        android:paddingBottom="5dp" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/dash_border"
+                        android:layout_marginBottom="5dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center">
+
+                        <Switch
+                            android:scaleX="1.3"
+                            android:scaleY="1.3"
+                            android:layout_marginHorizontal="8dp"
+                            android:id="@+id/switch_steering_heat"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- Siège gauche -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_section_rounded"
+                    android:padding="9dp"
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/climate_seat_left"
+                        android:textColor="@color/dash_text_lo"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.12"
+                        android:textAllCaps="true"
+                        android:paddingBottom="5dp" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/dash_border"
+                        android:layout_marginBottom="5dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginEnd="5dp">
+
+                            <Button
+                                android:id="@+id/btn_seat_left_0"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:layout_marginBottom="2dp"
+                                android:text="@string/climate_off"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+
+                            <Button
+                                android:id="@+id/btn_seat_left_2"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:text="@string/climate_level_2"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="5dp">
+
+                            <Button
+                                android:id="@+id/btn_seat_left_1"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:layout_marginBottom="2dp"
+                                android:text="@string/climate_level_1"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+
+                            <Button
+                                android:id="@+id/btn_seat_left_3"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:text="@string/climate_level_3"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- Siège droit -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:background="@drawable/bg_section_rounded"
+                    android:padding="9dp"
+                    android:layout_marginStart="5dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/climate_seat_right"
+                        android:textColor="@color/dash_text_lo"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.12"
+                        android:textAllCaps="true"
+                        android:paddingBottom="5dp" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/dash_border"
+                        android:layout_marginBottom="5dp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginEnd="5dp">
+
+                            <Button
+                                android:id="@+id/btn_seat_right_0"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:layout_marginBottom="2dp"
+                                android:text="@string/climate_off"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+
+                            <Button
+                                android:id="@+id/btn_seat_right_2"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:text="@string/climate_level_2"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="5dp">
+
+                            <Button
+                                android:id="@+id/btn_seat_right_1"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:layout_marginBottom="2dp"
+                                android:text="@string/climate_level_1"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+
+                            <Button
+                                android:id="@+id/btn_seat_right_3"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:text="@string/climate_level_3"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+                <!-- Climatisation : consigne de temperature + ventilation.
+                     Masquee par le code si le firmware n'expose pas la clim. -->
+                <LinearLayout
+                    android:id="@+id/climate_page_section"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!--  CARTE : Température + Ventilation                                -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_card_rounded"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/clim_card_title"
+            android:textColor="@color/dash_text_lo"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.12"
+            android:textAllCaps="true"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="7dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/dash_border" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="10dp">
+
+            <!-- ── Consigne de température ─────────────────────────── -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp"
+                android:layout_marginBottom="5dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/clim_temperature"
+                        android:textColor="@color/dash_text_lo"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.08"
+                        android:textAllCaps="true" />
+
+                    <TextView
+                        android:id="@+id/clim_temp_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="--°"
+                        android:textColor="@color/dash_accent"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/clim_temp_slider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:valueFrom="16"
+                    android:valueTo="32"
+                    android:value="22"
+                    android:stepSize="1"
+                    app:labelBehavior="gone"
+                    app:thumbRadius="14dp"
+                    app:trackHeight="10dp"
+                    app:thumbColor="@color/dash_accent"
+                    app:trackColorActive="@color/dash_accent"
+                    app:trackColorInactive="@color/dash_border" />
+
+            </LinearLayout>
+
+            <!-- ── Ventilation ─────────────────────────────────────── -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/clim_fan"
+                        android:textColor="@color/dash_text_lo"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.08"
+                        android:textAllCaps="true" />
+
+                    <TextView
+                        android:id="@+id/clim_fan_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="--"
+                        android:textColor="@color/dash_accent"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/clim_fan_slider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:valueFrom="1"
+                    android:valueTo="10"
+                    android:value="1"
+                    android:stepSize="1"
+                    app:labelBehavior="gone"
+                    app:thumbRadius="14dp"
+                    app:trackHeight="10dp"
+                    app:thumbColor="@color/dash_accent"
+                    app:trackColorActive="@color/dash_accent"
+                    app:trackColorInactive="@color/dash_border" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!--  CARTE : Interrupteurs | Recirculation | Dégivrages               -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_card_rounded">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/clim_modes_title"
+            android:textColor="@color/dash_text_lo"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.12"
+            android:textAllCaps="true"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="7dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/dash_border" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="10dp">
+
+            <!-- ── Colonne 1 : Marche / A-C / AUTO ─────────────────── -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp"
+                android:layout_marginEnd="5dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/clim_section_switches"
+                    android:textColor="@color/dash_text_lo"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08"
+                    android:textAllCaps="true"
+                    android:layout_marginBottom="6dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/clim_btn_power"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="4dp"
+                    android:text="@string/clim_power"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp"
+                    android:textAllCaps="true"
+                    app:backgroundTint="@color/dash_btn"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/dash_border"
+                    app:cornerRadius="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/clim_btn_ac"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="4dp"
+                    android:text="@string/clim_ac"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp"
+                    android:textAllCaps="true"
+                    app:backgroundTint="@color/dash_btn"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/dash_border"
+                    app:cornerRadius="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/clim_btn_auto"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="@string/clim_auto"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp"
+                    android:textAllCaps="true"
+                    app:backgroundTint="@color/dash_btn"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/dash_border"
+                    app:cornerRadius="8dp" />
+
+            </LinearLayout>
+
+            <!-- ── Colonne 2 : Recirculation ───────────────────────── -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp"
+                android:layout_marginEnd="5dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/clim_section_loop"
+                    android:textColor="@color/dash_text_lo"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08"
+                    android:textAllCaps="true"
+                    android:layout_marginBottom="6dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/clim_btn_loop_inner"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="4dp"
+                    android:text="@string/clim_loop_inner"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp"
+                    android:textAllCaps="true"
+                    app:backgroundTint="@color/dash_btn"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/dash_border"
+                    app:cornerRadius="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/clim_btn_loop_outside"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="4dp"
+                    android:text="@string/clim_loop_outside"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp"
+                    android:textAllCaps="true"
+                    app:backgroundTint="@color/dash_btn"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/dash_border"
+                    app:cornerRadius="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/clim_btn_loop_auto"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="@string/clim_loop_auto"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp"
+                    android:textAllCaps="true"
+                    app:backgroundTint="@color/dash_btn"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/dash_border"
+                    app:cornerRadius="8dp" />
+
+            </LinearLayout>
+
+            <!-- ── Colonne 3 : Dégivrages ──────────────────────────── -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:background="@drawable/bg_section_rounded"
+                android:padding="9dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/clim_section_defrost"
+                    android:textColor="@color/dash_text_lo"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08"
+                    android:textAllCaps="true"
+                    android:layout_marginBottom="6dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/clim_btn_defrost_front"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginBottom="4dp"
+                    android:text="@string/clim_defrost_front"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp"
+                    android:textAllCaps="true"
+                    app:backgroundTint="@color/dash_btn"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/dash_border"
+                    app:cornerRadius="8dp" />
+
+                <!-- Dégivrage arrière : commandé par un bouton PHYSIQUE sur le véhicule.
+                     Reste ici pour vérifier si le service l'expose aussi ; il se grise
+                     automatiquement si l'état n'est pas lisible. -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/clim_btn_defrost_rear"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="@string/clim_defrost_rear"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="16sp"
+                    android:textAllCaps="true"
+                    app:backgroundTint="@color/dash_btn"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/dash_border"
+                    app:cornerRadius="8dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+
+                </LinearLayout>
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>
