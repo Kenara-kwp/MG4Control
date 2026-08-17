@@ -57,9 +57,22 @@ object ExternalApi {
 
     /** Commandes exposées en action directe (celles qui ne réclament aucun paramètre). */
     val DIRECT_ACTIONS = listOf(
-        "ONE_PEDAL", "AEB_CYCLE", "SOUND_WARNING", "OVERSPEED_ALARM", "SPEED_LIMIT_TONE",
-        "ADAS_CYCLE", "ENERGY_SAVING_TOGGLE", "TSR_TOGGLE", "PROFILE_PICKER",
-        "VEHICLE_POWER_OFF", "OPEN_APP"
+        "ONE_PEDAL", "ENERGY_SAVING_TOGGLE", "PROFILE_PICKER", "OPEN_APP"
+    )
+
+    /**
+     * Commandes VOLONTAIREMENT hors API, quelle que soit la forme d'appel.
+     *
+     * Ces sept-là touchent à la sécurité active ou coupent le véhicule ; les exposer à toute
+     * application installée n'est pas un risque acceptable. Le filtre s'applique aussi à
+     * [ACTION_EXECUTE] : les retirer des seules actions directes n'aurait rien protégé, puisque
+     * l'extra `action` y donnait le même accès sans authentification supplémentaire.
+     *
+     * Elles restent évidemment pilotables depuis l'application et les raccourcis volant.
+     */
+    val BLOCKED_ACTIONS = setOf(
+        "VEHICLE_POWER_OFF", "SOUND_WARNING", "OVERSPEED_ALARM", "SPEED_LIMIT_TONE",
+        "ADAS_CYCLE", "AEB_CYCLE", "TSR_TOGGLE"
     )
 
     /** Nom de ShortcutAction porté par une action directe, ou null si ce n'en est pas une. */
@@ -92,6 +105,18 @@ object ExternalApi {
     const val SET_SEAT_HEAT_RIGHT = "seat_heat_right"  // 0..3
     const val SET_STEERING_HEAT   = "steering_heat"    // 0|1 (ou false|true)
     const val SET_PROFILE         = "profile"          // nom ou id
+
+    // ── Climatisation ────────────────────────────────────────────────────────
+    // Réglages de confort : ils ne changent pas le comportement routier, contrairement aux
+    // commandes de [BLOCKED_ACTIONS]. Ignorés si le firmware n'expose pas la clim.
+    const val SET_HVAC_POWER   = "hvac_power"     // 0|1
+    const val SET_HVAC_AC      = "ac"             // 0|1
+    const val SET_HVAC_AUTO    = "hvac_auto"      // 0|1
+    const val SET_HVAC_TEMP    = "hvac_temp"      // °C, clampé aux bornes réelles du véhicule
+    const val SET_HVAC_FAN     = "hvac_fan"       // niveau, clampé aux bornes réelles
+    const val SET_HVAC_RECIRC  = "hvac_recirc"    // INNER|OUTSIDE|AUTO (ou 0|1|2)
+    const val SET_DEFROST_FRONT = "defrost_front" // 0|1
+    const val SET_DEFROST_REAR  = "defrost_rear"  // 0|1
 
     // ── Lecture (ContentProvider) ────────────────────────────────────────────
 

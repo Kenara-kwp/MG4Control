@@ -183,6 +183,12 @@ class MG4ControlService : Service() {
 
         if (action == ExternalApi.ACTION_EXECUTE) {
             val name = intent.getStringExtra(ExternalApi.EXTRA_ACTION).orEmpty()
+            // Filtre appliqué ICI, donc pour les deux formes d'appel : retirer une commande des
+            // seules actions directes ne protégerait rien, l'extra `action` y donnant le même accès.
+            if (name.uppercase() in ExternalApi.BLOCKED_ACTIONS) {
+                AppLogger.w(ExternalApi.LOG_TAG, "REFUS '$name' — commande non exposée à l'API externe")
+                return true
+            }
             val sc = ShortcutAction.values().firstOrNull { it.name.equals(name, ignoreCase = true) }
             if (sc == null || sc == ShortcutAction.NONE) {
                 AppLogger.w(ExternalApi.LOG_TAG, "action inconnue : '$name'")
@@ -225,11 +231,67 @@ class MG4ControlService : Service() {
                     MG4Hardware.setSteeringHeat(on); true
                 }
                 ExternalApi.SET_PROFILE -> { applyProfileByName(value); true }
-                else -> false
+                else -> setClimateFromApi(key, value)
             }
             if (!ok) AppLogger.w(ExternalApi.LOG_TAG, "SET refusé — clé ou valeur invalide ($key=$value)")
         }
         return true
+    }
+
+    /**
+     * Clés `SET` de climatisation. Retourne false si [key] n'en est pas une — l'appelant
+     * s'en sert pour distinguer « clé inconnue » de « valeur invalide ».
+     *
+     * ⚠️ Bloquant : les commandes clim SAIC sont des bascules qui avancent d'un cran à la fois,
+     * donc plusieurs secondes possibles. Appelée depuis le contexte IO de [handleExternalApiIntent].
+     *
+     * Consigne et ventilation sont clampées aux **bornes réelles du véhicule**, pas à des
+     * valeurs codées en dur : elles diffèrent d'un firmware à l'autre.
+     */
+    private fun setClimateFromApi(key: String, value: String): Boolean {
+        val hvacKeys = setOf(
+            ExternalApi.SET_HVAC_POWER, ExternalApi.SET_HVAC_AC, ExternalApi.SET_HVAC_AUTO,
+            ExternalApi.SET_HVAC_TEMP, ExternalApi.SET_HVAC_FAN, ExternalApi.SET_HVAC_RECIRC,
+            ExternalApi.SET_DEFROST_FRONT, ExternalApi.SET_DEFROST_REAR
+        )
+        if (key !in hvacKeys) return false
+        if (!MG4Hardware.hasClimateControl()) {
+            AppLogger.w(ExternalApi.LOG_TAG, "SET $key ignoré — clim non pilotable sur ce firmware")
+            return true   // clé connue : ce n'est pas une erreur de syntaxe
+        }
+        val on = value.equals("true", true) || value == "1"
+        return when (key) {
+            ExternalApi.SET_HVAC_POWER    -> { MG4Hardware.setClimatePower(on); true }
+            ExternalApi.SET_HVAC_AC       -> { MG4Hardware.setClimateAc(on); true }
+            ExternalApi.SET_HVAC_AUTO     -> { MG4Hardware.setClimateAuto(on); true }
+            ExternalApi.SET_DEFROST_FRONT -> { MG4Hardware.setClimateDefrostFront(on); true }
+            ExternalApi.SET_DEFROST_REAR  -> { MG4Hardware.setClimateDefrostRear(on); true }
+            ExternalApi.SET_HVAC_RECIRC   -> {
+                val mode = when (value.uppercase()) {
+                    "INNER", "0"   -> MG4Hardware.LoopMode.INNER
+                    "OUTSIDE", "1" -> MG4Hardware.LoopMode.OUTSIDE
+                    "AUTO", "2"    -> MG4Hardware.LoopMode.AUTO
+                    else           -> return true.also {
+                        AppLogger.w(ExternalApi.LOG_TAG, "SET $key : valeur invalide '$value'")
+                    }
+                }
+                MG4Hardware.setClimateLoopMode(mode); true
+            }
+            ExternalApi.SET_HVAC_TEMP, ExternalApi.SET_HVAC_FAN -> {
+                val n = value.toIntOrNull() ?: return true.also {
+                    AppLogger.w(ExternalApi.LOG_TAG, "SET $key : valeur non numérique '$value'")
+                }
+                val state = MG4Hardware.getClimateState() ?: return true.also {
+                    AppLogger.w(ExternalApi.LOG_TAG, "SET $key : état clim illisible")
+                }
+                if (key == ExternalApi.SET_HVAC_TEMP)
+                    MG4Hardware.setClimateTemp(n.coerceIn(state.tempMin, state.tempMax))
+                else
+                    MG4Hardware.setClimateFan(n.coerceIn(state.fanMin, state.fanMax))
+                true
+            }
+            else -> false
+        }
     }
 
     /** Applique un profil désigné par son NOM (insensible à la casse) ou son id. */

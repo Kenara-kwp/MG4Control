@@ -90,17 +90,13 @@
                 <action android:name="com.mg4.control.action.EXECUTE" />
                 <action android:name="com.mg4.control.action.SET" />
                 <!-- Une action par commande : KeyMapper ne sait saisir QUE la chaine
-                     d'action, son editeur d'intent n'a pas de champ extras. -->
+                     d'action, son editeur d'intent n'a pas de champ extras.
+                     Les commandes de securite active (ADAS, AEB, TSR, alertes) et l'extinction
+                     vehicule sont VOLONTAIREMENT absentes — cf. ExternalApi.BLOCKED_ACTIONS,
+                     qui les refuse aussi via EXECUTE. -->
                 <action android:name="com.mg4.control.action.ONE_PEDAL" />
-                <action android:name="com.mg4.control.action.AEB_CYCLE" />
-                <action android:name="com.mg4.control.action.SOUND_WARNING" />
-                <action android:name="com.mg4.control.action.OVERSPEED_ALARM" />
-                <action android:name="com.mg4.control.action.SPEED_LIMIT_TONE" />
-                <action android:name="com.mg4.control.action.ADAS_CYCLE" />
                 <action android:name="com.mg4.control.action.ENERGY_SAVING_TOGGLE" />
-                <action android:name="com.mg4.control.action.TSR_TOGGLE" />
                 <action android:name="com.mg4.control.action.PROFILE_PICKER" />
-                <action android:name="com.mg4.control.action.VEHICLE_POWER_OFF" />
                 <action android:name="com.mg4.control.action.OPEN_APP" />
             </intent-filter>
         </receiver>
