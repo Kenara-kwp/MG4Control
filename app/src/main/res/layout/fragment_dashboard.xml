@@ -85,7 +85,9 @@
             <!-- ═══════════ CONDUITE ═══════════ -->
             <LinearLayout
                 android:id="@+id/page_dash_drive"
-                android:layout_width="match_parent"
+                android:divider="@drawable/spacer_v12"
+                android:showDividers="middle"
+                                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
@@ -338,7 +340,9 @@
             <!-- ═══════════ SECURITE ═══════════ -->
             <LinearLayout
                 android:id="@+id/page_dash_safety"
-                android:layout_width="match_parent"
+                android:divider="@drawable/spacer_v12"
+                android:showDividers="middle"
+                                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:visibility="gone">
@@ -1374,7 +1378,9 @@
             <!-- ═══════════ CONFORT ═══════════ -->
             <LinearLayout
                 android:id="@+id/page_dash_comfort"
-                android:layout_width="match_parent"
+                android:divider="@drawable/spacer_v12"
+                android:showDividers="middle"
+                                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:visibility="gone">

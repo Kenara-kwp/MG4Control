@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Écart vertical de 12dp inséré ENTRE les enfants d'un LinearLayout, via
+    android:divider + android:showDividers="middle".
+
+    Pourquoi pas une marge sur chaque bloc : les cartes de ces pages viennent d'anciennes
+    dispositions en colonnes, elles ne portaient que des marges horizontales. Les reprendre
+    une par une aurait voulu dire éditer des blocs sans id, réimportés depuis d'autres
+    fichiers. Le divider tient en deux attributs sur le conteneur et ne touche à rien.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <size android:height="12dp" android:width="1dp" />
+    <solid android:color="@android:color/transparent" />
+</shape>

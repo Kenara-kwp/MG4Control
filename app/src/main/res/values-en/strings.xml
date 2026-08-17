@@ -310,10 +310,10 @@
     <!-- A/C automation -->
     <string name="ac_auto_title">Trigger A/C based on temperature</string>
     <string name="ac_auto_desc">Set the climate control according to the outside temperature</string>
-    <string name="ac_auto_hot">When it is hot</string>
-    <string name="ac_auto_cold">When it is cold</string>
-    <string name="ac_auto_threshold_hot_label">If temperature above (°C)</string>
-    <string name="ac_auto_threshold_cold_label">If temperature below (°C)</string>
+    <string name="ac_auto_hot">Temperature above</string>
+    <string name="ac_auto_cold">Temperature below</string>
+    <string name="ac_auto_threshold_hot_label">Trigger threshold (°C)</string>
+    <string name="ac_auto_threshold_cold_label">Trigger threshold (°C)</string>
     <string name="ac_auto_threshold_hint">-20–60</string>
     <string name="ac_auto_target_label">Target temperature (°C)</string>
     <string name="ac_auto_target_hint">15–33</string>

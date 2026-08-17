@@ -219,6 +219,8 @@ class ProfileEditFragment : Fragment() {
         val hasHeat = FirmwareInfo.hasHeatFeatures()
         val heatVis = if (hasHeat) View.VISIBLE else View.GONE
         view.findViewById<View>(R.id.section_steering_dialog)?.visibility = heatVis
+        // section_seats_dialog est desormais A L'INTERIEUR de section_seats_header : masquer
+        // l'entete suffit. On garde les deux pour rester robuste a un futur deplacement.
         view.findViewById<View>(R.id.section_seats_header)?.visibility    = heatVis
         view.findViewById<View>(R.id.section_seats_dialog)?.visibility    = heatVis
 

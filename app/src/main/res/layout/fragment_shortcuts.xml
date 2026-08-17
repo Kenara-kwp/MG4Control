@@ -111,7 +111,9 @@
                 <!-- ═══════════ BOUTONS ═══════════ -->
                 <LinearLayout
                     android:id="@+id/page_sc_buttons"
-                    android:layout_width="match_parent"
+                    android:divider="@drawable/spacer_v12"
+                    android:showDividers="middle"
+                                        android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
@@ -216,7 +218,9 @@
                      l'onglet entier disparait (garde de page vide du rail). -->
                 <LinearLayout
                     android:id="@+id/page_sc_actions"
-                    android:layout_width="match_parent"
+                    android:divider="@drawable/spacer_v12"
+                    android:showDividers="middle"
+                                        android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:visibility="gone">

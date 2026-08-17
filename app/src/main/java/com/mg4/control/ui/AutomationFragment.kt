@@ -41,14 +41,15 @@ class AutomationFragment : Fragment() {
 
         val enabled = prefs.getBoolean(AutomationSettings.KEY_ENABLED, false)
         switchAuto.isChecked = enabled
-        rowConfig.visibility = if (enabled) View.VISIBLE else View.GONE
         inputTemp.setText(prefs.getInt(AutomationSettings.KEY_THRESHOLD, AutomationSettings.DEFAULT_THRESHOLD).toString())
         checkAuto.isChecked = prefs.getBoolean(AutomationSettings.KEY_AUTO_EXECUTE, false)
 
+        // L'interrupteur ne commande QUE l'activation : le parametrage reste consultable
+        // automatisation eteinte, c'est le chevron qui le replie.
         switchAuto.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean(AutomationSettings.KEY_ENABLED, checked).apply()
-            rowConfig.visibility = if (checked) View.VISIBLE else View.GONE
         }
+        bindExpander(view.findViewById(R.id.btn_automation_expand), rowConfig, expanded = enabled)
 
         fun commitTemp() {
             val clamped = AutomationSettings.clampTemp(inputTemp.text.toString().toIntOrNull())
@@ -114,11 +115,10 @@ class AutomationFragment : Fragment() {
 
         val enabled = prefs.getBoolean(ClimateAutomationSettings.KEY_ENABLED, false)
         switchAc.isChecked = enabled
-        rowConfig.visibility = if (enabled) View.VISIBLE else View.GONE
         switchAc.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean(ClimateAutomationSettings.KEY_ENABLED, checked).apply()
-            rowConfig.visibility = if (checked) View.VISIBLE else View.GONE
         }
+        bindExpander(view.findViewById(R.id.btn_ac_auto_expand), rowConfig, expanded = enabled)
 
         bindClimateRule(
             view, prefs, hot = true,
@@ -243,4 +243,23 @@ class AutomationFragment : Fragment() {
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
     }
+
+    /**
+     * Chevron de depliage d'une carte d'automatisation.
+     *
+     * Volontairement decorrele de l'interrupteur d'activation : on doit pouvoir consulter et
+     * modifier le parametrage sans activer l'automatisation, et inversement la laisser active
+     * en repliant la carte. L'etat initial suit quand meme l'activation — une automatisation
+     * eteinte s'ouvre repliee, ce qui reproduit le comportement precedent.
+     */
+    private fun bindExpander(btn: MaterialButton, content: View, expanded: Boolean) {
+        var open = expanded
+        fun apply() {
+            content.visibility = if (open) View.VISIBLE else View.GONE
+            btn.text = if (open) "▾" else "▸"   // chevron bas / droite
+        }
+        apply()
+        btn.setOnClickListener { open = !open; apply() }
+    }
+
 }

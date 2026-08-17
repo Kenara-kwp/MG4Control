@@ -1213,8 +1213,10 @@
 
                 </LinearLayout>
 
-                <!-- Entete des sieges : la section d'origine est un duo de cartes
-                     sans titre, l'interrupteur vit donc dans sa propre ligne. -->
+                <!-- Carte SIÈGES CHAUFFANTS, structurée comme celle du volant : ligne de
+                     titre + interrupteur, séparateur, puis le contenu. Les deux colonnes
+                     gauche/droite n'ont plus de fond propre — elles vivent DANS cette carte,
+                     des cartes imbriquées donnaient un bloc éclaté. -->
                 <LinearLayout
                     android:id="@+id/section_seats_header"
                     android:layout_width="match_parent"
@@ -1252,233 +1254,236 @@
 
                     </LinearLayout>
 
-                </LinearLayout>
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/dash_border"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginBottom="10dp" />
 
-                <!-- ── Sièges gauche et droit (masqués en SWI69) ─── -->
-                <LinearLayout
-                    android:id="@+id/section_seats_dialog"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="12dp">
-
-                    <!-- Siège gauche -->
+                    <!-- ── Sièges gauche et droit (masqués en SWI69) ─── -->
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:id="@+id/section_seats_dialog"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:background="@drawable/bg_section_rounded"
-                        android:padding="14dp"
-                        android:layout_marginEnd="4dp">
+                        android:orientation="horizontal">
 
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="@string/climate_seat_left"
-                            android:textColor="@color/dash_text_lo"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:letterSpacing="0.12"
-                            android:textAllCaps="true"
-                            android:paddingBottom="10dp" />
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:background="@color/dash_border"
-                            android:layout_marginBottom="5dp" />
-
+                        <!-- Siège gauche -->
                         <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="52dp"
-                            android:orientation="horizontal"
-                            android:layout_marginBottom="3dp">
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                                                        android:layout_marginEnd="4dp">
 
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_sl_0_d"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                android:layout_width="0dp"
-                                android:layout_height="match_parent"
-                                android:layout_weight="1"
-                                android:layout_marginEnd="5dp"
-                                android:text="@string/climate_off"
-                                android:textColor="@color/text_secondary"
-                                android:textSize="16sp"
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/climate_seat_left"
+                                android:textColor="@color/dash_text_lo"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                android:letterSpacing="0.12"
                                 android:textAllCaps="true"
-                                android:backgroundTint="@color/dash_btn"
-                                app:strokeColor="@color/dash_border"
-                                app:strokeWidth="1dp"
-                                app:cornerRadius="6dp" />
+                                android:paddingBottom="10dp" />
 
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_sl_1_d"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                android:layout_width="0dp"
-                                android:layout_height="match_parent"
-                                android:layout_weight="1"
-                                android:layout_marginStart="5dp"
-                                android:text="@string/climate_level_1"
-                                android:textColor="@color/text_secondary"
-                                android:textSize="16sp"
-                                android:textAllCaps="true"
-                                android:backgroundTint="@color/dash_btn"
-                                app:strokeColor="@color/dash_border"
-                                app:strokeWidth="1dp"
-                                app:cornerRadius="6dp" />
+                            <View
+                                android:layout_width="match_parent"
+                                android:layout_height="1dp"
+                                android:background="@color/dash_border"
+                                android:layout_marginBottom="5dp" />
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:orientation="horizontal"
+                                android:layout_marginBottom="3dp">
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_sl_0_d"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="match_parent"
+                                    android:layout_weight="1"
+                                    android:layout_marginEnd="5dp"
+                                    android:text="@string/climate_off"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="16sp"
+                                    android:textAllCaps="true"
+                                    android:backgroundTint="@color/dash_btn"
+                                    app:strokeColor="@color/dash_border"
+                                    app:strokeWidth="1dp"
+                                    app:cornerRadius="6dp" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_sl_1_d"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="match_parent"
+                                    android:layout_weight="1"
+                                    android:layout_marginStart="5dp"
+                                    android:text="@string/climate_level_1"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="16sp"
+                                    android:textAllCaps="true"
+                                    android:backgroundTint="@color/dash_btn"
+                                    app:strokeColor="@color/dash_border"
+                                    app:strokeWidth="1dp"
+                                    app:cornerRadius="6dp" />
+
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:orientation="horizontal">
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_sl_2_d"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="match_parent"
+                                    android:layout_weight="1"
+                                    android:layout_marginEnd="5dp"
+                                    android:text="@string/climate_level_2"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="16sp"
+                                    android:textAllCaps="true"
+                                    android:backgroundTint="@color/dash_btn"
+                                    app:strokeColor="@color/dash_border"
+                                    app:strokeWidth="1dp"
+                                    app:cornerRadius="6dp" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_sl_3_d"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="match_parent"
+                                    android:layout_weight="1"
+                                    android:layout_marginStart="5dp"
+                                    android:text="@string/climate_level_3"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="16sp"
+                                    android:textAllCaps="true"
+                                    android:backgroundTint="@color/dash_btn"
+                                    app:strokeColor="@color/dash_border"
+                                    app:strokeWidth="1dp"
+                                    app:cornerRadius="6dp" />
+
+                            </LinearLayout>
 
                         </LinearLayout>
 
+                        <!-- Siège droit -->
                         <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="52dp"
-                            android:orientation="horizontal">
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                                                        android:layout_marginStart="4dp">
 
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_sl_2_d"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                android:layout_width="0dp"
-                                android:layout_height="match_parent"
-                                android:layout_weight="1"
-                                android:layout_marginEnd="5dp"
-                                android:text="@string/climate_level_2"
-                                android:textColor="@color/text_secondary"
-                                android:textSize="16sp"
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/climate_seat_right"
+                                android:textColor="@color/dash_text_lo"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                android:letterSpacing="0.12"
                                 android:textAllCaps="true"
-                                android:backgroundTint="@color/dash_btn"
-                                app:strokeColor="@color/dash_border"
-                                app:strokeWidth="1dp"
-                                app:cornerRadius="6dp" />
+                                android:paddingBottom="10dp" />
 
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_sl_3_d"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                android:layout_width="0dp"
-                                android:layout_height="match_parent"
-                                android:layout_weight="1"
-                                android:layout_marginStart="5dp"
-                                android:text="@string/climate_level_3"
-                                android:textColor="@color/text_secondary"
-                                android:textSize="16sp"
-                                android:textAllCaps="true"
-                                android:backgroundTint="@color/dash_btn"
-                                app:strokeColor="@color/dash_border"
-                                app:strokeWidth="1dp"
-                                app:cornerRadius="6dp" />
+                            <View
+                                android:layout_width="match_parent"
+                                android:layout_height="1dp"
+                                android:background="@color/dash_border"
+                                android:layout_marginBottom="5dp" />
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:orientation="horizontal"
+                                android:layout_marginBottom="3dp">
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_sr_0_d"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="match_parent"
+                                    android:layout_weight="1"
+                                    android:layout_marginEnd="5dp"
+                                    android:text="@string/climate_off"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="16sp"
+                                    android:textAllCaps="true"
+                                    android:backgroundTint="@color/dash_btn"
+                                    app:strokeColor="@color/dash_border"
+                                    app:strokeWidth="1dp"
+                                    app:cornerRadius="6dp" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_sr_1_d"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="match_parent"
+                                    android:layout_weight="1"
+                                    android:layout_marginStart="5dp"
+                                    android:text="@string/climate_level_1"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="16sp"
+                                    android:textAllCaps="true"
+                                    android:backgroundTint="@color/dash_btn"
+                                    app:strokeColor="@color/dash_border"
+                                    app:strokeWidth="1dp"
+                                    app:cornerRadius="6dp" />
+
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:orientation="horizontal">
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_sr_2_d"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="match_parent"
+                                    android:layout_weight="1"
+                                    android:layout_marginEnd="5dp"
+                                    android:text="@string/climate_level_2"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="16sp"
+                                    android:textAllCaps="true"
+                                    android:backgroundTint="@color/dash_btn"
+                                    app:strokeColor="@color/dash_border"
+                                    app:strokeWidth="1dp"
+                                    app:cornerRadius="6dp" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_sr_3_d"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="match_parent"
+                                    android:layout_weight="1"
+                                    android:layout_marginStart="5dp"
+                                    android:text="@string/climate_level_3"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="16sp"
+                                    android:textAllCaps="true"
+                                    android:backgroundTint="@color/dash_btn"
+                                    app:strokeColor="@color/dash_border"
+                                    app:strokeWidth="1dp"
+                                    app:cornerRadius="6dp" />
+
+                            </LinearLayout>
 
                         </LinearLayout>
 
                     </LinearLayout>
 
-                    <!-- Siège droit -->
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:background="@drawable/bg_section_rounded"
-                        android:padding="14dp"
-                        android:layout_marginStart="4dp">
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="@string/climate_seat_right"
-                            android:textColor="@color/dash_text_lo"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:letterSpacing="0.12"
-                            android:textAllCaps="true"
-                            android:paddingBottom="10dp" />
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:background="@color/dash_border"
-                            android:layout_marginBottom="5dp" />
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="52dp"
-                            android:orientation="horizontal"
-                            android:layout_marginBottom="3dp">
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_sr_0_d"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                android:layout_width="0dp"
-                                android:layout_height="match_parent"
-                                android:layout_weight="1"
-                                android:layout_marginEnd="5dp"
-                                android:text="@string/climate_off"
-                                android:textColor="@color/text_secondary"
-                                android:textSize="16sp"
-                                android:textAllCaps="true"
-                                android:backgroundTint="@color/dash_btn"
-                                app:strokeColor="@color/dash_border"
-                                app:strokeWidth="1dp"
-                                app:cornerRadius="6dp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_sr_1_d"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                android:layout_width="0dp"
-                                android:layout_height="match_parent"
-                                android:layout_weight="1"
-                                android:layout_marginStart="5dp"
-                                android:text="@string/climate_level_1"
-                                android:textColor="@color/text_secondary"
-                                android:textSize="16sp"
-                                android:textAllCaps="true"
-                                android:backgroundTint="@color/dash_btn"
-                                app:strokeColor="@color/dash_border"
-                                app:strokeWidth="1dp"
-                                app:cornerRadius="6dp" />
-
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="52dp"
-                            android:orientation="horizontal">
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_sr_2_d"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                android:layout_width="0dp"
-                                android:layout_height="match_parent"
-                                android:layout_weight="1"
-                                android:layout_marginEnd="5dp"
-                                android:text="@string/climate_level_2"
-                                android:textColor="@color/text_secondary"
-                                android:textSize="16sp"
-                                android:textAllCaps="true"
-                                android:backgroundTint="@color/dash_btn"
-                                app:strokeColor="@color/dash_border"
-                                app:strokeWidth="1dp"
-                                app:cornerRadius="6dp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btn_sr_3_d"
-                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                                android:layout_width="0dp"
-                                android:layout_height="match_parent"
-                                android:layout_weight="1"
-                                android:layout_marginStart="5dp"
-                                android:text="@string/climate_level_3"
-                                android:textColor="@color/text_secondary"
-                                android:textSize="16sp"
-                                android:textAllCaps="true"
-                                android:backgroundTint="@color/dash_btn"
-                                app:strokeColor="@color/dash_border"
-                                app:strokeWidth="1dp"
-                                app:cornerRadius="6dp" />
-
-                        </LinearLayout>
-
-                    </LinearLayout>
-
                 </LinearLayout>
+
 
                 <!-- ── [BT-PROFILES] Section Bluetooth ───────────────── -->
                 <LinearLayout
