@@ -127,11 +127,17 @@ object ApkSignatureVerifier {
 
     /** Empreintes SHA-256 des certificats signant le fichier APK [apk]. */
     private fun fingerprintsOfArchive(context: Context, apk: File): Set<String> = try {
+        // ⚠️ CAUSE RACINE du « archive=0 cert » observé le 18/08 sur un APK pourtant complet et
+        // signé v1+v2+v3 : sur API 28, getPackageArchiveInfo() ne renseigne PAS `signingInfo`
+        // pour une ARCHIVE — seul le champ déprécié `signatures` l'est, et uniquement si
+        // GET_SIGNATURES est demandé. Ne demander que GET_SIGNING_CERTIFICATES rendait donc
+        // zéro certificat, alors que la même lecture sur le paquet INSTALLÉ fonctionnait : d'où
+        // le « archive=0, installee=1 » qui a fait accuser tour à tour la clé puis le réseau.
+        // On demande les DEUX drapeaux et [signatureDigests] prend celui qui est rempli.
         @Suppress("DEPRECATION")
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-            PackageManager.GET_SIGNING_CERTIFICATES
-        else
-            PackageManager.GET_SIGNATURES
+        val flags = PackageManager.GET_SIGNATURES or
+            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+                PackageManager.GET_SIGNING_CERTIFICATES else 0)
         val info = context.packageManager.getPackageArchiveInfo(apk.absolutePath, flags)
         signatureDigests(info)
     } catch (e: Exception) {
@@ -155,14 +161,15 @@ object ApkSignatureVerifier {
 
     private fun signatureDigests(info: android.content.pm.PackageInfo?): Set<String> {
         if (info == null) return emptySet()
+        val moderne = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.signingInfo?.let { si ->
+                if (si.hasMultipleSigners()) si.apkContentsSigners else si.signingCertificateHistory
+            }
+        } else null
+        // Repli volontaire sur l'API dépréciée : pour une archive sur API 28, `signatures` est le
+        // SEUL champ renseigné. Ne pas « moderniser » ce repli sans l'avoir testé sur véhicule.
         @Suppress("DEPRECATION")
-        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val signingInfo = info.signingInfo ?: return emptySet()
-            if (signingInfo.hasMultipleSigners()) signingInfo.apkContentsSigners
-            else signingInfo.signingCertificateHistory
-        } else {
-            info.signatures
-        } ?: return emptySet()
+        val signatures = moderne ?: info.signatures ?: return emptySet()
 
         val md = MessageDigest.getInstance("SHA-256")
         return signatures.mapNotNull { sig ->

@@ -36,9 +36,11 @@ object ApkInstaller {
         // Contrôle de signature (T-901) mis en commentaire à la demande explicite du
         // propriétaire du projet : l'OTA ne pointe que vers son propre dépôt GitHub.
         //
-        // CE QUI RESTE EN PLACE : ApkUrlPolicy (origine https + hôtes autorisés) et le
-        // contrôle de complétude du téléchargement dans ApkDownloader — c'est ce dernier
-        // qui traitait réellement la panne du 18/08 (APK tronqué), pas ce bloc-ci.
+        // CE QUI RESTE EN PLACE : ApkUrlPolicy (origine https + hôtes autorisés).
+        // NB : ApkDownloader n'a aucun appelant — l'OTA télécharge via le DownloadManager
+        // d'Android (voir UpdateDialogManager) ; son contrôle de complétude ne protège donc
+        // pas ce flux. La panne du 18/08 n'était pas un APK tronqué mais une lecture de
+        // signature d'archive erronée, corrigée dans ApkSecurity.fingerprintsOfArchive.
         //
         // CE QUI N'EST PLUS COUVERT : un APK servi par un hôte autorisé mais signé par une
         // AUTRE clé s'installera désormais sans objection, alors que l'app tourne en
