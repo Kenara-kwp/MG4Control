@@ -116,7 +116,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.full }}
-          name: Beta ${{ steps.ver.outputs.full }}
+          # Sans target_commitish, GitHub cree le tag sur la branche par defaut : la beta 2.6.6-beta.2
+          # a ainsi ete taguee sur main alors qu'elle etait construite depuis beta-OTA. L'APK etait
+          # bonne, mais le tag pointait vers un code qui n'etait pas celui livre.
+          target_commitish: ${{ github.sha }}
+          name: MG4Control ${{ steps.ver.outputs.full }}
           prerelease: true
           files: dist/*.apk
           body: |
