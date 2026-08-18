@@ -224,24 +224,18 @@ object UpdateDialogManager {
                 when (status) {
                     DownloadManager.STATUS_SUCCESSFUL -> {
                         progressBar.progress = 100
-                        // [DESACTIVE 2026-08-18 - decision utilisateur]
-                        // Contrôle de signature (T-901) mis en commentaire — voir ApkInstaller
-                        // pour le raisonnement complet et la marche à suivre pour réactiver.
-                        // La chaîne string update_error_signature est conservée exprès.
-                        // val downloaded = File(
-                        //     Environment.getExternalStoragePublicDirectory(
-                        //         Environment.DIRECTORY_DOWNLOADS), fileName)
-                        // if (!ApkSignatureVerifier.matchesRunningApp(activity, downloaded)) {
-                        //     downloaded.runCatching { delete() }
-                        //     tvStatus.setText(R.string.update_error_signature)
-                        //     btnCancel.setText(R.string.update_close)
-                        //     break
-                        // }
-                        // Mesure conservée, non bloquante — voir ApkSecurity.logVerdict.
-                        ApkSignatureVerifier.logVerdict(
-                            activity,
-                            File(Environment.getExternalStoragePublicDirectory(
-                                Environment.DIRECTORY_DOWNLOADS), fileName))
+                        // [RÉACTIVÉ 2026-08-18] Contrôle de signature (T-901) — voir ApkInstaller.
+                        // L'APK est dans un dossier public : on vérifie qu'il est signé par NOTRE
+                        // clé avant d'inviter l'utilisateur à l'installer.
+                        val downloaded = File(
+                            Environment.getExternalStoragePublicDirectory(
+                                Environment.DIRECTORY_DOWNLOADS), fileName)
+                        if (!ApkSignatureVerifier.matchesRunningApp(activity, downloaded)) {
+                            downloaded.runCatching { delete() }
+                            tvStatus.setText(R.string.update_error_signature)
+                            btnCancel.setText(R.string.update_close)
+                            break
+                        }
                         // Nettoie les anciens APK dans Téléchargements (garde les 5 plus récents)
                         ApkCleanup.cleanIfNeeded()
                         // Ouvre le dossier Téléchargements dans le gestionnaire AAOS

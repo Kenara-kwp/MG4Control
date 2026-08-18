@@ -28,8 +28,16 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Decode platform keystore
-        if: ${{ env.MG4_KEYSTORE_BASE64 != '' }}
         run: |
+          # An absent secret used to SKIP this step silently. Gradle then created no signing
+          # config and the workflow published an UNSIGNED APK -- which no device can install
+          # now that the T-901 signature check is enforced again. Fail loudly instead, which
+          # is what beta.yml already does.
+          if [ -z "$MG4_KEYSTORE_BASE64" ]; then
+            echo "::error::MG4_KEYSTORE_BASE64 is missing. The APK would be unsigned and every"
+            echo "::error::client would reject it at install time (signature check T-901)."
+            exit 1
+          fi
           # Tolerate newlines/spaces in the secret; printf avoids a stray trailing newline.
           printf '%s' "$MG4_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > "$RUNNER_TEMP/platform.keystore"
           # Validation: a PKCS12/JKS keystore starts with 0x30 (DER SEQUENCE). Otherwise the secret is corrupt.
@@ -53,6 +61,29 @@ jobs:
           mkdir -p dist
           find app/build/outputs/apk -name "MG4Control-*-*.apk" -exec cp {} dist/ \;
           ls -la dist/
+
+      # /!\ --min-sdk-version 23 is REQUIRED for this report to tell the truth. Without it,
+      # apksigner uses the APK's own minSdk (28), verifies with v3 only, and prints
+      # "Verified using v1 scheme: false" on an APK that DOES carry a v1 signature.
+      - name: Verify signature schemes
+        run: |
+          APKSIGNER=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -1)
+          for f in dist/*.apk; do
+            echo "-- $(basename "$f") --"
+            "$APKSIGNER" verify --print-certs -v --min-sdk-version 23 "$f" \
+              | grep -E 'Verified using v[0-9]|certificate SHA-256 digest'
+            # Actual presence of the v1 signature, regardless of what apksigner chose to verify
+            # with. On AAOS 9 the OTA check reads the archive through getPackageArchiveInfo(),
+            # which reports no certificate without v1 -- the app then refuses the update.
+            # Better to break the build than to publish that.
+            if ! unzip -l "$f" | grep -qE 'META-INF/.*[.](SF|RSA|DSA|EC)$'; then
+              echo "::error::$(basename "$f") has NO v1 (JAR) signature - clients would reject it"
+              exit 1
+            fi
+            echo "  v1 (JAR) present : YES"
+            echo "  size   : $(stat -c%s "$f") bytes"
+            echo "  sha256 : $(sha256sum "$f" | cut -d' ' -f1)"
+          done
 
       - name: Upload APKs as workflow artifacts
         uses: actions/upload-artifact@v4

@@ -72,52 +72,49 @@ object ApkSignatureVerifier {
         archive.isNotEmpty() && installed.isNotEmpty() && archive == installed
 
     /**
-     * Vrai si [apk] est signé exactement par la même clé que l'app installée.
-     * Toute erreur (archive corrompue, API indisponible) renvoie false.
+     * Vrai si [apk] est signé exactement par la même clé que l'app installée — et journalise le
+     * verdict dans les deux cas. Toute erreur (archive illisible, API indisponible) renvoie false.
+     *
+     * Une seule fonction fait la mesure ET la décision : les avoir séparées ferait analyser
+     * l'archive et calculer son sha256 deux fois par installation, pour un résultat identique.
+     *
+     * ⚠️ Le verdict ne repose QUE sur les empreintes de certificats. Ni la taille ni le sha256
+     * n'y participent — ils ne servent qu'au log, pour se confronter aux lignes publiées par la
+     * CI. Un APK légitime change forcément de poids d'une version à l'autre.
      */
     fun matchesRunningApp(context: Context, apk: File): Boolean {
+        val taille = runCatching { apk.length() }.getOrDefault(-1L)
+        val empreinte = sha256(apk)
         val archive = fingerprintsOfArchive(context, apk)
         val installed = fingerprintsOfInstalled(context)
         val ok = certsMatch(archive, installed)
-        if (!ok) {
-            AppLogger.w(TAG, "Signature de l'APK non conforme — installation refusée " +
-                    "(archive=${archive.size} cert(s), installée=${installed.size} cert(s))")
-            // Les compteurs seuls ne permettent pas de trancher entre les trois causes réelles :
-            // archive illisible (0 cert — typiquement une signature v2 sans v1, que
-            // getPackageArchiveInfo ne remonte pas sur AAOS 9), clé différente, ou lecture de
-            // notre propre signature en échec. Les empreintes le disent en une ligne.
+        if (ok) {
+            AppLogger.i(TAG, "Signature CONFORME — ${apk.name}, $taille octets, sha256=$empreinte")
+        } else {
+            AppLogger.w(TAG, "Signature NON CONFORME — installation refusée : ${apk.name}, " +
+                "$taille octets, sha256=$empreinte, " +
+                "archive=${archive.size} cert(s), installee=${installed.size} cert(s)")
+            // Les compteurs seuls ne distinguent pas les trois causes réelles : archive illisible,
+            // clé réellement différente, ou lecture de notre propre signature en échec.
             AppLogger.w(TAG, "  archive   : ${describe(archive)}")
-            AppLogger.w(TAG, "  installée : ${describe(installed)}")
+            AppLogger.w(TAG, "  installee : ${describe(installed)}")
+            if (archive.isEmpty()) AppLogger.w(TAG, "  archive=0 cert : archive illisible " +
+                "(APK non signé, ou v1 absente) — ce n'est PAS la preuve d'une clé différente")
         }
         return ok
     }
 
-    /**
-     * Journalise le verdict de signature SANS rien bloquer.
-     *
-     * Le contrôle bloquant a été désactivé à la demande du propriétaire (voir [ApkInstaller]),
-     * mais garder la MESURE permet de trancher, log en main, entre « signature réellement
-     * différente » et « archive illisible parce que le téléchargement a été coupé ». Les deux
-     * produisaient le même message auparavant, et c'est précisément ce qui a fait chercher une
-     * panne de clé là où le réseau était en cause.
-     *
-     * Ne renvoie volontairement RIEN : le résultat ne doit pas pouvoir être réutilisé comme
-     * condition, sans quoi le contrôle redeviendrait bloquant par inadvertance.
-     */
-    fun logVerdict(context: Context, apk: File) {
-        val taille = runCatching { apk.length() }.getOrDefault(-1L)
-        val archive = fingerprintsOfArchive(context, apk)
-        val installed = fingerprintsOfInstalled(context)
-        if (certsMatch(archive, installed)) {
-            AppLogger.i(TAG, "[AUDIT] Signature CONFORME (non bloquant) — ${apk.name}, $taille octets")
-        } else {
-            AppLogger.w(TAG, "[AUDIT] Signature NON CONFORME (non bloquant, installation poursuivie) — " +
-                "${apk.name}, $taille octets, archive=${archive.size} cert(s), installee=${installed.size} cert(s)")
-            AppLogger.w(TAG, "[AUDIT]   archive   : ${describe(archive)}")
-            AppLogger.w(TAG, "[AUDIT]   installee : ${describe(installed)}")
-            if (archive.isEmpty()) AppLogger.w(TAG, "[AUDIT]   archive=0 cert : archive illisible " +
-                "(telechargement tronque, ou v1 absente) — ce n'est PAS la preuve d'une cle differente")
+    /** Empreinte du fichier reçu, à confronter à celle publiée par la CI. */
+    private fun sha256(f: File): String = try {
+        val md = MessageDigest.getInstance("SHA-256")
+        f.inputStream().use { input ->
+            val buf = ByteArray(8_192)
+            var read: Int
+            while (input.read(buf).also { read = it } != -1) md.update(buf, 0, read)
         }
+        md.digest().joinToString("") { "%02x".format(it) }
+    } catch (e: Exception) {
+        "(illisible: ${e.message})"
     }
 
     /** Empreintes tronquées, suffisantes pour identifier une clé dans un log. */
