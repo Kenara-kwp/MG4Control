@@ -301,7 +301,21 @@ object UpdateChecker {
     /** Suffixe de pre-release : "2.6.6-beta2" -> "beta2" ; "" si version stable. */
     @VisibleForTesting
     internal fun preRelease(version: String): String =
-        version.trimStart('v', 'V').substringBefore('+').substringAfter('-', "")
+        stripFlavor(version.trimStart('v', 'V').substringBefore('+')).substringAfter('-', "")
+
+    /**
+     * Suffixes de *flavor* (AGP `versionNameSuffix`), a ne pas confondre avec une pre-release.
+     * Ils occupent la meme place syntaxique qu'un suffixe semver sans en etre un : "2.6.4-offline"
+     * est la MEME version que "2.6.4" (T-907). Sans ce retrait, la regle "stable > pre-release"
+     * ferait passer "2.6.4" pour posterieure a "2.6.4-offline".
+     *
+     * AGP ajoute ce suffixe en DERNIER, apres mg4.versionSuffix : "2.6.6-beta.2" + "-offline".
+     */
+    private val FLAVOR_SUFFIXES = listOf("-offline", "-online")
+
+    private fun stripFlavor(version: String): String =
+        FLAVOR_SUFFIXES.firstOrNull { version.endsWith(it, ignoreCase = true) }
+            ?.let { version.dropLast(it.length) } ?: version
 
     /**
      * Compare deux suffixes de pre-release (regle semver §11).

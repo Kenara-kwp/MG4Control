@@ -138,4 +138,21 @@ class UpdateCheckerTest {
         assertEquals("", UpdateChecker.preRelease("v2.6.6+build7"))
     }
 
+    /**
+     * Collision des deux systemes de suffixe : "-offline" est un marqueur de flavor, "-beta.2"
+     * une vraie pre-release, et AGP les concatene dans cet ordre. Confondre les deux faisait
+     * passer la stable pour posterieure a l'offline de meme numero.
+     */
+    @Test
+    fun `le suffixe de flavor ne masque pas la pre-release`() {
+        assertEquals("beta.2", UpdateChecker.preRelease("2.6.6-beta.2-offline"))
+        assertEquals("", UpdateChecker.preRelease("2.6.4-offline"))
+        // La beta suivante remplace la precedente, meme en flavor offline.
+        assertTrue(UpdateChecker.isNewer("2.6.6-beta.3", "2.6.6-beta.2-offline"))
+        // La stable remplace la derniere beta offline...
+        assertTrue(UpdateChecker.isNewer("2.6.6", "2.6.6-beta.2-offline"))
+        // ...mais deux stables de meme numero restent identiques (T-907).
+        assertFalse(UpdateChecker.isNewer("2.6.6", "2.6.6-offline"))
+    }
+
 }
