@@ -82,9 +82,20 @@ object ApkSignatureVerifier {
         if (!ok) {
             AppLogger.w(TAG, "Signature de l'APK non conforme — installation refusée " +
                     "(archive=${archive.size} cert(s), installée=${installed.size} cert(s))")
+            // Les compteurs seuls ne permettent pas de trancher entre les trois causes réelles :
+            // archive illisible (0 cert — typiquement une signature v2 sans v1, que
+            // getPackageArchiveInfo ne remonte pas sur AAOS 9), clé différente, ou lecture de
+            // notre propre signature en échec. Les empreintes le disent en une ligne.
+            AppLogger.w(TAG, "  archive   : ${describe(archive)}")
+            AppLogger.w(TAG, "  installée : ${describe(installed)}")
         }
         return ok
     }
+
+    /** Empreintes tronquées, suffisantes pour identifier une clé dans un log. */
+    private fun describe(certs: Set<String>): String =
+        if (certs.isEmpty()) "(aucune — archive illisible, non signée, ou signée v2 sans v1)"
+        else certs.joinToString(", ") { it.take(16) + "…" }
 
     /** Empreintes SHA-256 des certificats signant le fichier APK [apk]. */
     private fun fingerprintsOfArchive(context: Context, apk: File): Set<String> = try {

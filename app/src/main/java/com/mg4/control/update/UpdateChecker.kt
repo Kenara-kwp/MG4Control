@@ -82,6 +82,11 @@ object UpdateChecker {
                 // Essai GitHub → fallback GitLab. Le canal beta ne concerne que GitHub :
                 // les builds de test ne sont pas publies sur GitLab.
                 val beta = isBetaChannel(context)
+                // Tracer le canal AVANT la requete : sans cette ligne, un log qui montre une
+                // release stable ne permet pas de distinguer « interrupteur beta non coche »
+                // de « aucune beta publiee », et il faut relire le code pour trancher.
+                AppLogger.i(TAG, "Canal ${if (beta) "BETA (pre-releases incluses)" else "STABLE"}" +
+                    " — version installee $currentVersion")
                 val release = fetchFromGitHub(beta)
                     ?: fetchFromGitLab()
                     ?: run {
