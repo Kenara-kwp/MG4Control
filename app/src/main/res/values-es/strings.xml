@@ -367,4 +367,8 @@
     <string name="external_api_confirm_msg">Modo de conducción, regeneración, asientos y volante calefactados, climatización y perfiles quedan controlables por una app de terceros, sin más autorización por su parte.\n\nEl bloqueo por velocidad sigue activo.\n\nActive esto solo si realmente usa KeyMapper, Tasker o una herramienta similar.</string>
     <string name="external_api_confirm_risk">Activa esta opción <b>bajo su propia responsabilidad</b>: usted sigue siendo el único responsable de lo que una aplicación de terceros haga con su vehículo.</string>
     <string name="external_api_confirm_ok">Confirmar</string>
+
+    <!-- Canal beta OTA -->
+    <string name="settings_beta_channel">Canal de actualización beta</string>
+    <string name="settings_beta_channel_desc">Recibe versiones de prueba antes de su lanzamiento oficial. Pueden contener errores. No es posible volver a una versión anterior mediante la actualización.</string>
 </resources>

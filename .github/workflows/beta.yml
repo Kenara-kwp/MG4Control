@@ -1,0 +1,134 @@
+name: Beta release
+
+# Publie une PRE-RELEASE GitHub consommee par le canal beta de l'application.
+#
+# Difference avec "Test build" : ce workflow PUBLIE, donc les APK arrivent en OTA chez les
+# testeurs qui ont coche « Canal de mise a jour beta ». Ne le declencher que sur un etat du
+# code qu'on accepte de diffuser.
+#
+# Le numero de version installe DOIT correspondre au tag, sinon la mise a jour est reproposee
+# en boucle : d'ou -Pmg4.versionSuffix, qui injecte le suffixe dans le versionName de l'APK.
+#
+# La release stable (release.yml) reste prioritaire : a numero egal, une pre-release est
+# consideree ANTERIEURE (precedence semver), donc la stable remplace toujours la derniere beta.
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "Identifiant de la beta (ex: beta1, rc2)"
+        type: string
+        default: beta
+      notes:
+        description: "Ce qu'il faut tester / ce qui a change"
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      MG4_KEYSTORE_BASE64: ${{ secrets.MG4_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode platform keystore
+        run: |
+          if [ -z "$MG4_KEYSTORE_BASE64" ]; then
+            echo "::error::MG4_KEYSTORE_BASE64 absent. Une beta NON signee par la cle plateforme"
+            echo "::error::serait refusee a l'installation par le controle de signature (T-901)."
+            exit 1
+          fi
+          printf '%s' "$MG4_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > "$RUNNER_TEMP/platform.keystore"
+          if [ "$(head -c1 "$RUNNER_TEMP/platform.keystore" | od -An -tx1 | tr -d ' ')" != "30" ]; then
+            echo "::error::MG4_KEYSTORE_BASE64 est invalide. Recreer le secret avec : base64 -w0 platform.keystore"
+            exit 1
+          fi
+          echo "MG4_KEYSTORE=$RUNNER_TEMP/platform.keystore" >> "$GITHUB_ENV"
+
+      # Suffixe unique et croissant : le numero de run garantit qu'une beta publiee apres une
+      # autre est bien vue comme posterieure, meme si le libelle saisi est identique.
+      - name: Compute version
+        id: ver
+        run: |
+          # sed plutot que grep -oP : PCRE depend de la locale du runner, sed non.
+          BASE=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
+          if [ -z "$BASE" ]; then
+            echo "::error::versionName introuvable dans app/build.gradle.kts"; exit 1
+          fi
+          SUFFIX="-${{ inputs.label }}.${{ github.run_number }}"
+          echo "base=$BASE"                >> "$GITHUB_OUTPUT"
+          echo "suffix=$SUFFIX"            >> "$GITHUB_OUTPUT"
+          echo "full=${BASE}${SUFFIX}"     >> "$GITHUB_OUTPUT"
+          echo "Version beta : ${BASE}${SUFFIX}"
+
+      - name: Build online + offline APKs
+        env:
+          MG4_KEYSTORE_PASSWORD: ${{ secrets.MG4_KEYSTORE_PASSWORD }}
+          MG4_KEY_ALIAS: ${{ secrets.MG4_KEY_ALIAS }}
+          MG4_KEY_PASSWORD: ${{ secrets.MG4_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleOnlineRelease assembleOfflineRelease --no-daemon \
+            -Pmg4.versionSuffix='${{ steps.ver.outputs.suffix }}'
+
+      - name: Collect APKs
+        run: |
+          mkdir -p dist
+          find app/build/outputs/apk -name "MG4Control-*.apk" -exec cp {} dist/ \;
+          ls -la dist/
+
+      # Controle que l'APK annonce bien la version du tag : c'est la condition pour que l'OTA
+      # cesse de proposer la mise a jour une fois installee.
+      - name: Verify APK version matches the tag
+        run: |
+          AAPT=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/aapt2 | sort -V | tail -1)
+          EXPECTED='${{ steps.ver.outputs.full }}'
+          for f in dist/*.apk; do
+            GOT=$("$AAPT" dump badging "$f" | grep -oP "versionName='\K[^']+")
+            echo "$(basename "$f") -> $GOT"
+            case "$GOT" in
+              "$EXPECTED"|"$EXPECTED-offline") ;;
+              *) echo "::error::$(basename "$f") annonce '$GOT', attendu '$EXPECTED'"; exit 1 ;;
+            esac
+          done
+
+      - name: Signature report
+        run: |
+          APKSIGNER=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -1)
+          for f in dist/*.apk; do
+            echo "-- $(basename "$f") --"
+            "$APKSIGNER" verify --print-certs -v "$f" 2>&1 \
+              | grep -E 'Verified using v[0-9]|certificate SHA-256 digest' || echo "  (non verifiable)"
+          done
+
+      - name: Publish pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.full }}
+          name: Beta ${{ steps.ver.outputs.full }}
+          prerelease: true
+          files: dist/*.apk
+          body: |
+            ## MG4Control ${{ steps.ver.outputs.full }} — version de test
+
+            > Diffusee uniquement aux utilisateurs ayant active
+            > **Reglages -> Reglages avances -> Canal de mise a jour beta**.
+            > Le retour a une version anterieure n'est pas possible par mise a jour.
+
+            ${{ inputs.notes }}
+
+            | Variante | Fichier | Reseau | Mise a jour auto |
+            |---|---|---|---|
+            | **Online** | `MG4Control-online-*.apk` | oui | oui |
+            | **Offline** | `MG4Control-offline-*.apk` | aucun | non |

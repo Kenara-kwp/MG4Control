@@ -82,4 +82,60 @@ class UpdateCheckerTest {
         assertEquals(listOf(2, 6, 4), UpdateChecker.segments("2.6.4-offline"))
         assertEquals(listOf(2, 6, 4), UpdateChecker.segments("2.6.4+build9"))
     }
+
+    // ── Canal beta : precedence des pre-releases (semver §11) ────────────────
+
+    @Test
+    fun `beta d une version future remplace la stable actuelle`() {
+        assertTrue(UpdateChecker.isNewer("2.6.6-beta1", "2.6.5"))
+    }
+
+    @Test
+    fun `beta suivante remplace la precedente`() {
+        assertTrue(UpdateChecker.isNewer("2.6.6-beta2", "2.6.6-beta1"))
+    }
+
+    @Test
+    fun `beta 10 est posterieure a beta 9 - comparaison numerique et non lexicale`() {
+        assertTrue(UpdateChecker.isNewer("2.6.6-beta10", "2.6.6-beta9"))
+    }
+
+    @Test
+    fun `la stable remplace la derniere beta du meme numero`() {
+        assertTrue(UpdateChecker.isNewer("2.6.6", "2.6.6-beta9"))
+    }
+
+    @Test
+    fun `une beta n ecrase JAMAIS la stable de meme numero`() {
+        assertFalse(UpdateChecker.isNewer("2.6.6-beta9", "2.6.6"))
+    }
+
+    @Test
+    fun `beta anterieure a la stable installee est ignoree`() {
+        assertFalse(UpdateChecker.isNewer("2.6.5-beta3", "2.6.5"))
+    }
+
+    @Test
+    fun `meme beta - pas de mise a jour`() {
+        assertFalse(UpdateChecker.isNewer("2.6.6-beta1", "2.6.6-beta1"))
+    }
+
+    @Test
+    fun `suffixe du workflow beta - label point numero de run`() {
+        assertTrue(UpdateChecker.isNewer("2.6.6-beta.42", "2.6.6-beta.41"))
+        assertFalse(UpdateChecker.isNewer("2.6.6-beta.41", "2.6.6-beta.42"))
+    }
+
+    @Test
+    fun `rc est posterieure a beta - ordre alphabetique des identifiants`() {
+        assertTrue(UpdateChecker.isNewer("2.6.6-rc.1", "2.6.6-beta.9"))
+    }
+
+    @Test
+    fun `extraction du suffixe de pre-release`() {
+        assertEquals("beta.42", UpdateChecker.preRelease("v2.6.6-beta.42"))
+        assertEquals("", UpdateChecker.preRelease("2.6.6"))
+        assertEquals("", UpdateChecker.preRelease("v2.6.6+build7"))
+    }
+
 }

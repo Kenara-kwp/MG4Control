@@ -161,6 +161,17 @@ class SettingsFragment : Fragment() {
         btnThemeDark.setOnClickListener  { applyThemeMode("dark")  }
         btnThemeLight.setOnClickListener { applyThemeMode("light") }
 
+        // ── Canal de mise a jour beta ────────────────────────────────────────
+        // Aucun avertissement bloquant : une beta ne donne pas le controle du vehicule a un
+        // tiers, contrairement a l'API externe. Le texte sous l'interrupteur suffit, et il
+        // mentionne l'absence de retour arriere, qui est la vraie contrainte.
+        val switchBeta = view.findViewById<Switch>(R.id.switch_beta_channel)
+        switchBeta.isChecked = prefs.getBoolean(UpdateChecker.KEY_BETA_CHANNEL, false)
+        switchBeta.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean(UpdateChecker.KEY_BETA_CHANNEL, checked).apply()
+            AppLogger.i("MG4_UPDATE", "Canal beta ${if (checked) "ACTIVE" else "desactive"}")
+        }
+
         // ── API externe (issue #79) ──────────────────────────────────────────
         // Le seul verrou de cette API : tant qu'il est off, le receiver et le provider refusent.
         // L'ACTIVATION passe par une confirmation explicite ; la désactivation est immédiate —
@@ -235,6 +246,7 @@ class SettingsFragment : Fragment() {
         // Build offline : pas de réseau → on masque toute l'UI de mise à jour.
         if (BuildConfig.OFFLINE) {
             view.findViewById<View>(R.id.row_auto_update).visibility = View.GONE
+            view.findViewById<View>(R.id.row_beta_channel).visibility = View.GONE
             view.findViewById<View>(R.id.row_update_buttons).visibility = View.GONE
         } else {
             val switchAutoUpdate = view.findViewById<Switch>(R.id.switch_auto_update)

@@ -367,4 +367,8 @@
     <string name="external_api_confirm_msg">Fahrmodus, Rekuperation, Sitz- und Lenkradheizung, Klimaanlage und Profile werden für Dritt-Apps steuerbar, ohne weitere Zustimmung Ihrerseits.\n\nDie Geschwindigkeitssperre bleibt aktiv.\n\nNur aktivieren, wenn Sie KeyMapper, Tasker oder ein ähnliches Werkzeug wirklich nutzen.</string>
     <string name="external_api_confirm_risk">Sie aktivieren dies <b>auf eigene Gefahr</b>: Sie bleiben allein verantwortlich für alles, was eine Dritt-App mit Ihrem Fahrzeug macht.</string>
     <string name="external_api_confirm_ok">Bestätigen</string>
+
+    <!-- Canal beta OTA -->
+    <string name="settings_beta_channel">Beta-Update-Kanal</string>
+    <string name="settings_beta_channel_desc">Erhält Testversionen vor der offiziellen Veröffentlichung. Sie können Fehler enthalten. Eine Rückkehr zu einer früheren Version ist per Update nicht möglich.</string>
 </resources>

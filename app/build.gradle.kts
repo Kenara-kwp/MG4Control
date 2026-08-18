@@ -12,7 +12,10 @@ android {
         minSdk = 28
         targetSdk = 34
         versionCode = 17
-        versionName = "2.6.5"
+        // Suffixe injecte par la CI beta : -Pmg4.versionSuffix=-beta42 produit "2.6.6-beta42".
+        // L'APK installe annonce alors EXACTEMENT ce que dit le tag de la release, sans quoi
+        // l'OTA reproposerait la meme mise a jour indefiniment.
+        versionName = "2.6.5" + (project.findProperty("mg4.versionSuffix") as String? ?: "")
     }
 
     // Signature avec la clé plateforme de la ROM (requise par sharedUserId=android.uid.system).
