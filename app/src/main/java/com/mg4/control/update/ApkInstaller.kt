@@ -31,14 +31,31 @@ object ApkInstaller {
             return "APK manquant ou vide : ${apkFile.absolutePath}"
         }
 
-        // [RÉACTIVÉ 2026-08-05] Contrôle de signature (T-901). Les échecs précédents ont eu
-        // lieu avec une app installée signée à la main (v1 seul) face à un APK CI (v2/v3) :
-        // on retente avec les DEUX côtés produits par la CI, donc signés à l'identique.
-        // L'app tourne en uid.system : on n'installe que ce qui est signé par notre clé.
-        if (!ApkSignatureVerifier.matchesRunningApp(context, apkFile)) {
-            apkFile.runCatching { delete() }
-            return "Signature non conforme — APK rejeté et supprimé"
-        }
+        // ─────────────────────────────────────────────────────────────────────
+        // [DESACTIVE 2026-08-18 - decision utilisateur]
+        // Contrôle de signature (T-901) mis en commentaire à la demande explicite du
+        // propriétaire du projet : l'OTA ne pointe que vers son propre dépôt GitHub.
+        //
+        // CE QUI RESTE EN PLACE : ApkUrlPolicy (origine https + hôtes autorisés) et le
+        // contrôle de complétude du téléchargement dans ApkDownloader — c'est ce dernier
+        // qui traitait réellement la panne du 18/08 (APK tronqué), pas ce bloc-ci.
+        //
+        // CE QUI N'EST PLUS COUVERT : un APK servi par un hôte autorisé mais signé par une
+        // AUTRE clé s'installera désormais sans objection, alors que l'app tourne en
+        // uid.system. Le repli GitLab compte parmi ces hôtes autorisés.
+        //
+        // POUR RÉACTIVER : décommenter le bloc ci-dessous (rien d'autre à faire —
+        // ApkSignatureVerifier et ses tests sont restés intacts).
+        // ─────────────────────────────────────────────────────────────────────
+        // if (!ApkSignatureVerifier.matchesRunningApp(context, apkFile)) {
+        //     apkFile.runCatching { delete() }
+        //     return "Signature non conforme — APK rejeté et supprimé"
+        // }
+        //
+        // La MESURE, elle, est conservée : elle ne bloque rien mais elle dit dans le log si la
+        // signature aurait été acceptée. Sans elle, un futur échec d'installation redeviendrait
+        // indiscernable d'un problème de clé.
+        ApkSignatureVerifier.logVerdict(context, apkFile)
 
         // ── Stratégie 1 : pm install depuis le stockage externe ───────────────
         val extDir = context.getExternalFilesDir(null)

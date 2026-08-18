@@ -103,13 +103,31 @@ jobs:
             esac
           done
 
-      - name: Signature report
+      # /!\ --min-sdk-version 23 est OBLIGATOIRE pour que ce rapport dise la verite. Sans lui,
+      # apksigner prend le minSdk de l'APK (28) et ne verifie qu'en v3 : il affiche alors
+      # "Verified using v1 scheme: false" sur un APK qui CONTIENT bien une signature v1.
+      # Ce faux negatif a deja fait chercher une panne de cle la ou le reseau etait en cause.
+      - name: Verify signature schemes
         run: |
           APKSIGNER=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -1)
           for f in dist/*.apk; do
             echo "-- $(basename "$f") --"
-            "$APKSIGNER" verify --print-certs -v "$f" 2>&1 \
-              | grep -E 'Verified using v[0-9]|certificate SHA-256 digest' || echo "  (non verifiable)"
+            "$APKSIGNER" verify --print-certs -v --min-sdk-version 23 "$f" \
+              | grep -E 'Verified using v[0-9]|certificate SHA-256 digest'
+            # Presence REELLE de la signature v1, independamment de ce qu'apksigner choisit de
+            # verifier. Elle est indispensable : sur AAOS 9 le controle OTA lit l'archive via
+            # getPackageArchiveInfo(), qui ne remonte aucun certificat sans v1 - l'application
+            # refuse alors la mise a jour. Mieux vaut casser le build que publier ca.
+            if ! unzip -l "$f" | grep -qE 'META-INF/.*[.](SF|RSA|DSA|EC)$'; then
+              echo "::error::$(basename "$f") n a PAS de signature v1 (JAR) - l OTA la refuserait"
+              exit 1
+            fi
+            # Empreinte du fichier publie. Le vehicule journalise la meme chose apres
+            # telechargement ("APK telecharge : N octets, sha256=..."). Deux lignes identiques
+            # prouvent un transfert intact ; une divergence designe le reseau, pas la signature.
+            echo "  v1 (JAR) presente : OUI"
+            echo "  taille : $(stat -c%s "$f") octets"
+            echo "  sha256 : $(sha256sum "$f" | cut -d' ' -f1)"
           done
 
       - name: Publish pre-release

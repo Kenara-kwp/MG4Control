@@ -92,6 +92,34 @@ object ApkSignatureVerifier {
         return ok
     }
 
+    /**
+     * Journalise le verdict de signature SANS rien bloquer.
+     *
+     * Le contrôle bloquant a été désactivé à la demande du propriétaire (voir [ApkInstaller]),
+     * mais garder la MESURE permet de trancher, log en main, entre « signature réellement
+     * différente » et « archive illisible parce que le téléchargement a été coupé ». Les deux
+     * produisaient le même message auparavant, et c'est précisément ce qui a fait chercher une
+     * panne de clé là où le réseau était en cause.
+     *
+     * Ne renvoie volontairement RIEN : le résultat ne doit pas pouvoir être réutilisé comme
+     * condition, sans quoi le contrôle redeviendrait bloquant par inadvertance.
+     */
+    fun logVerdict(context: Context, apk: File) {
+        val taille = runCatching { apk.length() }.getOrDefault(-1L)
+        val archive = fingerprintsOfArchive(context, apk)
+        val installed = fingerprintsOfInstalled(context)
+        if (certsMatch(archive, installed)) {
+            AppLogger.i(TAG, "[AUDIT] Signature CONFORME (non bloquant) — ${apk.name}, $taille octets")
+        } else {
+            AppLogger.w(TAG, "[AUDIT] Signature NON CONFORME (non bloquant, installation poursuivie) — " +
+                "${apk.name}, $taille octets, archive=${archive.size} cert(s), installee=${installed.size} cert(s)")
+            AppLogger.w(TAG, "[AUDIT]   archive   : ${describe(archive)}")
+            AppLogger.w(TAG, "[AUDIT]   installee : ${describe(installed)}")
+            if (archive.isEmpty()) AppLogger.w(TAG, "[AUDIT]   archive=0 cert : archive illisible " +
+                "(telechargement tronque, ou v1 absente) — ce n'est PAS la preuve d'une cle differente")
+        }
+    }
+
     /** Empreintes tronquées, suffisantes pour identifier une clé dans un log. */
     private fun describe(certs: Set<String>): String =
         if (certs.isEmpty()) "(aucune — archive illisible, non signée, ou signée v2 sans v1)"
