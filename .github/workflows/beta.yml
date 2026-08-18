@@ -142,15 +142,15 @@ jobs:
           prerelease: true
           files: dist/*.apk
           body: |
-            ## MG4Control ${{ steps.ver.outputs.full }} — version de test
+            ## MG4Control ${{ steps.ver.outputs.full }} — test build
 
-            > Diffusee uniquement aux utilisateurs ayant active
-            > **Reglages -> Reglages avances -> Canal de mise a jour beta**.
-            > Le retour a une version anterieure n'est pas possible par mise a jour.
+            > Delivered only to users who enabled
+            > **Settings -> Advanced settings -> Beta update channel**.
+            > Rolling back to an earlier version is not possible through the updater.
 
             ${{ inputs.notes }}
 
-            | Variante | Fichier | Reseau | Mise a jour auto |
+            | Variant | File | Network | Auto-update |
             |---|---|---|---|
-            | **Online** | `MG4Control-online-*.apk` | oui | oui |
-            | **Offline** | `MG4Control-offline-*.apk` | aucun | non |
+            | **Online** | `MG4Control-online-*.apk` | yes | yes |
+            | **Offline** | `MG4Control-offline-*.apk` | none | no |
