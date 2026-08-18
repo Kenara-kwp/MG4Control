@@ -33,6 +33,7 @@ import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.button.MaterialButton
 import com.mg4.control.BuildConfig
+import com.mg4.control.api.ExternalApi
 import com.mg4.control.R
 import com.mg4.control.util.QrCode
 import com.mg4.control.debug.AppLogger
@@ -160,6 +161,50 @@ class SettingsFragment : Fragment() {
         btnThemeDark.setOnClickListener  { applyThemeMode("dark")  }
         btnThemeLight.setOnClickListener { applyThemeMode("light") }
 
+        // ── Canal de mise a jour beta ────────────────────────────────────────
+        // Aucun avertissement bloquant : une beta ne donne pas le controle du vehicule a un
+        // tiers, contrairement a l'API externe. Le texte sous l'interrupteur suffit, et il
+        // mentionne l'absence de retour arriere, qui est la vraie contrainte.
+        val switchBeta = view.findViewById<Switch>(R.id.switch_beta_channel)
+        switchBeta.isChecked = prefs.getBoolean(UpdateChecker.KEY_BETA_CHANNEL, false)
+        switchBeta.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean(UpdateChecker.KEY_BETA_CHANNEL, checked).apply()
+            AppLogger.i("MG4_UPDATE", "Canal beta ${if (checked) "ACTIVE" else "desactive"}")
+        }
+
+        // ── API externe (issue #79) ──────────────────────────────────────────
+        // Le seul verrou de cette API : tant qu'il est off, le receiver et le provider refusent.
+        // L'ACTIVATION passe par une confirmation explicite ; la désactivation est immédiate —
+        // on ne met jamais d'obstacle devant un retour à l'état sûr.
+        val switchExternalApi = view.findViewById<Switch>(R.id.switch_external_api)
+        switchExternalApi.isChecked = prefs.getBoolean(ExternalApi.KEY_ENABLED, false)
+        // Drapeau plutôt que retrait/remise de l'écouteur : les remises à zéro programmatiques
+        // ci-dessous rappellent l'écouteur, et sans garde on boucle.
+        var apiSwitchProgrammatic = false
+        switchExternalApi.setOnCheckedChangeListener { _, checked ->
+            if (apiSwitchProgrammatic) return@setOnCheckedChangeListener
+
+            if (!checked) {
+                prefs.edit().putBoolean(ExternalApi.KEY_ENABLED, false).apply()
+                AppLogger.i(ExternalApi.LOG_TAG, "API externe désactivée par l'utilisateur")
+                return@setOnCheckedChangeListener
+            }
+            // Repasse à off le temps de la question : l'interrupteur ne montre « activé »
+            // qu'après confirmation, jamais avant.
+            apiSwitchProgrammatic = true
+            switchExternalApi.isChecked = false
+            apiSwitchProgrammatic = false
+
+            showExternalApiConfirm { confirmed ->
+                if (!confirmed) return@showExternalApiConfirm
+                prefs.edit().putBoolean(ExternalApi.KEY_ENABLED, true).apply()
+                apiSwitchProgrammatic = true
+                switchExternalApi.isChecked = true
+                apiSwitchProgrammatic = false
+                AppLogger.i(ExternalApi.LOG_TAG, "API externe ACTIVÉE par l'utilisateur (confirmée)")
+            }
+        }
+
         // ── Auto-apply ───────────────────────────────────────────────────────
         val switchAutoApply = view.findViewById<Switch>(R.id.switch_auto_apply)
         switchAutoApply.isChecked = prefs.getBoolean("auto_apply_profile", true)
@@ -201,6 +246,7 @@ class SettingsFragment : Fragment() {
         // Build offline : pas de réseau → on masque toute l'UI de mise à jour.
         if (BuildConfig.OFFLINE) {
             view.findViewById<View>(R.id.row_auto_update).visibility = View.GONE
+            view.findViewById<View>(R.id.row_beta_channel).visibility = View.GONE
             view.findViewById<View>(R.id.row_update_buttons).visibility = View.GONE
         } else {
             val switchAutoUpdate = view.findViewById<Switch>(R.id.switch_auto_update)
@@ -760,6 +806,49 @@ class SettingsFragment : Fragment() {
                 requireActivity().recreate()
             }
         }
+    }
+
+
+    /**
+     * Confirmation avant d'ouvrir l'API externe (issue #79).
+     *
+     * L'avertissement est construit en code plutôt que dans une chaîne : le premier paragraphe
+     * doit être rouge ET gras, ce qu'un `setMessage` sur une chaîne plate ne permet pas. C'est
+     * la seule information qui compte vraiment ici, elle ne doit pas se fondre dans le reste.
+     *
+     * [onResult] reçoit false sur Annuler comme sur une fermeture par l'extérieur : dans le
+     * doute on ne suppose jamais l'accord.
+     */
+    private fun showExternalApiConfirm(onResult: (Boolean) -> Unit) {
+        val danger = requireContext().getColor(R.color.dash_danger)
+        val warn = getString(R.string.external_api_confirm_warn)
+        val body = getString(R.string.external_api_confirm_msg)
+        // getText et non getString : la ressource contient un <b> autour de « à vos risques et
+        // périls ». Le gras vient donc du fichier de chaînes, ce qui reste juste dans les six
+        // langues — le localiser en code aurait supposé de connaître la sous-chaîne traduite.
+        val risk = getText(R.string.external_api_confirm_risk)
+
+        val text = android.text.SpannableStringBuilder("$warn\n\n$body\n\n")
+        val riskStart = text.length
+        text.append(risk)
+
+        // Rouge + gras sur l'ouverture, rouge seul sur la clôture : l'avertissement encadre
+        // l'explication, et le gras reste réservé à la phrase la plus forte.
+        text.setSpan(android.text.style.ForegroundColorSpan(danger),
+            0, warn.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+            0, warn.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(android.text.style.ForegroundColorSpan(danger),
+            riskStart, text.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        var answered = false
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.external_api_confirm_title)
+            .setMessage(text)
+            .setNegativeButton(R.string.profile_cancel) { _, _ -> answered = true; onResult(false) }
+            .setPositiveButton(R.string.external_api_confirm_ok) { _, _ -> answered = true; onResult(true) }
+            .setOnDismissListener { if (!answered) onResult(false) }
+            .show()
     }
 
 }

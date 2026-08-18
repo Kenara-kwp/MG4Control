@@ -70,6 +70,52 @@
              hors du manifest de base évite aussi un conflit d'authority qui empêcherait
              d'installer les APK online et offline côte à côte. -->
 
+        <!-- ═══ API externe (issue #79) — KeyMapper, Tasker, etc. ═══════════════
+             ⚠️ Exporté SANS permission, et c'est délibéré : KeyMapper et Tasker viennent du
+             Play Store, elles ne seront jamais signées avec la clé plateforme, donc une
+             permission "signature" les exclurait. Et un broadcast ne porte aucune identité
+             d'émetteur : on ne peut pas filtrer l'appelant ici.
+
+             Le verrou est donc AILLEURS, et il est double :
+               1. l'interrupteur "API externe" des Réglages, DÉSACTIVÉ PAR DÉFAUT — tant qu'il
+                  est off, le receiver sort immédiatement ;
+               2. VehicleWriteGate, posé dans les primitives d'écriture de MG4Hardware, donc
+                  sous tout point d'entrée : aucune écriture véhicule en roulant.
+             Toute commande reçue est journalisée (tag MG4_API), refus compris. -->
+        <receiver
+            android:name=".api.ExternalApiReceiver"
+            android:exported="true">
+            <intent-filter>
+                <!-- Forme riche : un extra nomme la commande (Tasker, adb, scripts). -->
+                <action android:name="com.mg4.control.action.EXECUTE" />
+                <action android:name="com.mg4.control.action.SET" />
+                <!-- Une action par commande : KeyMapper ne sait saisir QUE la chaine
+                     d'action, son editeur d'intent n'a pas de champ extras.
+                     Les commandes de securite active (ADAS, AEB, TSR, alertes) et l'extinction
+                     vehicule sont VOLONTAIREMENT absentes — cf. ExternalApi.BLOCKED_ACTIONS,
+                     qui les refuse aussi via EXECUTE. -->
+                <action android:name="com.mg4.control.action.ONE_PEDAL" />
+                <action android:name="com.mg4.control.action.ENERGY_SAVING_TOGGLE" />
+                <action android:name="com.mg4.control.action.PROFILE_PICKER" />
+                <action android:name="com.mg4.control.action.OPEN_APP" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Lecture seule de l'état véhicule. Contrairement au receiver, un provider CONNAÎT son
+             appelant (getCallingPackage) : d'où la liste blanche optionnelle et la journalisation
+             nominative. Aucune écriture ne passe par ici. -->
+        <!-- Authority dérivée de l'applicationId : les variantes online et offline s'installent
+             côte à côte, et deux paquets ne peuvent pas déclarer la même authority
+             (INSTALL_FAILED_CONFLICTING_PROVIDER — le FileProvider s'y était déjà heurté).
+             Pas de readPermission : Tasker est un APK figé, il ne peut pas déclarer une
+             permission que nous inventerions — en exiger une fermerait la porte qu'on ouvre.
+             Le contrôle est en code et il est RÉEL ici, contrairement au receiver :
+             getCallingPackage() est fiable, donc interrupteur + liste blanche + journal nominatif. -->
+        <provider
+            android:name=".api.StateProvider"
+            android:authorities="${applicationId}.state"
+            android:exported="true" />
+
         <receiver
             android:name=".receiver.BootReceiver"
             android:exported="true"

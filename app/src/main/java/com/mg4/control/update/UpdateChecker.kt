@@ -23,6 +23,25 @@ object UpdateChecker {
     private const val GITHUB_API_URL =
         "https://api.github.com/repos/SliDeeN/MG4Control/releases/latest"
 
+    /**
+     * Canal beta : la LISTE des releases, pre-releases comprises.
+     *
+     * `/releases/latest` les exclut par definition cote GitHub — c'est la raison pour laquelle
+     * les builds de test n'etaient jamais proposes. La liste est deja triee par date de creation
+     * decroissante ; on prend malgre tout la plus recente PAR COMPARAISON DE VERSION, parce qu'une
+     * correction publiee apres coup sur une ancienne branche casserait l'ordre chronologique.
+     */
+    private const val GITHUB_BETA_URL =
+        "https://api.github.com/repos/SliDeeN/MG4Control/releases?per_page=20"
+
+    /** Interrupteur « canal beta » — Reglages avances. Defaut false. */
+    const val PREFS_SETTINGS = "mg4_settings"
+    const val KEY_BETA_CHANNEL = "update_channel_beta"
+
+    fun isBetaChannel(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_SETTINGS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_BETA_CHANNEL, false)
+
     private const val GITLAB_API_URL =
         "https://gitlab.com/api/v4/projects/SliDeeN%2Fmg4control/releases/permalink/latest"
 
@@ -60,8 +79,10 @@ object UpdateChecker {
                     .getSharedPreferences(PREFS_SKIP, Context.MODE_PRIVATE)
                     .getString(KEY_SKIP_VERSION, null)
 
-                // Essai GitHub → fallback GitLab
-                val release = fetchFromGitHub()
+                // Essai GitHub → fallback GitLab. Le canal beta ne concerne que GitHub :
+                // les builds de test ne sont pas publies sur GitLab.
+                val beta = isBetaChannel(context)
+                val release = fetchFromGitHub(beta)
                     ?: fetchFromGitLab()
                     ?: run {
                         AppLogger.w(TAG, "GitHub et GitLab inaccessibles")
@@ -99,9 +120,10 @@ object UpdateChecker {
     // Requête GitHub
     // -------------------------------------------------------------------------
 
-    private fun fetchFromGitHub(): RawRelease? {
+    private fun fetchFromGitHub(beta: Boolean = false): RawRelease? {
         return try {
-            val conn = (URL(GITHUB_API_URL).openConnection() as HttpURLConnection).apply {
+            val url = if (beta) GITHUB_BETA_URL else GITHUB_API_URL
+            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 setRequestProperty("Accept", "application/vnd.github.v3+json")
                 setRequestProperty("User-Agent", "MG4Control-Android")
                 connectTimeout = 10_000
@@ -112,8 +134,24 @@ object UpdateChecker {
                 conn.disconnect()
                 return null
             }
-            val json = JSONObject(conn.inputStream.bufferedReader().readText())
+            val payload = conn.inputStream.bufferedReader().readText()
             conn.disconnect()
+
+            // Canal beta : la reponse est un TABLEAU de releases. On garde la plus haute au sens
+            // de la comparaison de versions, brouillons exclus.
+            val json = if (beta) {
+                val arr = org.json.JSONArray(payload)
+                var best: JSONObject? = null
+                for (i in 0 until arr.length()) {
+                    val r = arr.getJSONObject(i)
+                    if (r.optBoolean("draft", false)) continue
+                    val t = r.optString("tag_name").trimStart('v')
+                    if (best == null || isNewer(t, best!!.optString("tag_name").trimStart('v'))) best = r
+                }
+                best ?: return null
+            } else {
+                JSONObject(payload)
+            }
 
             val tagName = json.getString("tag_name")
             val notes   = json.optString("body", "").take(400)
@@ -256,7 +294,49 @@ object UpdateChecker {
             if (rv > cv) return true
             if (rv < cv) return false
         }
-        return false
+        // Numeros identiques : c'est le suffixe de pre-release qui departage.
+        return preReleaseRank(preRelease(remote), preRelease(current)) > 0
+    }
+
+    /** Suffixe de pre-release : "2.6.6-beta2" -> "beta2" ; "" si version stable. */
+    @VisibleForTesting
+    internal fun preRelease(version: String): String =
+        version.trimStart('v', 'V').substringBefore('+').substringAfter('-', "")
+
+    /**
+     * Compare deux suffixes de pre-release (regle semver §11).
+     *
+     * Une version SANS suffixe l'emporte sur une version qui en a un : `2.6.6` est posterieure a
+     * `2.6.6-beta9`. C'est ce qui permet a la release stable de remplacer la derniere beta, et qui
+     * empeche une beta d'ecraser la stable de meme numero.
+     *
+     * Entre deux suffixes, comparaison identifiant par identifiant : les identifiants purement
+     * numeriques se comparent en nombres (`beta10` > `beta9`, ce qu'un tri lexical raterait).
+     */
+    @VisibleForTesting
+    internal fun preReleaseRank(remote: String, current: String): Int {
+        if (remote.isEmpty() && current.isEmpty()) return 0
+        if (remote.isEmpty()) return 1      // stable > pre-release
+        if (current.isEmpty()) return -1
+        val ri = remote.split('.')
+        val ci = current.split('.')
+        for (i in 0 until maxOf(ri.size, ci.size)) {
+            val a = ri.getOrNull(i) ?: return -1   // moins d'identifiants = anterieur
+            val b = ci.getOrNull(i) ?: return 1
+            val cmp = compareIdentifier(a, b)
+            if (cmp != 0) return cmp
+        }
+        return 0
+    }
+
+    /** "beta2" vs "beta10" : on isole le prefixe alphabetique et le nombre final. */
+    private fun compareIdentifier(a: String, b: String): Int {
+        val alphaA = a.takeWhile { !it.isDigit() }
+        val alphaB = b.takeWhile { !it.isDigit() }
+        if (alphaA != alphaB) return alphaA.compareTo(alphaB)
+        val numA = a.dropWhile { !it.isDigit() }.toLongOrNull() ?: -1L
+        val numB = b.dropWhile { !it.isDigit() }.toLongOrNull() ?: -1L
+        return numA.compareTo(numB)
     }
 
     /**

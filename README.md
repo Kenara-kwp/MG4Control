@@ -24,8 +24,9 @@ You enjoy MG4Control and want to support its development ?
 6. [Couches matérielles](#couches-matérielles)
 7. [Système de profils](#système-de-profils)
 8. [Interface utilisateur](#interface-utilisateur)
-9. [Compilation et installation](#compilation-et-installation)
-10. [Permissions requises](#permissions-requises)
+9. [API externe](#api-externe-keymapper-tasker)
+10. [Compilation et installation](#compilation-et-installation)
+11. [Permissions requises](#permissions-requises)
 
 ---
 
@@ -49,9 +50,11 @@ L'application communique avec le véhicule via le SDK propriétaire SAIC, en acc
 - **Mode de conduite** : ECO / NORMAL / SPORT / SNOW / CUSTOM
 - **Régénération** : Off / Faible / Moyen / Fort / Adaptatif / 1 Pédale
 
-### Climatisation
+### Confort
 - **Volant chauffant** : On / Off
 - **Sièges chauffants gauche et droit** : Off / Niveau 1 / 2 / 3
+- **Climatisation** : consigne de température, ventilation, marche/arrêt, A/C, AUTO,
+  recirculation (intérieur / extérieur / auto), dégivrage avant et arrière
 
 ### ADAS (Assistance à la conduite)
 - **SWI133** : Off / Limiteur / Auto / ACC / ICA + alertes excès de vitesse / changement de limite
@@ -60,9 +63,20 @@ L'application communique avec le véhicule via le SDK propriétaire SAIC, en acc
 - **SWI165** : Désactiver / ACC / TJA + Anti-collision avant (AEB) On/Off + mode Alerte / Alerte+Freinage + avertissement sonore
 
 ### Raccourcis volant
-- Configuration des **4 boutons du volant** (boutons latéraux gauche/droit)
-- Actions disponibles : Mode de conduite / Régénération / ADAS / **Ouvrir l'application**
+- Configuration des **boutons ★ gauche et droit**, en appui **simple** ou **long**
+- Actions disponibles : 1 Pédale, cycle ADAS, cycle anticollision, alertes sonores,
+  reconnaissance des panneaux, économie d'énergie, lancer un profil, sélecteur de profil,
+  ouvrir MG4Control, lancer une application, éteindre le véhicule
+- Réglages associés affichés **uniquement si l'action correspondante est attribuée**
+  (niveau de repli du mode 1 Pédale, crans du cycle ADAS)
 - Activation / désactivation des raccourcis avec **dialog d'avertissement**
+
+### Automatisation
+- **Application d'un profil selon la température extérieure** : seuil, sens
+  (inférieure/supérieure), profil à appliquer, exécution directe ou popup de confirmation
+- **Déclenchement A/C via la température** : deux règles indépendantes (température supérieure /
+  inférieure), chacune avec son seuil, sa consigne, sa ventilation et ses dégivrages
+- Chaque automatisation est dépliable indépendamment de son interrupteur d'activation
 
 ### Gestion de profils
 - Sauvegarde jusqu'à **5 profils** personnalisés
@@ -70,20 +84,28 @@ L'application communique avec le véhicule via le SDK propriétaire SAIC, en acc
 - Application automatique du profil par défaut **au démarrage du véhicule**
 
 ### Réglages
-- Choix de la langue (Français / English)
-- Activation/désactivation de l'application automatique du profil
-- **Mise à jour automatique** : vérification GitHub + téléchargement APK vers le dossier Téléchargements
-- **Nettoyage APK** : suppression des anciens fichiers `MGControl*.apk` du dossier Téléchargements
-- Dialog "À propos" avec version de l'app, version firmware et QR code GitHub
-- Bouton "Fermer" pour revenir directement au dashboard
+Écran organisé en **quatre onglets** :
+- **Langues** : français, anglais, allemand, espagnol, italien, portugais
+- **Interface** : écran affiché au démarrage, apparence (auto / sombre / clair)
+- **Réglages avancés** : application automatique du profil, vérification des mises à jour au
+  lancement, extinction du véhicule écran allumé, blocage des réglages de conduite au-delà d'une
+  vitesse donnée, **API externe** (cf. section dédiée)
+- **Infos** : vérification des mises à jour, nettoyage des APK, dialog « À propos » (version de
+  l'app, firmware, QR codes), indicateur de firmware, et bouton Diagnostic révélé par 5 clics
+  sur le logo
 
 ### Profils
-- Bouton "Fermer" pour revenir directement au dashboard
+- Liste des profils avec application, définition par défaut, modification, suppression
+- **Éditeur en plein écran** organisé en trois catégories : Conduite, Sécurité, Confort
+- Le nom du profil et le réglage « profil par défaut » restent visibles sur les trois onglets
+- Volant et sièges chauffants disposent d'un interrupteur de **prise en compte** : décoché, le
+  profil ne touche pas au réglage au lieu de l'éteindre
 
 ### Compatibilité firmware inconnue (UNKNOWN)
 - Dialog d'avertissement au démarrage si le firmware n'est ni SWI133 ni SWI68
 - L'utilisateur peut fermer l'application ou continuer
-- En mode "Continuer", les chips SWI133 / SWI68 / SWI69 / SWI131 deviennent cliquables pour forcer un mode de compatibilité
+- En mode "Continuer", les pastilles de firmware (*Réglages → Infos*) deviennent cliquables pour
+  forcer un mode de compatibilité
 - Le choix forcé est persisté en SharedPreferences et survit aux redémarrages de l'app
 
 ---
@@ -182,10 +204,25 @@ MG4Control/
 │   │   ├── hardware/
 │   │   │   └── MG4Hardware.kt         # Abstraction matérielle (4 couches)
 │   │   │
+│   │   ├── api/
+│   │   │   ├── ExternalApi.kt         # Contrat de l'API externe (actions, clés, verrous)
+│   │   │   ├── ExternalApiReceiver.kt # Réception des intents tiers
+│   │   │   └── StateProvider.kt       # Lecture de l'état (ContentProvider)
+│   │   │
+│   │   ├── automation/
+│   │   │   ├── AutomationSettings.kt        # Profil selon la température
+│   │   │   ├── AutomationDecision.kt        # Décision pure (testable hors Android)
+│   │   │   ├── ClimateAutomationSettings.kt # Déclenchement A/C
+│   │   │   └── ClimateAutomationDecision.kt
+│   │   │
 │   │   ├── ui/
-│   │   │   ├── DashboardFragment.kt   # Écran principal unifié
-│   │   │   ├── ProfileFragment.kt     # Gestion des profils
-│   │   │   ├── SettingsFragment.kt    # Réglages & À propos
+│   │   │   ├── DashboardFragment.kt   # Écran principal (rail 3 catégories)
+│   │   │   ├── ProfileFragment.kt     # Liste des profils
+│   │   │   ├── ProfileEditFragment.kt # Éditeur plein écran (rail 3 catégories)
+│   │   │   ├── SettingsFragment.kt    # Réglages (rail 4 onglets)
+│   │   │   ├── ShortcutsFragment.kt   # Raccourcis volant (rail 2 onglets)
+│   │   │   ├── AutomationFragment.kt  # Automatisations
+│   │   │   ├── AudioFragment.kt       # Audio (A9 uniquement)
 │   │   │   ├── ProfileAdapter.kt      # Adaptateur RecyclerView profils
 │   │   │   ├── ConsoleFragment.kt     # Journal de debug en temps réel
 │   │   │   ├── DriveRegenFragment.kt  # Héritage (non utilisé en v2)
@@ -317,33 +354,177 @@ Les profils sont sérialisés en JSON via **Gson** et stockés dans `SharedPrefe
 ## Interface utilisateur
 
 ### Navigation
-L'application utilise un **NavController** avec **3 destinations** :
+L'application utilise un **NavController** avec **7 destinations** :
 
 ```
 DashboardFragment (départ)
-    ├──► ProfileFragment  (bouton PROFILS — toggle)
-    └──► SettingsFragment (bouton RÉGLAGES — toggle)
+    ├──► ProfileFragment ──► ProfileEditFragment  (création / édition, plein écran)
+    ├──► SettingsFragment
+    ├──► ShortcutsFragment
+    ├──► AudioFragment        (A9 uniquement)
+    └──► AutomationFragment
 ```
 
-Un second appui sur PROFILS ou RÉGLAGES ferme la vue et revient au dashboard.
+Les boutons de la barre du haut fonctionnent en bascule : un second appui revient au dashboard.
 
-### Dashboard (écran principal)
-Disposition en **2 rangées** (ratio 2:1) optimisée pour 1280×480 :
-- **Rangée haute (2/3)** : Mode de conduite | Régénération | ADAS
-- **Rangée basse (1/3)** : Climatisation (volant + sièges) | Alertes
+### Rail de catégories
+Quatre écrans partagent le même motif : un **rail vertical à gauche** sélectionne une catégorie,
+le contenu défile à droite, et ce qui n'appartient à aucune catégorie reste dans un bandeau
+persistant (nom du profil, interrupteur maître) ou en pied de page (Annuler / Enregistrer / Fermer).
 
-### Dark theme — palette de couleurs
+| Écran | Onglets |
+|---|---|
+| Dashboard | Conduite · Sécurité · Confort |
+| Éditeur de profil | Conduite · Sécurité · Confort |
+| Réglages | Langues · Interface · Réglages avancés · Infos |
+| Raccourcis | Boutons · Actions |
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `dash_bg` | `#0C0C0E` | Fond général |
-| `dash_card` | `#141416` | Cartes |
-| `dash_section` | `#1C1C1F` | Sections internes |
-| `dash_border` | `#2A2A2E` | Bordures |
-| `dash_accent` | `#38BDF8` | Sélection active (bleu) |
-| `dash_eco` | `#22C55E` | Mode ECO (vert) |
-| `dash_warn` | `#F59E0B` | Mode SPORT (orange) |
-| `dash_danger` | `#F43F5E` | Suppression / danger |
+Un onglet dont la page n'a plus aucune section visible sur le firmware courant est **masqué** —
+mieux vaut pas d'onglet qu'un onglet qui ouvre une page vide.
+
+### Dimensionnement
+Valeurs communes aux écrans refondus, calées sur la lisibilité au volant : titres **20sp**,
+en-têtes de section **13sp**, libellés et boutons **16sp**, hauteur de bouton **52dp**, onglets du
+rail **64dp**, rail **180dp**, padding de carte **14dp**.
+
+### Palette de couleurs
+
+L'application suit le thème clair ou sombre. Les valeurs claires sont dans
+`res/values/colors.xml`, les sombres dans `res/values-night/colors.xml` — **mêmes noms de token
+des deux côtés**, c'est la seule règle à respecter en ajoutant une couleur.
+
+| Token | Clair | Sombre | Usage |
+|-------|-------|--------|-------|
+| `dash_bg` | `#F2F2F7` | `#0C0C0E` | Fond général |
+| `dash_card` | `#FFFFFF` | `#141416` | Cartes |
+| `dash_section` | `#F2F2F7` | `#1C1C1F` | Sections internes |
+| `dash_border` | `#D1D1D6` | `#2A2A2E` | Bordures et séparateurs |
+| `dash_btn` | `#E5E5EA` | `#222226` | Fond de bouton inactif |
+| `dash_text_lo` | `#8E8E93` | `#52525B` | En-têtes de section |
+| `dash_accent` | `#0284C7` | `#38BDF8` | Sélection active (bleu) |
+| `dash_accent_dim` | `#E0F2FE` | `#0C4A6E` | Fond de la sélection active |
+| `dash_eco` | `#16A34A` | `#22C55E` | Mode ECO (vert) |
+| `dash_warn` | `#D97706` | `#F59E0B` | Avertissement (orange) |
+| `dash_danger` | `#E11D48` | `#F43F5E` | Suppression / danger |
+| `text_primary` | `#1C1C1E` | `#FFFFFF` | Texte principal |
+| `text_secondary` | `#6C6C70` | `#B0B0B0` | Texte secondaire |
+
+Chaque couleur `*_dim` est le fond associé à sa couleur vive : `dash_eco_dim`, `dash_warn_dim` et
+`dash_danger_dim` suivent le même principe que `dash_accent_dim`.
+
+> **Piège de nommage :** `bg_dark` vaut `#FFFFFF` en thème clair. Le nom date d'une époque où
+> l'application n'avait qu'un thème sombre ; il désigne le fond général, pas une couleur foncée.
+
+---
+
+## API externe (KeyMapper, Tasker…)
+
+Permet à une application tierce de déclencher les fonctions de MG4Control (issue #79).
+
+> **Désactivée par défaut.** Elle s'active dans *Réglages → Réglages avancés → « API externe »*,
+> avec une confirmation explicite. Tant qu'elle est désactivée, toute commande reçue est refusée
+> et journalisée. Une fois activée, **n'importe quelle application installée** peut envoyer ces
+> intents : ils ne sont protégés par aucune permission, car KeyMapper et Tasker viennent du Play
+> Store et ne peuvent pas en détenir une de niveau `signature`.
+
+### Actions directes — une action d'intent par commande
+
+Aucun extra requis : c'est la forme utilisable depuis **KeyMapper**, dont l'éditeur d'intent ne
+propose que le type (*Broadcast receiver*) et la chaîne d'action.
+
+| Action | Effet |
+|---|---|
+| `com.mg4.control.action.ONE_PEDAL` | Bascule 1 pédale ↔ niveau de repli |
+| `com.mg4.control.action.ENERGY_SAVING_TOGGLE` | Économie d'énergie |
+| `com.mg4.control.action.PROFILE_PICKER` | Ouvre le sélecteur de profil à l'écran |
+| `com.mg4.control.action.OPEN_APP` | Ouvre MG4Control |
+
+Ce sont des **bascules** : chaque envoi inverse l'état, il n'existe pas de « mettre à ON ».
+
+> **Commandes volontairement hors API.** `VEHICLE_POWER_OFF`, `ADAS_CYCLE`, `AEB_CYCLE`,
+> `TSR_TOGGLE`, `OVERSPEED_ALARM`, `SPEED_LIMIT_TONE` et `SOUND_WARNING` ne sont **pas** exposées :
+> elles touchent à la sécurité active ou coupent le véhicule. Le refus s'applique aussi à
+> `EXECUTE` — les retirer des seules actions directes n'aurait rien protégé. Elles restent
+> pilotables depuis l'application et les raccourcis volant.
+
+**Dans KeyMapper** : ajouter une action → *Intent* (version 2.3.0 minimum) → type
+**Broadcast receiver** → coller la chaîne dans le champ *Action*.
+
+### `EXECUTE` — pour Tasker, adb, scripts
+
+`com.mg4.control.action.EXECUTE` avec un extra texte `action` valant l'un des noms ci-dessus, plus
+deux commandes que les actions directes ne peuvent pas couvrir :
+
+- `APPLY_PROFILE` — exige un extra `profile` : le nom du profil, insensible à la casse
+- `OPEN_CUSTOM_APP` — ouvre l'application configurée dans les raccourcis
+
+```bash
+adb shell am broadcast -a com.mg4.control.action.EXECUTE \
+  --es action APPLY_PROFILE --es profile "Trajet domicile"
+```
+
+### `SET` — écriture directe d'une valeur
+
+`com.mg4.control.action.SET` avec les extras `key` et `value` :
+
+| `key` | `value` accepté |
+|---|---|
+| `drive_mode` | `ECO` `NORMAL` `SPORT` `SNOW` `CUSTOM` |
+| `regen` | `OFF` `LOW` `MEDIUM` `HIGH` `ADAPTIVE` `ONE_PEDAL` |
+| `seat_heat_left` | `0` à `3` |
+| `seat_heat_right` | `0` à `3` |
+| `steering_heat` | `0`/`1` ou `false`/`true` |
+| `profile` | nom du profil |
+| `hvac_power` | `0`/`1` — marche/arrêt de la clim |
+| `ac` | `0`/`1` — compresseur A/C |
+| `hvac_auto` | `0`/`1` — mode automatique |
+| `hvac_temp` | °C, clampé aux bornes réelles du véhicule |
+| `hvac_fan` | niveau de ventilation, clampé aux bornes réelles |
+| `hvac_recirc` | `INNER` `OUTSIDE` `AUTO` (ou `0` `1` `2`) |
+| `defrost_front` | `0`/`1` |
+| `defrost_rear` | `0`/`1` |
+
+Les clés `hvac_*` et `defrost_*` sont ignorées si le firmware n'expose pas la climatisation.
+Consigne et ventilation sont clampées aux bornes **lues sur le véhicule**, qui diffèrent d'un
+firmware à l'autre. Ces commandes sont des bascules matérielles qui avancent d'un cran à la fois :
+comptez quelques secondes avant que l'état final soit atteint.
+
+```bash
+adb shell am broadcast -a com.mg4.control.action.SET --es key drive_mode --es value SPORT
+```
+
+### Lecture de l'état — ContentProvider
+
+`content://com.mg4.control.state/state` (ou `com.mg4.control.offline.state` pour la variante
+offline — l'authority suit l'applicationId). Un curseur d'**une** ligne :
+
+`drive_mode`, `regen`, `seat_heat_left`, `seat_heat_right`, `steering_heat`, `speed_kmh`,
+`outside_temp_c`, `tsr`, `energy_saving`, `aeb_enabled`, `firmware`, `profiles` (noms séparés
+par `|`), `default_profile`.
+
+Une valeur illisible vaut `null`, jamais `0` — un zéro se confondrait avec « siège éteint » ou
+« véhicule à l'arrêt ». Tasker sait interroger un ContentProvider, KeyMapper non.
+
+Contrairement aux broadcasts, un provider connaît son appelant : chaque lecture est journalisée
+nominativement, et la préférence `external_api_allowlist` (liste de paquets séparés par des
+virgules, vide = tous acceptés) est réellement appliquée.
+
+### Sécurité et diagnostic
+
+Le **verrou de vitesse** (*Réglages → « Bloquer les réglages de conduite au-delà d'une certaine
+vitesse »*) s'applique aussi à l'API, puisqu'il est posé dans les primitives d'écriture. Attention :
+il est lui-même **désactivé par défaut** — s'il ne l'est pas, aucune limite de vitesse ne
+s'applique aux commandes externes. Le confort (sièges, volant chauffants) n'est jamais concerné.
+
+Toute commande, acceptée ou refusée, est tracée au tag **`MG4_API`** (visible via le bouton
+Diagnostic). Pour tester l'application indépendamment de KeyMapper :
+
+```bash
+adb shell am broadcast -a com.mg4.control.action.PROFILE_PICKER
+```
+
+Silence complet = APK pas à jour ou service arrêté. `REFUS … API externe désactivée` =
+l'interrupteur des Réglages n'a pas été confirmé.
 
 ---
 
@@ -416,8 +597,9 @@ adb shell pm install -r --system /sdcard/app-debug.apk
 6. [Hardware Layers](#hardware-layers)
 7. [Profile System](#profile-system)
 8. [User Interface](#user-interface)
-9. [Build & Installation](#build--installation)
-10. [Required Permissions](#required-permissions)
+9. [External API](#external-api-keymapper-tasker)
+10. [Build & Installation](#build--installation)
+11. [Required Permissions](#required-permissions)
 
 ---
 
@@ -441,9 +623,11 @@ The app communicates with the vehicle through the proprietary SAIC SDK, accessin
 - **Drive mode**: ECO / NORMAL / SPORT / SNOW / CUSTOM
 - **Regenerative braking**: Off / Low / Medium / High / Adaptive / One Pedal
 
-### Climate Control
+### Comfort
 - **Heated steering wheel**: On / Off
 - **Heated seats (left & right)**: Off / Level 1 / 2 / 3
+- **Climate control**: temperature setpoint, fan speed, power, A/C, AUTO, recirculation
+  (inner / outside / auto), front and rear defrost
 
 ### ADAS (Advanced Driver Assistance)
 - **SWI133**: Off / Speed Limiter / Auto / ACC / ICA + overspeed alert / speed limit change alert
@@ -686,33 +870,176 @@ Profiles are serialized to JSON via **Gson** and stored in `SharedPreferences`. 
 ## User Interface
 
 ### Navigation
-The app uses a **NavController** with **3 destinations**:
+The app uses a **NavController** with **7 destinations**:
 
 ```
 DashboardFragment (start)
-    ├──► ProfileFragment  (PROFILS button — toggle)
-    └──► SettingsFragment (RÉGLAGES button — toggle)
+    ├──► ProfileFragment ──► ProfileEditFragment  (create / edit, full screen)
+    ├──► SettingsFragment
+    ├──► ShortcutsFragment
+    ├──► AudioFragment        (A9 only)
+    └──► AutomationFragment
 ```
 
-A second press on PROFILS or RÉGLAGES closes the view and returns to the dashboard.
+Top-bar buttons act as toggles: a second press returns to the dashboard.
 
-### Dashboard (main screen)
-**2-row layout** (2:1 weight ratio) optimized for 1280×480:
-- **Top row (2/3 height)**: Drive mode | Regeneration | ADAS
-- **Bottom row (1/3 height)**: Climate (steering + seats) | Alerts
+### Category rail
+Four screens share the same pattern: a **vertical rail on the left** selects a category, the
+content scrolls on the right, and whatever belongs to no category stays in a persistent header
+(profile name, master switch) or footer (Cancel / Save / Close).
 
-### Dark Theme — Color Palette
+| Screen | Tabs |
+|---|---|
+| Dashboard | Driving · Safety · Comfort |
+| Profile editor | Driving · Safety · Comfort |
+| Settings | Languages · Interface · Advanced · Info |
+| Shortcuts | Buttons · Actions |
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `dash_bg` | `#0C0C0E` | App background |
-| `dash_card` | `#141416` | Cards |
-| `dash_section` | `#1C1C1F` | Inner sections |
-| `dash_border` | `#2A2A2E` | Borders |
-| `dash_accent` | `#38BDF8` | Active selection (blue) |
-| `dash_eco` | `#22C55E` | ECO mode (green) |
-| `dash_warn` | `#F59E0B` | SPORT mode (amber) |
-| `dash_danger` | `#F43F5E` | Delete / danger actions |
+A tab whose page has no visible section left on the current firmware is **hidden** — better no tab
+than a tab opening an empty page.
+
+### Sizing
+Values shared by the reworked screens, tuned for readability while driving: titles **20sp**,
+section headers **13sp**, labels and buttons **16sp**, button height **52dp**, rail tabs **64dp**,
+rail width **180dp**, card padding **14dp**.
+
+### Color Palette
+
+The app follows the light or dark theme. Light values live in `res/values/colors.xml`, dark ones in
+`res/values-night/colors.xml` — **same token names on both sides**, which is the only rule to
+follow when adding a colour.
+
+| Token | Light | Dark | Usage |
+|-------|-------|------|-------|
+| `dash_bg` | `#F2F2F7` | `#0C0C0E` | App background |
+| `dash_card` | `#FFFFFF` | `#141416` | Cards |
+| `dash_section` | `#F2F2F7` | `#1C1C1F` | Inner sections |
+| `dash_border` | `#D1D1D6` | `#2A2A2E` | Borders and dividers |
+| `dash_btn` | `#E5E5EA` | `#222226` | Inactive button background |
+| `dash_text_lo` | `#8E8E93` | `#52525B` | Section headers |
+| `dash_accent` | `#0284C7` | `#38BDF8` | Active selection (blue) |
+| `dash_accent_dim` | `#E0F2FE` | `#0C4A6E` | Active selection background |
+| `dash_eco` | `#16A34A` | `#22C55E` | ECO mode (green) |
+| `dash_warn` | `#D97706` | `#F59E0B` | Warning (amber) |
+| `dash_danger` | `#E11D48` | `#F43F5E` | Delete / danger actions |
+| `text_primary` | `#1C1C1E` | `#FFFFFF` | Primary text |
+| `text_secondary` | `#6C6C70` | `#B0B0B0` | Secondary text |
+
+Every `*_dim` colour is the background paired with its vivid counterpart: `dash_eco_dim`,
+`dash_warn_dim` and `dash_danger_dim` follow the same principle as `dash_accent_dim`.
+
+> **Naming pitfall:** `bg_dark` is `#FFFFFF` in the light theme. The name dates back to when the
+> app only had a dark theme; it means the general background, not a dark colour.
+
+---
+
+## External API (KeyMapper, Tasker…)
+
+Lets a third-party app trigger MG4Control functions (issue #79).
+
+> **Disabled by default.** Turn it on in *Settings → Advanced settings → "External API"*, with an
+> explicit confirmation. While disabled, every incoming command is refused and logged. Once
+> enabled, **any installed app** can send these intents: they are protected by no permission,
+> because KeyMapper and Tasker ship from the Play Store and can never hold a `signature` one.
+
+### Direct actions — one intent action per command
+
+No extras required. This is the form usable from **KeyMapper**, whose intent editor only offers
+the type (*Broadcast receiver*) and the action string.
+
+| Action | Effect |
+|---|---|
+| `com.mg4.control.action.ONE_PEDAL` | Toggle 1-pedal ↔ fallback regen level |
+| `com.mg4.control.action.ENERGY_SAVING_TOGGLE` | Energy saving |
+| `com.mg4.control.action.PROFILE_PICKER` | Show the on-screen profile picker |
+| `com.mg4.control.action.OPEN_APP` | Open MG4Control |
+
+These are **toggles**: each send flips the state, there is no "set to ON".
+
+> **Deliberately out of the API.** `VEHICLE_POWER_OFF`, `ADAS_CYCLE`, `AEB_CYCLE`, `TSR_TOGGLE`,
+> `OVERSPEED_ALARM`, `SPEED_LIMIT_TONE` and `SOUND_WARNING` are **not** exposed: they affect active
+> safety or shut the vehicle down. The refusal also covers `EXECUTE` — removing them from the direct
+> actions alone would have protected nothing. They remain available from the app and the steering
+> wheel shortcuts.
+
+**In KeyMapper**: add an action → *Intent* (version 2.3.0 minimum) → type **Broadcast receiver** →
+paste the string into the *Action* field.
+
+### `EXECUTE` — for Tasker, adb, scripts
+
+`com.mg4.control.action.EXECUTE` with a string extra `action` holding one of the names above, plus
+two commands the direct actions cannot cover:
+
+- `APPLY_PROFILE` — requires a `profile` extra: the profile name, case-insensitive
+- `OPEN_CUSTOM_APP` — opens the app configured in the shortcuts screen
+
+```bash
+adb shell am broadcast -a com.mg4.control.action.EXECUTE \
+  --es action APPLY_PROFILE --es profile "Home commute"
+```
+
+### `SET` — write a value directly
+
+`com.mg4.control.action.SET` with the `key` and `value` extras:
+
+| `key` | accepted `value` |
+|---|---|
+| `drive_mode` | `ECO` `NORMAL` `SPORT` `SNOW` `CUSTOM` |
+| `regen` | `OFF` `LOW` `MEDIUM` `HIGH` `ADAPTIVE` `ONE_PEDAL` |
+| `seat_heat_left` | `0` to `3` |
+| `seat_heat_right` | `0` to `3` |
+| `steering_heat` | `0`/`1` or `false`/`true` |
+| `profile` | profile name |
+| `hvac_power` | `0`/`1` — climate on/off |
+| `ac` | `0`/`1` — A/C compressor |
+| `hvac_auto` | `0`/`1` — automatic mode |
+| `hvac_temp` | °C, clamped to the vehicle's real bounds |
+| `hvac_fan` | fan level, clamped to the real bounds |
+| `hvac_recirc` | `INNER` `OUTSIDE` `AUTO` (or `0` `1` `2`) |
+| `defrost_front` | `0`/`1` |
+| `defrost_rear` | `0`/`1` |
+
+The `hvac_*` and `defrost_*` keys are ignored when the firmware exposes no climate control.
+Setpoint and fan are clamped to bounds **read from the vehicle**, which differ across firmwares.
+These are hardware toggles that step one notch at a time: expect a few seconds before the final
+state is reached.
+
+```bash
+adb shell am broadcast -a com.mg4.control.action.SET --es key drive_mode --es value SPORT
+```
+
+### Reading state — ContentProvider
+
+`content://com.mg4.control.state/state` (or `com.mg4.control.offline.state` for the offline
+variant — the authority follows the applicationId). A **single**-row cursor:
+
+`drive_mode`, `regen`, `seat_heat_left`, `seat_heat_right`, `steering_heat`, `speed_kmh`,
+`outside_temp_c`, `tsr`, `energy_saving`, `aeb_enabled`, `firmware`, `profiles` (names separated
+by `|`), `default_profile`.
+
+An unreadable value is `null`, never `0` — a zero would be indistinguishable from "seat off" or
+"vehicle stopped". Tasker can query a ContentProvider, KeyMapper cannot.
+
+Unlike broadcasts, a provider knows its caller: every read is logged by package name, and the
+`external_api_allowlist` preference (comma-separated packages, empty = all allowed) is actually
+enforced.
+
+### Security and diagnostics
+
+The **speed lock** (*Settings → "Block driving settings above a given speed"*) also covers the API,
+since it sits in the write primitives. Note that it is itself **disabled by default** — if you have
+not enabled it, no speed limit applies to external commands. Comfort settings (seats, steering
+wheel heating) are never affected.
+
+Every command, accepted or refused, is traced under the **`MG4_API`** tag (visible via the
+Diagnostic button). To test the app independently of KeyMapper:
+
+```bash
+adb shell am broadcast -a com.mg4.control.action.PROFILE_PICKER
+```
+
+Complete silence = stale APK or service not running. `REFUS … API externe désactivée` = the
+Settings toggle was never confirmed.
 
 ---
 

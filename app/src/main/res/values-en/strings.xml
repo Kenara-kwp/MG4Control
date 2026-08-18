@@ -356,4 +356,19 @@
     <!-- Raccourcis : categories -->
     <string name="shortcuts_cat_buttons">Buttons</string>
     <string name="shortcuts_cat_actions">Actions</string>
+
+    <!-- API externe (issue #79) -->
+    <string name="settings_external_api">External API (KeyMapper, Tasker…)</string>
+    <string name="settings_external_api_warn">⚠ Lets any installed app control driving settings. The speed lock still applies. Leave off if you don\'t need it.</string>
+
+    <!-- Confirmation d'activation de l'API externe (issue #79) -->
+    <string name="external_api_confirm_title">Enable the external API?</string>
+    <string name="external_api_confirm_warn">ANY INSTALLED APP WILL BE ABLE TO TAKE CONTROL OF THE VEHICLE.</string>
+    <string name="external_api_confirm_msg">Drive mode, regeneration, heated seats and steering wheel, climate control and profiles become controllable by a third-party app, with no further approval from you.\n\nThe speed lock stays active.\n\nOnly enable this if you actually use KeyMapper, Tasker or a similar tool.</string>
+    <string name="external_api_confirm_risk">You enable this <b>at your own risk</b>: you remain solely responsible for whatever a third-party app does to your vehicle.</string>
+    <string name="external_api_confirm_ok">Confirm</string>
+
+    <!-- Canal beta OTA -->
+    <string name="settings_beta_channel">Beta update channel</string>
+    <string name="settings_beta_channel_desc">Receives test builds before their official release. They may contain bugs. Rolling back to an earlier version is not possible through the updater.</string>
 </resources>
