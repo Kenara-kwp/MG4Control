@@ -493,6 +493,30 @@ comptez quelques secondes avant que l'état final soit atteint.
 adb shell am broadcast -a com.mg4.control.action.SET --es key drive_mode --es value SPORT
 ```
 
+#### `NEXT` / `PREV` / `TOGGLE` — cycler sans connaître l'état
+
+À la place d'une consigne, `value` accepte **`NEXT`** (cran suivant), **`PREV`** (cran précédent)
+ou **`TOGGLE`** (alias de `NEXT`, plus lisible sur un booléen). La nouvelle valeur est calculée à
+partir de l'état lu sur le véhicule, ce qui permet d'assigner « siège chauffant +1 » à un seul
+bouton de volant. Le cycle **reboucle** : au maximum, le cran suivant revient au minimum.
+
+```bash
+adb shell am broadcast -a com.mg4.control.action.SET --es key seat_heat_left --es value NEXT
+adb shell am broadcast -a com.mg4.control.action.SET --es key ac --es value TOGGLE
+```
+
+Clés cyclables : `seat_heat_left`, `seat_heat_right`, `steering_heat`, `hvac_power`, `ac`,
+`hvac_auto`, `hvac_temp`, `hvac_fan`, `hvac_recirc`, `defrost_front`, `defrost_rear`.
+
+`drive_mode`, `regen` et `profile` en sont **volontairement exclus** : l'énumération des modes de
+conduite n'est pas filtrée par firmware (on cyclerait vers un mode absent du véhicule), la
+disponibilité de la régénération dépend de l'état courant (aucun niveau en mode Neige, One Pedal
+seul quand Éco énergie est actif), et il n'existe pas de notion de « profil courant ».
+
+Si l'état courant est illisible, la commande est **refusée sans rien écrire** plutôt que de partir
+d'une valeur supposée — un point de départ deviné ferait descendre la valeur alors que vous
+appuyez pour la monter. Le refus est journalisé (`adb logcat -s MG4_API`).
+
 ### Lecture de l'état — ContentProvider
 
 `content://com.mg4.control.state/state` (ou `com.mg4.control.offline.state` pour la variante
@@ -1007,6 +1031,30 @@ state is reached.
 ```bash
 adb shell am broadcast -a com.mg4.control.action.SET --es key drive_mode --es value SPORT
 ```
+
+#### `NEXT` / `PREV` / `TOGGLE` — cycling without knowing the state
+
+Instead of a setpoint, `value` accepts **`NEXT`** (next notch), **`PREV`** (previous notch) or
+**`TOGGLE`** (an alias of `NEXT`, easier to read on a boolean). The new value is computed from the
+state read on the vehicle, so a single steering-wheel button can mean "seat heat +1". The cycle
+**wraps around**: past the maximum, the next notch returns to the minimum.
+
+```bash
+adb shell am broadcast -a com.mg4.control.action.SET --es key seat_heat_left --es value NEXT
+adb shell am broadcast -a com.mg4.control.action.SET --es key ac --es value TOGGLE
+```
+
+Cyclable keys: `seat_heat_left`, `seat_heat_right`, `steering_heat`, `hvac_power`, `ac`,
+`hvac_auto`, `hvac_temp`, `hvac_fan`, `hvac_recirc`, `defrost_front`, `defrost_rear`.
+
+`drive_mode`, `regen` and `profile` are **deliberately excluded**: the drive-mode enum is not
+filtered per firmware (cycling could select a mode the car does not have), regen availability
+depends on the current state (no level at all in Snow mode, One Pedal only while Energy Saving is
+on), and there is no notion of a "current profile".
+
+When the current state cannot be read, the command is **refused without writing anything** rather
+than assuming a starting point — a guessed origin would move the value down while you press to
+move it up. Refusals are logged (`adb logcat -s MG4_API`).
 
 ### Reading state — ContentProvider
 

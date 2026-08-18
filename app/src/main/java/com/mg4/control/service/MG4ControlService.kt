@@ -211,31 +211,89 @@ class MG4ControlService : Service() {
         AppLogger.i(ExternalApi.LOG_TAG, "SET $key=$value")
 
         CoroutineScope(Dispatchers.IO).launch {
+            // NEXT/PREV/TOGGLE sont résolus en valeur concrète AVANT le dispatch : le cycle
+            // emprunte ensuite exactement le même chemin d'écriture qu'une consigne explicite,
+            // donc les mêmes validations, le même clampage et le même verrou de vitesse.
+            val dir = ExternalApi.cycleDirection(value)
+            val v   = if (dir == null) value else resolveCycle(key, dir)
+            if (v == null) {
+                AppLogger.w(ExternalApi.LOG_TAG,
+                    "CYCLE $key=$value refusé — clé non cyclable ou état courant illisible")
+                return@launch
+            }
+            if (dir != null) AppLogger.i(ExternalApi.LOG_TAG, "CYCLE $key : $value → $v")
+
             // Toutes ces écritures passent par MG4Hardware, donc par VehicleWriteGate : refusées
             // en roulant sans que l'API ait à s'en préoccuper.
             val ok = when (key) {
                 ExternalApi.SET_DRIVE_MODE -> DriveMode.values()
-                    .firstOrNull { it.name.equals(value, true) }
+                    .firstOrNull { it.name.equals(v, true) }
                     ?.let { MG4Hardware.setDriveMode(it); true } ?: false
                 ExternalApi.SET_REGEN -> RegenLevel.values()
-                    .firstOrNull { it.name.equals(value, true) }
+                    .firstOrNull { it.name.equals(v, true) }
                     ?.let { MG4Hardware.setRegenLevel(it); true } ?: false
                 ExternalApi.SET_SEAT_HEAT_LEFT ->
-                    value.toIntOrNull()?.takeIf { it in 0..3 }
+                    v.toIntOrNull()?.takeIf { it in 0..3 }
                         ?.let { MG4Hardware.setSeatHeatLeft(it); true } ?: false
                 ExternalApi.SET_SEAT_HEAT_RIGHT ->
-                    value.toIntOrNull()?.takeIf { it in 0..3 }
+                    v.toIntOrNull()?.takeIf { it in 0..3 }
                         ?.let { MG4Hardware.setSeatHeatRight(it); true } ?: false
                 ExternalApi.SET_STEERING_HEAT -> {
-                    val on = value.equals("true", true) || value == "1"
+                    val on = v.equals("true", true) || v == "1"
                     MG4Hardware.setSteeringHeat(on); true
                 }
-                ExternalApi.SET_PROFILE -> { applyProfileByName(value); true }
-                else -> setClimateFromApi(key, value)
+                ExternalApi.SET_PROFILE -> { applyProfileByName(v); true }
+                else -> setClimateFromApi(key, v)
             }
-            if (!ok) AppLogger.w(ExternalApi.LOG_TAG, "SET refusé — clé ou valeur invalide ($key=$value)")
+            if (!ok) AppLogger.w(ExternalApi.LOG_TAG, "SET refusé — clé ou valeur invalide ($key=$v)")
         }
         return true
+    }
+
+    /**
+     * Traduit NEXT/PREV en valeur concrète pour [key], en partant de l'état LU sur le véhicule.
+     * [dir] vaut +1 ou -1. Retourne null quand la clé n'est pas cyclable ou que son état courant
+     * est illisible — et dans ce cas on n'écrit RIEN.
+     *
+     * ⚠️ Ne jamais « supposer » un point de départ pour sauver l'appel : sur un siège réellement
+     * à 3 dont la propriété est muette, partir de 0 ferait descendre la valeur alors que
+     * l'utilisateur appuie pour monter. Un refus journalisé est diagnosticable, pas ça.
+     *
+     * Le cycle boucle (max → min) : c'est indispensable sur un bouton de volant, qui n'a pas de
+     * sens « descendre ». Appelée depuis le contexte IO de [handleExternalApiIntent].
+     */
+    private fun resolveCycle(key: String, dir: Int): String? {
+        if (key !in ExternalApi.CYCLABLE_KEYS) return null
+
+        fun step(cur: Int, min: Int, max: Int): String =
+            ExternalApi.cycleStep(cur, min, max, dir).toString()
+        fun flip(cur: Boolean?): String? = cur?.let { if (it) "0" else "1" }
+
+        when (key) {
+            ExternalApi.SET_SEAT_HEAT_LEFT  ->
+                return MG4Hardware.getSeatHeatLeftOrNull()?.let { step(it, 0, 3) }
+            ExternalApi.SET_SEAT_HEAT_RIGHT ->
+                return MG4Hardware.getSeatHeatRightOrNull()?.let { step(it, 0, 3) }
+            ExternalApi.SET_STEERING_HEAT   ->
+                return flip(MG4Hardware.getSteeringHeatOrNull())
+        }
+
+        // Reste : la clim. Un SEUL getClimateState() — c'est une lecture binder, pas un champ.
+        if (!MG4Hardware.hasClimateControl()) return null
+        val st = MG4Hardware.getClimateState() ?: return null
+        return when (key) {
+            ExternalApi.SET_HVAC_POWER    -> flip(st.powerOn)
+            ExternalApi.SET_HVAC_AC       -> flip(st.acOn)
+            ExternalApi.SET_HVAC_AUTO     -> flip(st.autoOn)
+            ExternalApi.SET_DEFROST_FRONT -> flip(st.defrostFront)
+            ExternalApi.SET_DEFROST_REAR  -> flip(st.defrostRear)
+            // Bornes lues sur le véhicule, jamais codées en dur : elles varient d'un firmware
+            // à l'autre, et c'est sur elles que le cycle reboucle.
+            ExternalApi.SET_HVAC_TEMP     -> st.tempC?.let { step(it, st.tempMin, st.tempMax) }
+            ExternalApi.SET_HVAC_FAN      -> st.fanLevel?.let { step(it, st.fanMin, st.fanMax) }
+            ExternalApi.SET_HVAC_RECIRC   -> st.loopMode?.let { step(it, 0, 2) }
+            else -> null
+        }
     }
 
     /**

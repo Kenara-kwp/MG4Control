@@ -47,11 +47,14 @@ object ExternalApi {
      * Préfixe des actions « une commande = une action d'intent » :
      * `com.mg4.control.action.ONE_PEDAL`, `…ADAS_CYCLE`, `…PROFILE_PICKER`…
      *
-     * ⚠️ RAISON D'ÊTRE, ne pas fusionner avec [ACTION_EXECUTE] en croyant simplifier :
-     * KeyMapper ne sait saisir QUE la chaîne d'action, son éditeur d'intent n'a pas de champ
-     * « extras ». Une API qui exige un extra lui est inutilisable. Cette forme-là ne demande
-     * rien d'autre que l'action, donc elle marche avec n'importe quel outil capable d'émettre
-     * un intent.
+     * RAISON D'ÊTRE : cette forme ne demande QUE la chaîne d'action, donc elle marche avec
+     * n'importe quel outil capable d'émettre un intent, même sans éditeur d'extras.
+     *
+     * ⚠️ CORRECTIF 2026-08 : ce bloc affirmait que l'éditeur d'intent de KeyMapper n'avait pas
+     * de champ « extras » et que [ACTION_SET] lui était donc inutilisable. C'est FAUX — c'était
+     * un artefact d'une version ancienne. KeyMapper (Broadcast receiver) comme Tasker
+     * (misc/send intent) savent poser `key`/`value`. Les actions directes restent un confort,
+     * elles ne sont plus une nécessité : ne pas rejustifier un choix de conception par là.
      */
     const val ACTION_PREFIX = "com.mg4.control.action."
 
@@ -117,6 +120,60 @@ object ExternalApi {
     const val SET_HVAC_RECIRC  = "hvac_recirc"    // INNER|OUTSIDE|AUTO (ou 0|1|2)
     const val SET_DEFROST_FRONT = "defrost_front" // 0|1
     const val SET_DEFROST_REAR  = "defrost_rear"  // 0|1
+
+    // ── Valeurs spéciales : cycle sur l'état courant ──────────────────────────
+
+    /**
+     * Acceptées à la place d'une consigne : la nouvelle valeur est calculée à partir de celle
+     * LUE sur le véhicule. Demandé par les utilisateurs KeyMapper, pour qui « un cran de plus »
+     * sur un appui de volant ne devrait pas obliger à connaître l'état courant.
+     *
+     * [VALUE_TOGGLE] est un alias strict de [VALUE_NEXT] : sur une clé à deux états, avancer
+     * d'un cran EST la bascule. Deux noms parce que « TOGGLE » se lit mieux sur un booléen.
+     */
+    const val VALUE_NEXT   = "NEXT"
+    const val VALUE_PREV   = "PREV"
+    const val VALUE_TOGGLE = "TOGGLE"
+
+    /**
+     * Clés dont le cycle est supporté — liste blanche, et surtout PAS « tout sauf ».
+     *
+     * Une clé n'est cyclable que si son état courant se lit de façon FIABLE, ce qui exclut :
+     *  • `drive_mode` : l'enum n'a aucun filtre firmware, on cyclerait vers un mode absent ;
+     *  • `regen` : l'ordre de déclaration n'est pas l'ordre d'usage (OFF est coincé entre
+     *    ADAPTIVE et ONE_PEDAL), et la disponibilité dépend de l'état courant — aucun niveau
+     *    en mode SNOW, ONE_PEDAL seul quand Éco énergie est actif ;
+     *  • `profile` : il n'existe pas de « profil courant » à faire avancer.
+     *
+     * Les rouvrir demande de régler ces points d'abord, pas seulement d'ajouter la clé ici.
+     */
+    val CYCLABLE_KEYS = setOf(
+        SET_SEAT_HEAT_LEFT, SET_SEAT_HEAT_RIGHT, SET_STEERING_HEAT,
+        SET_HVAC_POWER, SET_HVAC_AC, SET_HVAC_AUTO, SET_HVAC_TEMP,
+        SET_HVAC_FAN, SET_HVAC_RECIRC, SET_DEFROST_FRONT, SET_DEFROST_REAR
+    )
+
+    /** +1 pour NEXT/TOGGLE, -1 pour PREV, null si [value] est une consigne ordinaire. */
+    fun cycleDirection(value: String): Int? = when (value.trim().uppercase()) {
+        VALUE_NEXT, VALUE_TOGGLE -> 1
+        VALUE_PREV               -> -1
+        else                     -> null
+    }
+
+    /**
+     * Avance [cur] de [dir] cran(s) dans [min]..[max], en rebouclant aux deux bouts.
+     *
+     * ⚠️ Le double modulo n'est pas une coquetterie : en Kotlin `(-1) % 4` vaut `-1`, pas `3`.
+     * Un modulo naïf ferait sortir PREV sous le minimum au lieu de reboucler sur le maximum.
+     *
+     * Le bouclage est voulu : sur un bouton de volant il n'existe pas de geste « redescendre »,
+     * donc un cycle qui bute sur la borne devient un cul-de-sac.
+     */
+    fun cycleStep(cur: Int, min: Int, max: Int, dir: Int): Int {
+        if (max <= min) return min
+        val span = max - min + 1
+        return min + (((cur - min + dir) % span) + span) % span
+    }
 
     // ── Lecture (ContentProvider) ────────────────────────────────────────────
 

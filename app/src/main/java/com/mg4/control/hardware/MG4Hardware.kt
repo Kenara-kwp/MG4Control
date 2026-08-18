@@ -1616,6 +1616,25 @@ object MG4Hardware {
     fun getSeatHeatRight(): Int = getIntPropertyHvac(PROP_SEAT_HEAT_R, AREA_HVAC).coerceAtLeast(0)
     fun isSteeringHeatOn(): Boolean = getIntPropertyHvac(PROP_STEERING_HEAT, AREA_HVAC) > 0
 
+    /**
+     * Variantes nullables des lectures de chauffage : `null` = propriété ILLISIBLE, ce qui n'est
+     * PAS « éteint ».
+     *
+     * Les trois lectures ci-dessus écrasent cette distinction — `coerceAtLeast(0)` et `> 0`
+     * transforment le -1 d'échec de [getIntPropertyHvac] en 0/false. C'est sans conséquence pour
+     * l'affichage, mais ça casse le cycle de l'API externe : partir d'un 0 supposé alors que la
+     * propriété est muette produirait un cycle bloqué à 1, et si le siège est réellement à 3
+     * l'utilisateur appuie pour monter et voit la valeur descendre.
+     */
+    fun getSeatHeatLeftOrNull(): Int? =
+        getIntPropertyHvac(PROP_SEAT_HEAT_L, AREA_HVAC).takeIf { it >= 0 }
+
+    fun getSeatHeatRightOrNull(): Int? =
+        getIntPropertyHvac(PROP_SEAT_HEAT_R, AREA_HVAC).takeIf { it >= 0 }
+
+    fun getSteeringHeatOrNull(): Boolean? =
+        getIntPropertyHvac(PROP_STEERING_HEAT, AREA_HVAC).takeIf { it >= 0 }?.let { it > 0 }
+
     fun getDriveMode(): DriveMode? {
         val cpm = sCarPropertyManager ?: return null
         return try {
