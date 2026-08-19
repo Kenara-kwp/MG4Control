@@ -90,6 +90,16 @@ class DashboardFragment : Fragment() {
     private var switchAeb: Switch? = null
     private var btnAebAlarm: Button? = null
     private var btnAebAlarmBrake: Button? = null
+    // Somnolence + sensibilité + ESC (SWI133) — carte masquée ailleurs.
+    private var safetyDmsEscCard: View? = null
+    private var btnEscOn: Button? = null
+    private var btnEscOff: Button? = null
+    private var btnDmsOn: Button? = null
+    private var btnDmsOff: Button? = null
+    private var btnDmsSenLow: Button? = null
+    private var btnDmsSenMedium: Button? = null
+    private var btnDmsSenHigh: Button? = null
+
     private var btnAebSenLow: Button? = null
     private var btnAebSenStandard: Button? = null
     private var btnAebSenHigh: Button? = null
@@ -153,6 +163,7 @@ class DashboardFragment : Fragment() {
             }
         }
         refreshElk()  // SWI133 — sVsm133 indépendant de Katman4
+        refreshSafetyDmsEsc()
     }
 
     override fun onPause() {
@@ -540,6 +551,22 @@ class DashboardFragment : Fragment() {
             btnAebSenHigh         = view.findViewById(R.id.btn_aeb_sen_high)
             setupAebPage2Listeners()
             MG4Hardware.whenKatman4Ready { if (isAdded) refreshAebPage2() }
+        }
+
+        // Somnolence / sensibilité / ESC — la carte reste masquée si le firmware n'expose pas
+        // ces propriétés, plutôt que d'afficher des boutons qui échoueraient en silence.
+        if (MG4Hardware.hasDrowsinessAndEsc()) {
+            safetyDmsEscCard = view.findViewById(R.id.safety_dms_esc_card)
+            btnEscOn         = view.findViewById(R.id.btn_esc_on)
+            btnEscOff        = view.findViewById(R.id.btn_esc_off)
+            btnDmsOn         = view.findViewById(R.id.btn_dms_on)
+            btnDmsOff        = view.findViewById(R.id.btn_dms_off)
+            btnDmsSenLow     = view.findViewById(R.id.btn_dms_sen_low)
+            btnDmsSenMedium  = view.findViewById(R.id.btn_dms_sen_medium)
+            btnDmsSenHigh    = view.findViewById(R.id.btn_dms_sen_high)
+            safetyDmsEscCard?.visibility = View.VISIBLE
+            setupSafetyDmsEscListeners()
+            refreshSafetyDmsEsc()
         }
 
         setupElkListeners()
@@ -953,6 +980,77 @@ class DashboardFragment : Fragment() {
         btnAebAlarmBrake?.isEnabled = enabled
         btnAebAlarm?.alpha          = if (enabled) 1f else 0.35f
         btnAebAlarmBrake?.alpha     = if (enabled) 1f else 0.35f
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    //  Somnolence (DMS) + sensibilité + ESC — SWI133
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Boutons ON/OFF distincts plutôt qu'un interrupteur : sur une bascule matérielle, un
+     * Switch affiche un état qu'on n'a pas toujours pu relire, et l'utilisateur croit avoir
+     * agi alors que rien n'a bougé. Deux boutons expriment une INTENTION, et c'est la
+     * relecture qui décide lequel s'allume.
+     */
+    private fun setupSafetyDmsEscListeners() {
+        btnEscOn?.setOnClickListener  { writeSafety { MG4Hardware.setEsc(true) } }
+        btnEscOff?.setOnClickListener { writeSafety { MG4Hardware.setEsc(false) } }
+        btnDmsOn?.setOnClickListener  { writeSafety { MG4Hardware.setDrowsiness(true) } }
+        btnDmsOff?.setOnClickListener { writeSafety { MG4Hardware.setDrowsiness(false) } }
+        btnDmsSenLow?.setOnClickListener {
+            writeSafety { MG4Hardware.setDrowsinessSensitivity(MG4Hardware.DrowsinessSensitivity.LOW) }
+        }
+        btnDmsSenMedium?.setOnClickListener {
+            writeSafety { MG4Hardware.setDrowsinessSensitivity(MG4Hardware.DrowsinessSensitivity.MEDIUM) }
+        }
+        btnDmsSenHigh?.setOnClickListener {
+            writeSafety { MG4Hardware.setDrowsinessSensitivity(MG4Hardware.DrowsinessSensitivity.HIGH) }
+        }
+    }
+
+    /**
+     * Écrit hors du thread UI puis RELIT pour rafraîchir l'affichage.
+     *
+     * On ne présume jamais du résultat : l'écriture peut être refusée par le verrou de vitesse,
+     * et l'ESC est une bascule dont l'effet doit être constaté. Afficher l'état demandé plutôt
+     * que l'état obtenu ferait mentir l'écran.
+     */
+    private fun writeSafety(action: () -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            action()
+            withContext(Dispatchers.Main) { if (isAdded) refreshSafetyDmsEsc() }
+        }
+    }
+
+    private fun refreshSafetyDmsEsc() {
+        if (!MG4Hardware.hasDrowsinessAndEsc()) return
+        CoroutineScope(Dispatchers.IO).launch {
+            val esc = MG4Hardware.isEscOn()
+            val dms = MG4Hardware.isDrowsinessOn()
+            val sen = MG4Hardware.getDrowsinessSensitivity()
+            withContext(Dispatchers.Main) {
+                if (!isAdded) return@withContext
+                applyPairUI(btnEscOn, btnEscOff, esc)
+                applyPairUI(btnDmsOn, btnDmsOff, dms)
+                applySeatUI(
+                    listOfNotNull(btnDmsSenLow, btnDmsSenMedium, btnDmsSenHigh),
+                    // sen vaut 1..3 ; -1 (illisible) donne -1 donc aucun bouton allumé,
+                    // ce qui vaut mieux qu'en allumer un au hasard.
+                    sen - 1
+                )
+            }
+        }
+    }
+
+    /**
+     * Allume ON ou OFF selon [state]. `null` = état illisible : on n'allume RIEN, pour ne pas
+     * laisser croire qu'on connaît un état qu'on n'a pas pu lire.
+     */
+    private fun applyPairUI(on: Button?, off: Button?, state: Boolean?) {
+        listOf(on to (state == true), off to (state == false)).forEach { (btn, active) ->
+            btn?.backgroundTintList = ColorStateList.valueOf(if (active) colorActive else colorInactive)
+            btn?.setTextColor(if (active) colorTextActive else colorTextInactive)
+        }
     }
 
     private fun applySeatUI(buttons: List<Button>, activeIndex: Int) {

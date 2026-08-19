@@ -1952,6 +1952,155 @@ object MG4Hardware {
     }
 
     // -------------------------------------------------------------------------
+    // Somnolence (DMS), sensibilité de son alerte, et ESC — SWI133 uniquement
+    //
+    // Décodé du smali de com.saicmotor.hmi.vehiclesettings, classe VehiclePropertyID :
+    //   ID_DMS_SWITCH                      0x3010001   1=OFF, 2=ON
+    //   ID_AAD_UDW_ALARM_TONE_SENSITIVITY  0x3010007   1=Faible, 2=Moyen, 3=Élevé
+    //   ID_ZONED_VEHICLE_ESP               0x4020003   lecture 0=OFF, 1=ON, 2=OFF
+    //
+    // UDW = « Unfit Driver Warning » : la sensibilité appartient bien à la somnolence et non au
+    // FCW — le handler d'origine s'appelle unsteadyDrivingWarningSenOnClick.
+    //
+    // Les autres firmwares exposent les mêmes réglages par d'autres voies, non câblées tant que
+    // SWI133 n'est pas validé sur véhicule :
+    //   SWI68/165     : setEspSwitch / setUnsteadyDrivingWarning / setUnsteadyDrivingWarningSen
+    //   A9 69/131/132 : transactions 0x54 (ESC, nommé « Eps »), 0x90 (DMS), 0x96 (sensibilité)
+    // -------------------------------------------------------------------------
+
+    private const val PROP_DMS_SWITCH      = 0x3010001
+    private const val PROP_DMS_SENSITIVITY = 0x3010007
+    private const val PROP_ESC             = 0x4020003
+
+    private const val DMS_OFF = 1
+    private const val DMS_ON  = 2
+
+    /** Sensibilité de l'alerte de somnolence — mêmes paliers que la sensibilité AEB. */
+    object DrowsinessSensitivity {
+        const val LOW    = 1
+        const val MEDIUM = 2
+        const val HIGH   = 3
+    }
+
+    /**
+     * Vrai si ce firmware expose somnolence et ESC par la voie câblée ici (propriétés VPM).
+     *
+     * Volontairement restreint à SWI133 : ces IDs n'existent QUE sur cette génération — vérifié,
+     * ils sont absents du smali SWI68/165 (méthodes nommées) et d'A9 (transactions binder).
+     * Élargir la condition sans câbler ces voies ferait échouer les écritures en silence.
+     */
+    fun hasDrowsinessAndEsc(): Boolean =
+        FirmwareInfo.getGeneration() == FirmwareInfo.Gen.SWI133
+
+    /** Avertissement de somnolence : true=ON, false=OFF, null=illisible ou firmware non géré. */
+    fun isDrowsinessOn(): Boolean? {
+        if (!hasDrowsinessAndEsc()) return null
+        return when (getIntPropertyVpm(PROP_DMS_SWITCH)) {
+            DMS_ON  -> true
+            DMS_OFF -> false
+            else    -> null
+        }
+    }
+
+    fun setDrowsiness(on: Boolean): Boolean {
+        if (!hasDrowsinessAndEsc()) return false
+        val v = if (on) DMS_ON else DMS_OFF
+        AppLogger.i(TAG, "  DMS SET switch=$v (${if (on) "ON" else "OFF"}) via VPM")
+        return setIntPropertyVpmRecovery(PROP_DMS_SWITCH, v)
+    }
+
+    /** Sensibilité de l'alerte somnolence (1=Faible, 2=Moyen, 3=Élevé), -1 si illisible. */
+    fun getDrowsinessSensitivity(): Int {
+        if (!hasDrowsinessAndEsc()) return -1
+        val raw = getIntPropertyVpm(PROP_DMS_SENSITIVITY)
+        return if (raw in 1..3) raw else -1
+    }
+
+    fun setDrowsinessSensitivity(level: Int): Boolean {
+        if (!hasDrowsinessAndEsc() || level !in 1..3) return false
+        AppLogger.i(TAG, "  DMS SET sensitivity=$level via VPM")
+        return setIntPropertyVpmRecovery(PROP_DMS_SENSITIVITY, level)
+    }
+
+    /** ESC : true=ON, false=OFF, null=illisible. Lecture 0=OFF, 1=ON, 2=OFF. */
+    fun isEscOn(): Boolean? {
+        if (!hasDrowsinessAndEsc()) return null
+        return when (getIntPropertyVpm(PROP_ESC)) {
+            1    -> true
+            0, 2 -> false
+            else -> null
+        }
+    }
+
+    /**
+     * Active/désactive l'ESC.
+     *
+     * ⚠️ L'écriture n'est PAS un « set » ordinaire : dans l'UI d'origine, l'interrupteur ET son
+     * dialogue de confirmation écrivent tous deux la valeur **1**. C'est la signature d'une
+     * bascule qui ignore son argument, comme les commandes clim SAIC (voir hvacCycleTo).
+     *
+     * On lit donc l'état courant et on n'écrit QUE s'il diffère de la cible. Le helper reste juste
+     * dans les deux hypothèses : si c'était en réalité un « set » où 1=ON, écrire 1 pour passer de
+     * OFF à ON donne le même résultat. [runSafetyDiag] tranche la question.
+     *
+     * Refuse plutôt que de deviner quand l'état courant est illisible : sur une bascule, partir
+     * d'un état supposé fait l'inverse de ce qui est demandé une fois sur deux.
+     */
+    fun setEsc(on: Boolean): Boolean {
+        if (!hasDrowsinessAndEsc()) return false
+        val current = isEscOn()
+        if (current == null) {
+            AppLogger.w(TAG, "  ESC SET refusé — état courant illisible")
+            return false
+        }
+        if (current == on) {
+            AppLogger.i(TAG, "  ESC déjà ${if (on) "ON" else "OFF"} — aucune écriture")
+            return true
+        }
+        AppLogger.i(TAG, "  ESC SET → ${if (on) "ON" else "OFF"} (bascule présumée : écriture de 1)")
+        val ok = setIntPropertyVpmRecovery(PROP_ESC, 1)
+        // Relecture immédiate : c'est elle qui tranche l'encodage sans avoir à écrire exprès
+        // depuis une sonde. Si l'état obtenu n'est pas la cible, on le dit au lieu de laisser
+        // croire que la commande a abouti.
+        val reached = isEscOn()
+        AppLogger.i(SAFE_TAG, "ESC après écriture : demandé=${if (on) "ON" else "OFF"} " +
+            "obtenu=${reached ?: "illisible"} écriture=$ok " +
+            "(${if (reached == on) "bascule CONFIRMÉE ✓" else "⚠️ cible NON atteinte — encodage à revoir"})")
+        return ok && reached == on
+    }
+
+    // ── Sonde somnolence / sensibilité / ESC (bouton Diagnostic) ──────────────
+    private const val SAFE_TAG = "MG4_SAFE"
+
+    /**
+     * Sonde des trois réglages — **lecture seule**.
+     *
+     * Elle est appelée par le bouton Diagnostic, qui enchaîne les sondes pour produire un
+     * rapport : rien de ce qui est déclenché là ne doit modifier l'état du véhicule, et surtout
+     * pas un organe de sécurité active. La question ouverte sur l'encodage d'écriture de l'ESC
+     * est donc tranchée ailleurs — [setEsc] relit et journalise après chaque écriture, donc un
+     * simple appui sur le bouton ESC de l'écran suffit à conclure.
+     */
+    fun runSafetyDiag() {
+        AppLogger.i(SAFE_TAG, "── DIAG somnolence / sensibilité / ESC ──")
+        AppLogger.i(SAFE_TAG, "firmware=${FirmwareInfo.getGeneration()} géré=${hasDrowsinessAndEsc()}")
+        if (!hasDrowsinessAndEsc()) {
+            AppLogger.i(SAFE_TAG, "→ voie VPM non applicable ici. SWI68/165 : méthodes nommées ; " +
+                "A9 : transactions 0x54 / 0x90 / 0x96. Rien n'est câblé pour ces firmwares.")
+            return
+        }
+
+        val dms = getIntPropertyVpm(PROP_DMS_SWITCH)
+        val sen = getIntPropertyVpm(PROP_DMS_SENSITIVITY)
+        val esc = getIntPropertyVpm(PROP_ESC)
+        AppLogger.i(SAFE_TAG, "DMS_SWITCH(0x3010001)      = $dms (1=OFF, 2=ON) → ${isDrowsinessOn()}")
+        AppLogger.i(SAFE_TAG, "UDW_SENSITIVITY(0x3010007) = $sen (1=Faible, 2=Moyen, 3=Élevé)")
+        AppLogger.i(SAFE_TAG, "ESP(0x4020003)             = $esc (0=OFF, 1=ON, 2=OFF) → ${isEscOn()}")
+
+        AppLogger.i(SAFE_TAG, "── fin DIAG ──")
+    }
+
+    // -------------------------------------------------------------------------
     // ELK — Assistant de sortie de voie (SWI133 uniquement pour l'instant)
     // Utilise IVehicleSettingService via sVehicleBinder (TX 0x53–0x56)
     // -------------------------------------------------------------------------

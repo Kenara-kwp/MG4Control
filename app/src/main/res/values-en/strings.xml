@@ -371,4 +371,14 @@
     <!-- Canal beta OTA -->
     <string name="settings_beta_channel">Beta update channel</string>
     <string name="settings_beta_channel_desc">Receives test builds before their official release. They may contain bugs. Rolling back to an earlier version is not possible through the updater.</string>
+
+    <!-- Somnolence / sensibilite d'alerte / ESC (SWI133) -->
+    <string name="safety_drowsiness">Driver attention warning</string>
+    <string name="safety_drowsiness_sensitivity">Alert sensitivity</string>
+    <string name="safety_esc">ESC</string>
+    <string name="sens_low">Low</string>
+    <string name="sens_medium">Medium</string>
+    <string name="sens_high">High</string>
+    <string name="common_on">ON</string>
+    <string name="common_off">OFF</string>
 </resources>

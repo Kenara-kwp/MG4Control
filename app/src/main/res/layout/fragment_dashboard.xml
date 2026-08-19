@@ -1373,6 +1373,170 @@
 
     </LinearLayout>
 
+
+        <!-- ═════ Somnolence + sensibilité + ESC — SWI133 uniquement ═════ -->
+        <LinearLayout
+            android:id="@+id/safety_dms_esc_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_section_rounded"
+            android:padding="9dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/safety_esc"
+                android:textColor="@color/dash_text_lo"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.12"
+                android:textAllCaps="true"
+                android:paddingBottom="5dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/dash_border"
+                android:layout_marginBottom="5dp" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="9dp">
+
+                <Button
+                    android:id="@+id/btn_esc_on"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="@string/common_on"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+                <Button
+                    android:id="@+id/btn_esc_off"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="0dp"
+                    android:text="@string/common_off"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+            </LinearLayout>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/safety_drowsiness"
+                android:textColor="@color/dash_text_lo"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.12"
+                android:textAllCaps="true"
+                android:paddingBottom="5dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/dash_border"
+                android:layout_marginBottom="5dp" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="9dp">
+
+                <Button
+                    android:id="@+id/btn_dms_on"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="@string/common_on"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+                <Button
+                    android:id="@+id/btn_dms_off"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="0dp"
+                    android:text="@string/common_off"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+            </LinearLayout>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/safety_drowsiness_sensitivity"
+                android:textColor="@color/dash_text_lo"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.12"
+                android:textAllCaps="true"
+                android:paddingBottom="5dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/dash_border"
+                android:layout_marginBottom="5dp" />
+            <LinearLayout
+                android:id="@+id/dms_sen_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="0dp">
+
+                <Button
+                    android:id="@+id/btn_dms_sen_low"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="@string/sens_low"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+                <Button
+                    android:id="@+id/btn_dms_sen_medium"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="@string/sens_medium"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+                <Button
+                    android:id="@+id/btn_dms_sen_high"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="0dp"
+                    android:text="@string/sens_high"
+                    android:textColor="@color/text_secondary"
+                    android:backgroundTint="@color/dash_btn"
+                    android:textSize="16sp"
+                    android:textAllCaps="true" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
             </LinearLayout>
 
             <!-- ═══════════ CONFORT ═══════════ -->

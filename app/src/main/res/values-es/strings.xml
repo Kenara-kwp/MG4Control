@@ -371,4 +371,14 @@
     <!-- Canal beta OTA -->
     <string name="settings_beta_channel">Canal de actualización beta</string>
     <string name="settings_beta_channel_desc">Recibe versiones de prueba antes de su lanzamiento oficial. Pueden contener errores. No es posible volver a una versión anterior mediante la actualización.</string>
+
+    <!-- Somnolence / sensibilite d'alerte / ESC (SWI133) -->
+    <string name="safety_drowsiness">Aviso de somnolencia</string>
+    <string name="safety_drowsiness_sensitivity">Sensibilidad de la alerta</string>
+    <string name="safety_esc">ESC</string>
+    <string name="sens_low">Baja</string>
+    <string name="sens_medium">Media</string>
+    <string name="sens_high">Alta</string>
+    <string name="common_on">ON</string>
+    <string name="common_off">OFF</string>
 </resources>

@@ -505,6 +505,9 @@ class SettingsFragment : Fragment() {
         MG4Hardware.runSpeedDiag()
         // Sonde climatisation : lecture seule, repère ce qui répond avant tout pilotage.
         MG4Hardware.runClimateDiag()
+        // Sonde somnolence / sensibilité / ESC : lecture seule (elle ne bascule RIEN — un
+        // rapport de diagnostic ne doit pas toucher à un organe de sécurité active).
+        MG4Hardware.runSafetyDiag()
         // Chasse à la consigne de température (candidats × zones + voie OEM).
         MG4Hardware.runClimateSetpointHunt()
         // Sonde thème : quelle source de day/night répond sur ce firmware. Contexte d'ACTIVITÉ —
