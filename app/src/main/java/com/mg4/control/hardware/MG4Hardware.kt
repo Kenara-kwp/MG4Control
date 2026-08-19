@@ -1955,7 +1955,7 @@ object MG4Hardware {
     // Somnolence (DMS), sensibilité de son alerte, et ESC — SWI133 uniquement
     //
     // Décodé du smali de com.saicmotor.hmi.vehiclesettings, classe VehiclePropertyID :
-    //   ID_DMS_SWITCH                      0x3010001   1=OFF, 2=ON
+    //   ID_AAD_UDW_MAIN_SWITCH             0x3010005   1=OFF, 2=ON, 0=OFF
     //   ID_AAD_UDW_ALARM_TONE_SENSITIVITY  0x3010007   1=Faible, 2=Moyen, 3=Élevé
     //   ID_ZONED_VEHICLE_ESP               0x4020003   lecture 0=OFF, 1=ON, 2=OFF
     //
@@ -1968,7 +1968,13 @@ object MG4Hardware {
     //   A9 69/131/132 : transactions 0x54 (ESC, nommé « Eps »), 0x90 (DMS), 0x96 (sensibilité)
     // -------------------------------------------------------------------------
 
-    private const val PROP_DMS_SWITCH      = 0x3010001
+    // ⚠️ 0x3010005 (UDW_MAIN_SWITCH) et NON 0x3010001 (DMS_SWITCH). Les deux existent et
+    // portent des libelles voisins : DMS_SWITCH pilote la surveillance par CAMERA
+    // ("Avertisseur de somnolence du conducteur"), UDW_MAIN_SWITCH l'avertissement de
+    // somnolence de la capture ecran. Ecrire sur DMS_SWITCH n'avait aucun effet visible.
+    // Coherence a verifier a l'avenir : le commutateur et sa sensibilite doivent appartenir
+    // a la MEME famille (ici UDW_*), sinon c'est qu'on a melange deux reglages.
+    private const val PROP_UDW_MAIN_SWITCH = 0x3010005
     private const val PROP_DMS_SENSITIVITY = 0x3010007
     private const val PROP_ESC             = 0x4020003
 
@@ -1992,13 +1998,20 @@ object MG4Hardware {
     fun hasDrowsinessAndEsc(): Boolean =
         FirmwareInfo.getGeneration() == FirmwareInfo.Gen.SWI133
 
-    /** Avertissement de somnolence : true=ON, false=OFF, null=illisible ou firmware non géré. */
+    /**
+     * Avertissement de somnolence : true=ON, false=OFF, null=illisible.
+     *
+     * ⚠️ La valeur **0** compte pour OFF, pas pour « illisible ». C'est ce que fait l'UI d'origine
+     * (onDriverMonitorSysStatusChanged : 1→OFF, 2→ON, 0→OFF, autre→« value error »), et l'ignorer
+     * renvoyait null sur un état parfaitement valide — donc aucun bouton allumé à l'écran.
+     * Seul -1, la sentinelle d'échec de [getIntPropertyVpm], vaut réellement « illisible ».
+     */
     fun isDrowsinessOn(): Boolean? {
         if (!hasDrowsinessAndEsc()) return null
-        return when (getIntPropertyVpm(PROP_DMS_SWITCH)) {
-            DMS_ON  -> true
-            DMS_OFF -> false
-            else    -> null
+        return when (getIntPropertyVpm(PROP_UDW_MAIN_SWITCH)) {
+            DMS_ON     -> true
+            DMS_OFF, 0 -> false
+            else       -> null
         }
     }
 
@@ -2006,7 +2019,7 @@ object MG4Hardware {
         if (!hasDrowsinessAndEsc()) return false
         val v = if (on) DMS_ON else DMS_OFF
         AppLogger.i(TAG, "  DMS SET switch=$v (${if (on) "ON" else "OFF"}) via VPM")
-        return setIntPropertyVpmRecovery(PROP_DMS_SWITCH, v)
+        return setIntPropertyVpmRecovery(PROP_UDW_MAIN_SWITCH, v)
     }
 
     /** Sensibilité de l'alerte somnolence (1=Faible, 2=Moyen, 3=Élevé), -1 si illisible. */
@@ -2059,14 +2072,12 @@ object MG4Hardware {
         }
         AppLogger.i(TAG, "  ESC SET → ${if (on) "ON" else "OFF"} (bascule présumée : écriture de 1)")
         val ok = setIntPropertyVpmRecovery(PROP_ESC, 1)
-        // Relecture immédiate : c'est elle qui tranche l'encodage sans avoir à écrire exprès
-        // depuis une sonde. Si l'état obtenu n'est pas la cible, on le dit au lieu de laisser
-        // croire que la commande a abouti.
-        val reached = isEscOn()
-        AppLogger.i(SAFE_TAG, "ESC après écriture : demandé=${if (on) "ON" else "OFF"} " +
-            "obtenu=${reached ?: "illisible"} écriture=$ok " +
-            "(${if (reached == on) "bascule CONFIRMÉE ✓" else "⚠️ cible NON atteinte — encodage à revoir"})")
-        return ok && reached == on
+        // ⚠️ Ne PAS relire immédiatement pour juger du résultat : le calculateur applique la
+        // consigne avec un délai, donc une relecture collée à l'écriture rend l'ANCIENNE valeur
+        // et ferait conclure à tort que la commande a échoué. On journalise seulement ce qui
+        // est certain ici ; l'état réel est constaté par la relecture différée de l'écran.
+        AppLogger.i(SAFE_TAG, "ESC : écriture de 1 (cible ${if (on) "ON" else "OFF"}) → $ok")
+        return ok
     }
 
     // ── Sonde somnolence / sensibilité / ESC (bouton Diagnostic) ──────────────
@@ -2090,10 +2101,10 @@ object MG4Hardware {
             return
         }
 
-        val dms = getIntPropertyVpm(PROP_DMS_SWITCH)
+        val dms = getIntPropertyVpm(PROP_UDW_MAIN_SWITCH)
         val sen = getIntPropertyVpm(PROP_DMS_SENSITIVITY)
         val esc = getIntPropertyVpm(PROP_ESC)
-        AppLogger.i(SAFE_TAG, "DMS_SWITCH(0x3010001)      = $dms (1=OFF, 2=ON) → ${isDrowsinessOn()}")
+        AppLogger.i(SAFE_TAG, "UDW_MAIN_SWITCH(0x3010005) = $dms (2=ON, 1 et 0=OFF) → ${isDrowsinessOn()}")
         AppLogger.i(SAFE_TAG, "UDW_SENSITIVITY(0x3010007) = $sen (1=Faible, 2=Moyen, 3=Élevé)")
         AppLogger.i(SAFE_TAG, "ESP(0x4020003)             = $esc (0=OFF, 1=ON, 2=OFF) → ${isEscOn()}")
 

@@ -329,7 +329,7 @@
     <string name="clim_fan">Ventilation</string>
     <string name="clim_modes_title">Modes</string>
     <string name="clim_section_switches">Commandes</string>
-    <string name="clim_power">Système</string>
+    <string name="clim_power">ON/OFF</string>
     <string name="clim_ac">A/C</string>
     <string name="clim_auto">Auto</string>
     <string name="clim_section_loop">Recirculation</string>
@@ -379,7 +379,7 @@
     <string name="safety_drowsiness_sensitivity">Sensibilité de l\'alerte</string>
     <string name="safety_esc">ESC</string>
     <string name="sens_low">Faible</string>
-    <string name="sens_medium">Moyen</string>
+    <string name="sens_medium">Standard</string>
     <string name="sens_high">Élevé</string>
     <string name="common_on">ON</string>
     <string name="common_off">OFF</string>

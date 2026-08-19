@@ -163,7 +163,7 @@ class DashboardFragment : Fragment() {
             }
         }
         refreshElk()  // SWI133 — sVsm133 indépendant de Katman4
-        refreshSafetyDmsEsc()
+        MG4Hardware.whenKatman4Ready { if (isAdded) refreshSafetyDmsEsc() }
     }
 
     override fun onPause() {
@@ -566,7 +566,9 @@ class DashboardFragment : Fragment() {
             btnDmsSenHigh    = view.findViewById(R.id.btn_dms_sen_high)
             safetyDmsEscCard?.visibility = View.VISIBLE
             setupSafetyDmsEscListeners()
-            refreshSafetyDmsEsc()
+            // sVpm est lié de façon ASYNCHRONE : rafraîchir tout de suite lisait -1 partout et
+            // n'allumait donc aucun bouton à l'ouverture de l'écran.
+            MG4Hardware.whenKatman4Ready { if (isAdded) refreshSafetyDmsEsc() }
         }
 
         setupElkListeners()
@@ -993,18 +995,28 @@ class DashboardFragment : Fragment() {
      * relecture qui décide lequel s'allume.
      */
     private fun setupSafetyDmsEscListeners() {
-        btnEscOn?.setOnClickListener  { writeSafety { MG4Hardware.setEsc(true) } }
-        btnEscOff?.setOnClickListener { writeSafety { MG4Hardware.setEsc(false) } }
-        btnDmsOn?.setOnClickListener  { writeSafety { MG4Hardware.setDrowsiness(true) } }
-        btnDmsOff?.setOnClickListener { writeSafety { MG4Hardware.setDrowsiness(false) } }
-        btnDmsSenLow?.setOnClickListener {
-            writeSafety { MG4Hardware.setDrowsinessSensitivity(MG4Hardware.DrowsinessSensitivity.LOW) }
+        val sens = listOfNotNull(btnDmsSenLow, btnDmsSenMedium, btnDmsSenHigh)
+        btnEscOn?.setOnClickListener {
+            applyPairUI(btnEscOn, btnEscOff, true);  writeSafety { MG4Hardware.setEsc(true) }
         }
-        btnDmsSenMedium?.setOnClickListener {
-            writeSafety { MG4Hardware.setDrowsinessSensitivity(MG4Hardware.DrowsinessSensitivity.MEDIUM) }
+        btnEscOff?.setOnClickListener {
+            applyPairUI(btnEscOn, btnEscOff, false); writeSafety { MG4Hardware.setEsc(false) }
         }
-        btnDmsSenHigh?.setOnClickListener {
-            writeSafety { MG4Hardware.setDrowsinessSensitivity(MG4Hardware.DrowsinessSensitivity.HIGH) }
+        btnDmsOn?.setOnClickListener {
+            applyPairUI(btnDmsOn, btnDmsOff, true);  writeSafety { MG4Hardware.setDrowsiness(true) }
+        }
+        btnDmsOff?.setOnClickListener {
+            applyPairUI(btnDmsOn, btnDmsOff, false); writeSafety { MG4Hardware.setDrowsiness(false) }
+        }
+        listOf(
+            btnDmsSenLow    to MG4Hardware.DrowsinessSensitivity.LOW,
+            btnDmsSenMedium to MG4Hardware.DrowsinessSensitivity.MEDIUM,
+            btnDmsSenHigh   to MG4Hardware.DrowsinessSensitivity.HIGH
+        ).forEach { (btn, level) ->
+            btn?.setOnClickListener {
+                applySeatUI(sens, level - 1)
+                writeSafety { MG4Hardware.setDrowsinessSensitivity(level) }
+            }
         }
     }
 
@@ -1018,6 +1030,12 @@ class DashboardFragment : Fragment() {
     private fun writeSafety(action: () -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             action()
+            // ⚠️ Relire IMMÉDIATEMENT après l'écriture rend l'ancienne valeur : le calculateur
+            // n'a pas encore appliqué la consigne. C'est ce qui faisait rester l'affichage sur
+            // OFF alors que le réglage venait bien de passer à ON. L'UI d'origine ne relit pas
+            // non plus — elle peint l'état demandé et attend le callback de changement.
+            // Ici : peinture optimiste au clic (déjà faite), puis relecture qui fait autorité.
+            delay(700)
             withContext(Dispatchers.Main) { if (isAdded) refreshSafetyDmsEsc() }
         }
     }
