@@ -854,7 +854,9 @@ class MG4ControlService : Service() {
                     targetTemp   = rule.targetTemp,
                     fanLevel     = rule.fanLevel,
                     defrostFront = rule.defrostFront,
-                    defrostRear  = rule.defrostRear
+                    defrostRear  = rule.defrostRear,
+                    autoMode     = rule.autoMode,
+                    loopMode     = rule.loopMode
                 )
                 AppLogger.i(TAG, "Auto A/C ($origin) : règle $outcome appliquée — ok=$ok")
             }

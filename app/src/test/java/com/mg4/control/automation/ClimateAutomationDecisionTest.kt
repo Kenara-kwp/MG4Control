@@ -6,8 +6,13 @@ import org.junit.Test
 
 class ClimateAutomationDecisionTest {
 
+    // Seuls [active] et [threshold] comptent pour la decision ; le reste est du remplissage,
+    // nomme pour que l ajout d un champ ne fasse pas glisser silencieusement les positions.
     private fun rule(active: Boolean, threshold: Int) =
-        ClimateAutomationSettings.Rule(active, threshold, 21, 4, false, false)
+        ClimateAutomationSettings.Rule(
+            active = active, threshold = threshold, targetTemp = 21, fanLevel = 4,
+            defrostFront = false, defrostRear = false, autoMode = false, loopMode = null
+        )
 
     private fun cfg(
         enabled: Boolean = true,

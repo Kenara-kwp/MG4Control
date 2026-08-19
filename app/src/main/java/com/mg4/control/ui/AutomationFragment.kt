@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
+import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.Spinner
@@ -125,14 +126,24 @@ class AutomationFragment : Fragment() {
             checkId = R.id.check_ac_hot, rowId = R.id.row_ac_hot_config,
             thresholdId = R.id.input_ac_hot_threshold, targetId = R.id.input_ac_hot_target,
             fanId = R.id.input_ac_hot_fan,
-            defFrontId = R.id.check_ac_hot_def_front, defRearId = R.id.check_ac_hot_def_rear
+            defFrontId = R.id.check_ac_hot_def_front, defRearId = R.id.check_ac_hot_def_rear,
+            autoId = R.id.check_ac_hot_auto, fanRowId = R.id.row_ac_hot_fan,
+            recircForceId = R.id.check_ac_hot_recirc_force, recircRowId = R.id.row_ac_hot_recirc,
+            recircInnerId = R.id.btn_ac_hot_recirc_inner,
+            recircOutsideId = R.id.btn_ac_hot_recirc_outside,
+            recircAutoId = R.id.btn_ac_hot_recirc_auto
         )
         bindClimateRule(
             view, prefs, hot = false,
             checkId = R.id.check_ac_cold, rowId = R.id.row_ac_cold_config,
             thresholdId = R.id.input_ac_cold_threshold, targetId = R.id.input_ac_cold_target,
             fanId = R.id.input_ac_cold_fan,
-            defFrontId = R.id.check_ac_cold_def_front, defRearId = R.id.check_ac_cold_def_rear
+            defFrontId = R.id.check_ac_cold_def_front, defRearId = R.id.check_ac_cold_def_rear,
+            autoId = R.id.check_ac_cold_auto, fanRowId = R.id.row_ac_cold_fan,
+            recircForceId = R.id.check_ac_cold_recirc_force, recircRowId = R.id.row_ac_cold_recirc,
+            recircInnerId = R.id.btn_ac_cold_recirc_inner,
+            recircOutsideId = R.id.btn_ac_cold_recirc_outside,
+            recircAutoId = R.id.btn_ac_cold_recirc_auto
         )
     }
 
@@ -142,7 +153,10 @@ class AutomationFragment : Fragment() {
         hot: Boolean,
         checkId: Int, rowId: Int,
         thresholdId: Int, targetId: Int, fanId: Int,
-        defFrontId: Int, defRearId: Int
+        defFrontId: Int, defRearId: Int,
+        autoId: Int, fanRowId: Int,
+        recircForceId: Int, recircRowId: Int,
+        recircInnerId: Int, recircOutsideId: Int, recircAutoId: Int
     ) {
         val check     = view.findViewById<CheckBox>(checkId)
         val row       = view.findViewById<View>(rowId)
@@ -185,6 +199,59 @@ class AutomationFragment : Fragment() {
         }
         defRear.setOnCheckedChangeListener { _, c ->
             prefs.edit().putBoolean(ClimateAutomationSettings.keyDefRear(hot), c).apply()
+        }
+
+        // ── Mode automatique de la ventilation ───────────────────────────────
+        // Régler une vitesse fait sortir du mode auto sur ce véhicule : les deux réglages
+        // s'excluent, donc on grise la ventilation au lieu de laisser saisir une valeur qui
+        // ne serait jamais appliquée.
+        val autoBox = view.findViewById<CheckBox>(autoId)
+        val fanRow  = view.findViewById<View>(fanRowId)
+        fun majFan(auto: Boolean) {
+            fanRow.alpha = if (auto) 0.35f else 1f
+            fanRow.isEnabled = !auto
+            fan.isEnabled = !auto
+        }
+        autoBox.isChecked = prefs.getBoolean(ClimateAutomationSettings.keyAuto(hot), false)
+        majFan(autoBox.isChecked)
+        autoBox.setOnCheckedChangeListener { _, c ->
+            prefs.edit().putBoolean(ClimateAutomationSettings.keyAuto(hot), c).apply()
+            majFan(c)
+        }
+
+        // ── Recyclage d'air ──────────────────────────────────────────────────
+        // Décoché = on ne touche PAS au recyclage. C'est le défaut, pour qu'une automatisation
+        // déjà configurée ne se mette pas à piloter un réglage qu'elle ne pilotait pas.
+        val recircBox  = view.findViewById<CheckBox>(recircForceId)
+        val recircRow  = view.findViewById<View>(recircRowId)
+        val recircBtns = listOf(
+            view.findViewById<Button>(recircInnerId),
+            view.findViewById<Button>(recircOutsideId),
+            view.findViewById<Button>(recircAutoId)
+        )
+        val actif   = requireContext().getColor(R.color.dash_accent_dim)
+        val inactif = requireContext().getColor(R.color.dash_btn)
+        fun majRecirc(force: Boolean, mode: Int) {
+            recircRow.alpha = if (force) 1f else 0.35f
+            recircBtns.forEachIndexed { i, b ->
+                b.isEnabled = force
+                b.backgroundTintList = ColorStateList.valueOf(if (i == mode) actif else inactif)
+            }
+        }
+        var modeCourant = prefs.getInt(ClimateAutomationSettings.keyRecirc(hot),
+            ClimateAutomationSettings.DEFAULT_LOOP).coerceIn(0, 2)
+        recircBox.isChecked = prefs.getBoolean(ClimateAutomationSettings.keyRecircForce(hot), false)
+        majRecirc(recircBox.isChecked, modeCourant)
+        recircBox.setOnCheckedChangeListener { _, c ->
+            prefs.edit().putBoolean(ClimateAutomationSettings.keyRecircForce(hot), c).apply()
+            majRecirc(c, modeCourant)
+        }
+        recircBtns.forEachIndexed { i, b ->
+            b.setOnClickListener {
+                modeCourant = i
+                prefs.edit().putInt(ClimateAutomationSettings.keyRecirc(hot), i).apply()
+                majRecirc(recircBox.isChecked, i)
+            }
         }
     }
 

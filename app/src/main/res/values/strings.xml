@@ -383,4 +383,11 @@
     <string name="sens_high">Élevé</string>
     <string name="common_on">ON</string>
     <string name="common_off">OFF</string>
+
+    <!-- Automatisation clim : mode auto + recyclage -->
+    <string name="ac_auto_auto_mode">Mode automatique</string>
+    <string name="ac_auto_recirc_force">Forcer la recirculation d\'air</string>
+    <string name="recirc_inner">Intérieur</string>
+    <string name="recirc_outside">Extérieur</string>
+    <string name="recirc_auto">Auto</string>
 </resources>

@@ -381,4 +381,11 @@
     <string name="sens_high">Hoch</string>
     <string name="common_on">ON</string>
     <string name="common_off">OFF</string>
+
+    <!-- Automatisation clim : mode auto + recyclage -->
+    <string name="ac_auto_auto_mode">Automatikmodus</string>
+    <string name="ac_auto_recirc_force">Luftumwälzung erzwingen</string>
+    <string name="recirc_inner">Innen</string>
+    <string name="recirc_outside">Außen</string>
+    <string name="recirc_auto">Auto</string>
 </resources>

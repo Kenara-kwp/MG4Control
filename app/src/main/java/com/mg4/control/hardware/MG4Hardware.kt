@@ -117,6 +117,11 @@ object MG4Hardware {
 
     // SWI68 : VehicleSettingManager class name (loaded via launcher context)
     private const val VSM_CLASS      = "com.saicmotor.sdk.vehiclesettings.manager.VehicleSettingManager"
+
+    // ⚠️ VehicleCONTROLManager, a ne confondre ni avec VehicleSettingManager (sVsm) ni avec
+    // VehicleConditionManager (sVcm). C'est le seul a porter get/setEspSwitch sur SWI68/165 :
+    // chercher ces methodes sur sVsm echouait en silence, l'ESC ne repondait donc pas.
+    private const val VCONTROL_CLASS = "com.saicmotor.sdk.vehiclesettings.manager.VehicleControlManager"
     private const val LAUNCHER68_PKG = "com.saicmotor.hmi.launcher"
 
     // Luminosité écran — ancien SDK (SWI133/68/165) : GeneralManager.setBrightness(Int)/getBrightness().
@@ -218,6 +223,7 @@ object MG4Hardware {
     @Volatile private var sVpmService: Any? = null   // mIVehiclePropertyService field value (SWI133)
     @Volatile private var sVsm: Any? = null          // VehicleSettingManager instance (SWI68, Katman4)
     @Volatile private var sVsmService: Any? = null   // mVehicleSettingService field value (SWI68)
+    @Volatile private var sVcontrol: Any? = null     // VehicleControlManager (ESC, SWI68/165)
     @Volatile private var sVsm133: Any? = null       // VehicleSettingManager instance (SWI133, pour ELK)
     @Volatile private var sGeneral: Any? = null      // GeneralManager instance (SWI133/68/165, luminosité)
     @Volatile private var sSmartSound: Any? = null   // SmartSoundManager instance (SWI133/68/165, loudness)
@@ -612,6 +618,7 @@ object MG4Hardware {
         tryInitVsm133(launcherCtx, context)
 
         // 3b) GeneralManager pour SWI133 (luminosité écran)
+        tryInitVehicleControlManager(launcherCtx, context)   // ESC sur SWI68/165
         tryInitGeneralManager(launcherCtx, context)
 
         // 3c) SmartSoundManager pour SWI133 (loudness audio)
@@ -623,6 +630,7 @@ object MG4Hardware {
             h.postDelayed({
                 if (sVpmService == null) tryGetVpmService(sVpm ?: return@postDelayed)
                 if (sVsm133 == null) tryInitVsm133(launcherCtx, context)
+                if (sVcontrol == null) tryInitVehicleControlManager(launcherCtx, context)
                 if (sGeneral == null) tryInitGeneralManager(launcherCtx, context)
                 if (sSmartSound == null) tryInitSmartSoundManager(launcherCtx, context)
                 if (doorVolumeEnabled() && sCarPropMgr == null) startDoorVolumeWatcher()
@@ -798,6 +806,85 @@ object MG4Hardware {
     // GeneralManager.init(Context, ISettingsServiceListener) — singleton sInstance.
     // Même pattern que tryInitVsm133 ; chargé depuis le launcher com.saicmotor.hmi.launcher.
     // -------------------------------------------------------------------------
+
+    /**
+     * VehicleControlManager — porte l'ESC sur SWI68/165 (get/setEspSwitch).
+     *
+     * Même schéma que [tryInitGeneralManager] : singleton statique, sinon init(Context, listener).
+     * On DOIT appeler init() nous-mêmes : la classe vient du classloader du launcher, mais les
+     * statiques vivent par processus, donc le singleton déjà construit côté launcher ne nous est
+     * pas visible.
+     */
+    private fun tryInitVehicleControlManager(launcherCtx: Context, appCtx: Context) {
+        if (sVcontrol != null) return
+        try {
+            val cls = launcherCtx.classLoader.loadClass(VCONTROL_CLASS)
+            val f = cls.getDeclaredField("sVehicleControlManager")
+            f.isAccessible = true
+            f.get(null)?.let {
+                sVcontrol = it
+                AppLogger.i(TAG, "  VehicleControlManager singleton ✓")
+                return
+            }
+            val initMethod = cls.methods.firstOrNull { m ->
+                m.name == "init" && m.parameterCount == 2 &&
+                Context::class.java.isAssignableFrom(m.parameterTypes[0])
+            } ?: run {
+                AppLogger.w(TAG, "  VehicleControlManager init() non trouvé")
+                return
+            }
+            val listenerType = initMethod.parameterTypes[1]
+            val listener = if (listenerType.isInterface) {
+                java.lang.reflect.Proxy.newProxyInstance(
+                    listenerType.classLoader, arrayOf(listenerType)
+                ) { _, method, _ ->
+                    if (method.name == "onServiceConnected") {
+                        try {
+                            f.get(null)?.let { sVcontrol = it }
+                            AppLogger.i(TAG, "  VehicleControlManager onServiceConnected — " +
+                                "sVcontrol=${if (sVcontrol != null) "OK ✓" else "null"}")
+                        } catch (_: Exception) {}
+                    }
+                    null
+                }
+            } else null
+            initMethod.invoke(null, appCtx, listener)
+            f.get(null)?.let { sVcontrol = it }
+            AppLogger.i(TAG, "  VehicleControlManager.init() appelé — " +
+                "sVcontrol=${if (sVcontrol != null) "OK ✓" else "null"}")
+        } catch (e: Exception) {
+            AppLogger.d(TAG, "  tryInitVehicleControlManager exc: ${e.message}")
+        }
+    }
+
+    /** Lecture sur VehicleControlManager. null si indisponible. */
+    private fun callVcontrol(methodName: String, vararg args: Any?): Any? {
+        val m = sVcontrol ?: return null
+        return try {
+            val types = args.map { if (it is Int) Int::class.javaPrimitiveType!! else it!!.javaClass }.toTypedArray()
+            m.javaClass.getMethod(methodName, *types).invoke(m, *args)
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "  VCTRL: $methodName() exc: ${e.message}")
+            null
+        }
+    }
+
+    /** Écriture sur VehicleControlManager — soumise au verrou de vitesse comme toute écriture. */
+    private fun callVcontrolVoid(methodName: String, vararg args: Any?): Boolean {
+        if (!VehicleWriteGate.allow("VCTRL $methodName")) return false
+        val m = sVcontrol ?: run {
+            AppLogger.w(TAG, "  VCTRL: $methodName() — manager non lié")
+            return false
+        }
+        return try {
+            val types = args.map { if (it is Int) Int::class.javaPrimitiveType!! else it!!.javaClass }.toTypedArray()
+            m.javaClass.getMethod(methodName, *types).invoke(m, *args)
+            true
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "  VCTRL: $methodName() exc: ${e.message}")
+            false
+        }
+    }
 
     private fun tryInitGeneralManager(launcherCtx: Context, appCtx: Context) {
         if (sGeneral != null) return
@@ -1055,6 +1142,7 @@ object MG4Hardware {
         sVsm?.let { tryGetVsmService(it, vsmClass) }
 
         // GeneralManager pour SWI68/SWI165 (luminosité écran) — même launcher context
+        tryInitVehicleControlManager(launcherCtx, context)   // ESC sur SWI68/165
         tryInitGeneralManager(launcherCtx, context)
 
         // SmartSoundManager pour SWI68/SWI165 (loudness audio) — même launcher context
@@ -1073,6 +1161,7 @@ object MG4Hardware {
                     } catch (_: Exception) {}
                 }
                 sVsm?.let { if (sVsmService == null) tryGetVsmService(it, vsmClass) }
+                if (sVcontrol == null) tryInitVehicleControlManager(launcherCtx, context)
                 if (sGeneral == null) tryInitGeneralManager(launcherCtx, context)
                 if (sSmartSound == null) tryInitSmartSoundManager(launcherCtx, context)
             }, delay)
@@ -2069,10 +2158,29 @@ object MG4Hardware {
         return writeSafety(PROP_DMS_SENSITIVITY, nSenSet(), level)
     }
 
+    /**
+     * Lecture brute de l'ESC. Trois voies DIFFÉRENTES, et c'est le piège :
+     *   • SWI133      : propriété VPM 0x4020003 ;
+     *   • SWI68/165   : **VehicleControlManager**, pas le VehicleSettingManager — get/setEspSwitch
+     *     n'existent que là. Les chercher sur sVsm échouait sans bruit, d'où un ESC inerte ;
+     *   • A9          : CarVehicleSettingClient (setDrivingEpsMode), donc bien sVsm.
+     */
+    private fun readEscRaw(): Int = when {
+        isA9Vsm()                 -> (callVsm(nEscGet()) as? Int) ?: -1
+        FirmwareInfo.isVsmBased() -> (callVcontrol(nEscGet()) as? Int) ?: -1
+        else                      -> getIntPropertyVpm(PROP_ESC)
+    }
+
+    private fun writeEscRaw(value: Int): Boolean = when {
+        isA9Vsm()                 -> callVsmVoid(nEscSet(), value)
+        FirmwareInfo.isVsmBased() -> callVcontrolVoid(nEscSet(), value)
+        else                      -> setIntPropertyVpmRecovery(PROP_ESC, value)
+    }
+
     /** ESC : true=ON, false=OFF, null=illisible. Lecture 0=OFF, 1=ON, 2=OFF. */
     fun isEscOn(): Boolean? {
         if (!hasDrowsinessAndEsc()) return null
-        return when (readSafety(PROP_ESC, nEscGet())) {
+        return when (readEscRaw()) {
             1    -> true
             0, 2 -> false
             else -> null
@@ -2106,7 +2214,7 @@ object MG4Hardware {
         }
         AppLogger.i(TAG, "  ESC SET → ${if (on) "ON" else "OFF"} " +
             "(bascule : écriture de 1 via ${nEscSet()})")
-        val ok = writeSafety(PROP_ESC, nEscSet(), 1)
+        val ok = writeEscRaw(1)
         // ⚠️ Ne PAS relire immédiatement pour juger du résultat : le calculateur applique la
         // consigne avec un délai, donc une relecture collée à l'écriture rend l'ANCIENNE valeur
         // et ferait conclure à tort que la commande a échoué. On journalise seulement ce qui
@@ -2134,11 +2242,17 @@ object MG4Hardware {
             AppLogger.i(SAFE_TAG, "→ firmware inconnu, aucune voie applicable")
             return
         }
-        AppLogger.i(SAFE_TAG, "voie=${if (FirmwareInfo.isVsmBased()) "sVsm (" + nUdwGet() + ")" else "VPM (propriétés)"}")
+        AppLogger.i(SAFE_TAG, "voie UDW=" +
+            (if (FirmwareInfo.isVsmBased()) "sVsm (" + nUdwGet() + ")" else "VPM") +
+            " | voie ESC=" + when {
+                isA9Vsm()                 -> "sVsm (" + nEscGet() + ")"
+                FirmwareInfo.isVsmBased() -> "VehicleControlManager lié=" + (sVcontrol != null)
+                else                      -> "VPM 0x4020003"
+            })
 
         val dms = readSafety(PROP_UDW_MAIN_SWITCH, nUdwGet())
         val sen = readSafety(PROP_DMS_SENSITIVITY, nSenGet())
-        val esc = readSafety(PROP_ESC, nEscGet())
+        val esc = readEscRaw()
         AppLogger.i(SAFE_TAG, "UDW_MAIN_SWITCH(0x3010005) = $dms (2=ON, 1 et 0=OFF) → ${isDrowsinessOn()}")
         AppLogger.i(SAFE_TAG, "UDW_SENSITIVITY(0x3010007) = $sen (1=Faible, 2=Moyen, 3=Élevé)")
         AppLogger.i(SAFE_TAG, "ESP(0x4020003)             = $esc (0=OFF, 1=ON, 2=OFF) → ${isEscOn()}")
@@ -4241,7 +4355,14 @@ object MG4Hardware {
      *
      * ⚠️ Bloquant (plusieurs secondes avec les bascules) → appeler depuis un thread IO.
      */
-    fun applyClimatePreset(targetTemp: Int, fanLevel: Int, defrostFront: Boolean, defrostRear: Boolean): Boolean {
+    fun applyClimatePreset(
+        targetTemp: Int,
+        fanLevel: Int,
+        defrostFront: Boolean,
+        defrostRear: Boolean,
+        autoMode: Boolean = false,
+        loopMode: Int? = null
+    ): Boolean {
         val state = getClimateState() ?: run {
             AppLogger.w(CLIM_TAG, "Préréglage : état clim illisible → abandon")
             return false
@@ -4249,11 +4370,34 @@ object MG4Hardware {
         var ok = setClimatePower(true)
         ok = setClimateAc(true) && ok
         ok = setClimateTemp(targetTemp.coerceIn(state.tempMin, state.tempMax)) && ok
-        ok = setClimateFan(fanLevel.coerceIn(state.fanMin, state.fanMax)) && ok
+
+        // ⚠️ Mode auto et ventilation manuelle s'excluent : régler une vitesse fait sortir du
+        // mode auto, et activer le mode auto reprend la main sur la vitesse. Appliquer les deux
+        // donnerait un état final décidé par le seul ordre des appels, pas par l'utilisateur.
+        if (autoMode) {
+            ok = setClimateAuto(true) && ok
+        } else {
+            ok = setClimateFan(fanLevel.coerceIn(state.fanMin, state.fanMax)) && ok
+        }
+
         if (state.defrostFront != null) ok = setClimateDefrostFront(defrostFront) && ok
         if (state.defrostRear  != null) ok = setClimateDefrostRear(defrostRear) && ok
-        AppLogger.i(CLIM_TAG, "Préréglage appliqué : consigne=$targetTemp vent=$fanLevel " +
-            "dégAV=$defrostFront dégAR=$defrostRear → ok=$ok")
+
+        // null = l'utilisateur n'a pas demandé à piloter le recyclage : on n'y touche pas, pour
+        // ne pas modifier le comportement des automatisations déjà configurées.
+        if (loopMode != null) {
+            val mode = when (loopMode) {
+                0    -> LoopMode.INNER
+                1    -> LoopMode.OUTSIDE
+                else -> LoopMode.AUTO
+            }
+            ok = setClimateLoopMode(mode) && ok
+        }
+
+        AppLogger.i(CLIM_TAG, "Préréglage appliqué : consigne=$targetTemp " +
+            (if (autoMode) "ventilation=AUTO" else "vent=$fanLevel") +
+            " dégAV=$defrostFront dégAR=$defrostRear " +
+            "recyclage=${loopMode ?: "inchangé"} → ok=$ok")
         return ok
     }
 
