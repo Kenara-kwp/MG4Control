@@ -1996,7 +1996,41 @@ object MG4Hardware {
      * Élargir la condition sans câbler ces voies ferait échouer les écritures en silence.
      */
     fun hasDrowsinessAndEsc(): Boolean =
-        FirmwareInfo.getGeneration() == FirmwareInfo.Gen.SWI133
+        FirmwareInfo.getGeneration() != FirmwareInfo.Gen.UNKNOWN
+
+    /**
+     * Vrai si ce firmware passe par carapi (A9). Les noms de méthodes y diffèrent de l'old-SDK.
+     *
+     * ⚠️ Ne PAS utiliser `FirmwareInfo.isNewGenVsm()` ici : il ne couvre que SWI69 et SWI131,
+     * il laisse SWI132 de côté alors que c'est bien un A9. Même triplet que isClimateA9().
+     */
+    private fun isA9Vsm(): Boolean {
+        val gen = FirmwareInfo.getGeneration()
+        return gen == FirmwareInfo.Gen.SWI69 || gen == FirmwareInfo.Gen.SWI131 ||
+               gen == FirmwareInfo.Gen.SWI132
+    }
+
+    // Noms de méthodes sur sVsm. Le commutateur et sa sensibilité viennent TOUJOURS de la même
+    // famille (UDW) : c'est la règle que la panne SWI133 a mise en évidence — un setDmsStatus
+    // (surveillance caméra) à côté d'un setUdwSensitivity ne pilote pas le même réglage.
+    // Codes de transaction A9 correspondants, consécutifs, ce qui confirme le regroupement :
+    //   setUdwStatus 0x94 / get 0x95   setUdwSensitivityState 0x96 / get 0x97
+    //   setDrivingEpsMode 0x54 / get 0x55   (ESC, nommé « Eps » et non « Esc »)
+    private fun nUdwSet() = if (isA9Vsm()) "setUdwStatus"           else "setUnsteadyDrivingWarning"
+    private fun nUdwGet() = if (isA9Vsm()) "getUdwStatus"           else "getUnsteadyDrivingWarning"
+    private fun nSenSet() = if (isA9Vsm()) "setUdwSensitivityState" else "setUnsteadyDrivingWarningSen"
+    private fun nSenGet() = if (isA9Vsm()) "getUdwSensitivityState" else "getUnsteadyDrivingWarningSen"
+    private fun nEscSet() = if (isA9Vsm()) "setDrivingEpsMode"      else "setEspSwitch"
+    private fun nEscGet() = if (isA9Vsm()) "getDrivingEpsMode"      else "getEspSwitch"
+
+    /** Lecture brute du commutateur/sensibilité, quelle que soit la voie. -1 si illisible. */
+    private fun readSafety(prop: Int, method: String): Int =
+        if (FirmwareInfo.isVsmBased()) (callVsm(method) as? Int) ?: -1
+        else getIntPropertyVpm(prop)
+
+    private fun writeSafety(prop: Int, method: String, value: Int): Boolean =
+        if (FirmwareInfo.isVsmBased()) callVsmVoid(method, value)
+        else setIntPropertyVpmRecovery(prop, value)
 
     /**
      * Avertissement de somnolence : true=ON, false=OFF, null=illisible.
@@ -2008,7 +2042,7 @@ object MG4Hardware {
      */
     fun isDrowsinessOn(): Boolean? {
         if (!hasDrowsinessAndEsc()) return null
-        return when (getIntPropertyVpm(PROP_UDW_MAIN_SWITCH)) {
+        return when (readSafety(PROP_UDW_MAIN_SWITCH, nUdwGet())) {
             DMS_ON     -> true
             DMS_OFF, 0 -> false
             else       -> null
@@ -2018,27 +2052,27 @@ object MG4Hardware {
     fun setDrowsiness(on: Boolean): Boolean {
         if (!hasDrowsinessAndEsc()) return false
         val v = if (on) DMS_ON else DMS_OFF
-        AppLogger.i(TAG, "  DMS SET switch=$v (${if (on) "ON" else "OFF"}) via VPM")
-        return setIntPropertyVpmRecovery(PROP_UDW_MAIN_SWITCH, v)
+        AppLogger.i(TAG, "  UDW SET switch=$v (${if (on) "ON" else "OFF"}) via ${nUdwSet()}")
+        return writeSafety(PROP_UDW_MAIN_SWITCH, nUdwSet(), v)
     }
 
     /** Sensibilité de l'alerte somnolence (1=Faible, 2=Moyen, 3=Élevé), -1 si illisible. */
     fun getDrowsinessSensitivity(): Int {
         if (!hasDrowsinessAndEsc()) return -1
-        val raw = getIntPropertyVpm(PROP_DMS_SENSITIVITY)
+        val raw = readSafety(PROP_DMS_SENSITIVITY, nSenGet())
         return if (raw in 1..3) raw else -1
     }
 
     fun setDrowsinessSensitivity(level: Int): Boolean {
         if (!hasDrowsinessAndEsc() || level !in 1..3) return false
-        AppLogger.i(TAG, "  DMS SET sensitivity=$level via VPM")
-        return setIntPropertyVpmRecovery(PROP_DMS_SENSITIVITY, level)
+        AppLogger.i(TAG, "  UDW SET sensitivity=$level via ${nSenSet()}")
+        return writeSafety(PROP_DMS_SENSITIVITY, nSenSet(), level)
     }
 
     /** ESC : true=ON, false=OFF, null=illisible. Lecture 0=OFF, 1=ON, 2=OFF. */
     fun isEscOn(): Boolean? {
         if (!hasDrowsinessAndEsc()) return null
-        return when (getIntPropertyVpm(PROP_ESC)) {
+        return when (readSafety(PROP_ESC, nEscGet())) {
             1    -> true
             0, 2 -> false
             else -> null
@@ -2070,8 +2104,9 @@ object MG4Hardware {
             AppLogger.i(TAG, "  ESC déjà ${if (on) "ON" else "OFF"} — aucune écriture")
             return true
         }
-        AppLogger.i(TAG, "  ESC SET → ${if (on) "ON" else "OFF"} (bascule présumée : écriture de 1)")
-        val ok = setIntPropertyVpmRecovery(PROP_ESC, 1)
+        AppLogger.i(TAG, "  ESC SET → ${if (on) "ON" else "OFF"} " +
+            "(bascule : écriture de 1 via ${nEscSet()})")
+        val ok = writeSafety(PROP_ESC, nEscSet(), 1)
         // ⚠️ Ne PAS relire immédiatement pour juger du résultat : le calculateur applique la
         // consigne avec un délai, donc une relecture collée à l'écriture rend l'ANCIENNE valeur
         // et ferait conclure à tort que la commande a échoué. On journalise seulement ce qui
@@ -2096,14 +2131,14 @@ object MG4Hardware {
         AppLogger.i(SAFE_TAG, "── DIAG somnolence / sensibilité / ESC ──")
         AppLogger.i(SAFE_TAG, "firmware=${FirmwareInfo.getGeneration()} géré=${hasDrowsinessAndEsc()}")
         if (!hasDrowsinessAndEsc()) {
-            AppLogger.i(SAFE_TAG, "→ voie VPM non applicable ici. SWI68/165 : méthodes nommées ; " +
-                "A9 : transactions 0x54 / 0x90 / 0x96. Rien n'est câblé pour ces firmwares.")
+            AppLogger.i(SAFE_TAG, "→ firmware inconnu, aucune voie applicable")
             return
         }
+        AppLogger.i(SAFE_TAG, "voie=${if (FirmwareInfo.isVsmBased()) "sVsm (" + nUdwGet() + ")" else "VPM (propriétés)"}")
 
-        val dms = getIntPropertyVpm(PROP_UDW_MAIN_SWITCH)
-        val sen = getIntPropertyVpm(PROP_DMS_SENSITIVITY)
-        val esc = getIntPropertyVpm(PROP_ESC)
+        val dms = readSafety(PROP_UDW_MAIN_SWITCH, nUdwGet())
+        val sen = readSafety(PROP_DMS_SENSITIVITY, nSenGet())
+        val esc = readSafety(PROP_ESC, nEscGet())
         AppLogger.i(SAFE_TAG, "UDW_MAIN_SWITCH(0x3010005) = $dms (2=ON, 1 et 0=OFF) → ${isDrowsinessOn()}")
         AppLogger.i(SAFE_TAG, "UDW_SENSITIVITY(0x3010007) = $sen (1=Faible, 2=Moyen, 3=Élevé)")
         AppLogger.i(SAFE_TAG, "ESP(0x4020003)             = $esc (0=OFF, 1=ON, 2=OFF) → ${isEscOn()}")
