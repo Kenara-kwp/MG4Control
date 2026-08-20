@@ -37,6 +37,7 @@ import com.mg4.control.api.ExternalApi
 import com.mg4.control.R
 import com.mg4.control.util.QrCode
 import com.mg4.control.debug.AppLogger
+import com.mg4.control.debug.DataUsageProbe
 import com.mg4.control.debug.CrashLogger
 import com.mg4.control.hardware.MG4Hardware
 import com.mg4.control.hardware.VehicleWriteGate
@@ -505,6 +506,8 @@ class SettingsFragment : Fragment() {
         MG4Hardware.runSpeedDiag()
         // Sonde climatisation : lecture seule, repère ce qui répond avant tout pilotage.
         MG4Hardware.runClimateDiag()
+        // Sonde consommation de données : lecture seule, aucune API véhicule impliquée.
+        DataUsageProbe.run(ctx)
         // Sonde somnolence / sensibilité / ESC : lecture seule (elle ne bascule RIEN — un
         // rapport de diagnostic ne doit pas toucher à un organe de sécurité active).
         MG4Hardware.runSafetyDiag()
