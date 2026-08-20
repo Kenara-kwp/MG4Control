@@ -161,6 +161,7 @@ object ProfileApplier {
                         AppLogger.i(TAG, "  SasMode=${profile.swi132SasMode} (0=Off 2=Manuel 3=Intelligent)")
                     }
                     applyAeb(profile.aebEnabled, profile.aebMode, profile.aebSensitivity)
+                    applySafety(profile)
 
                     // Économie d'énergie — via CarVehicleSettingClient (setEnduranceMode), même path que SWI69
                     val esOk = MG4Hardware.setEnergySavingMode(profile.energySaving)
@@ -190,6 +191,7 @@ object ProfileApplier {
                         AppLogger.i(TAG, "  LimiterMode=${profile.swi132SasMode} (0=Off 2=Manuel 3=Intelligent)")
                     }
                     applyAeb(profile.aebEnabled, profile.aebMode, profile.aebSensitivity)
+                    applySafety(profile)
 
                     // Économie d'énergie — firmwares VSM hors SWI132 (SWI68/SWI69/SWI131/SWI165)
                     val esOk = MG4Hardware.setEnergySavingMode(profile.energySaving)
@@ -218,6 +220,7 @@ object ProfileApplier {
                     val adOk = MG4Hardware.setMixedIntelligentDrive(profile.adasMode)
                     AppLogger.i(TAG, "  AdasMode=${profile.adasMode} → $adOk")
                     applyAeb(profile.aebEnabled, profile.aebMode, profile.aebSensitivity)
+                    applySafety(profile)
 
                     // Économie d'énergie — SWI133 via VPM
                     if (FirmwareInfo.getGeneration() == FirmwareInfo.Gen.SWI133) {
@@ -309,6 +312,27 @@ object ProfileApplier {
      * Si elkMode=0 (valeur par défaut — profil créé avant l'ajout de l'ELK),
      * on ne touche pas aux réglages ELK pour éviter une modification involontaire.
      */
+    /**
+     * ESC, avertissement de somnolence et sensibilité de son alerte.
+     *
+     * Les valeurs viennent des ACCESSEURS du profil, pas des champs bruts : un profil enregistré
+     * avant la fonctionnalité a ses trois champs à null et doit recevoir les défauts que la
+     * voiture rétablit d'elle-même au démarrage (ESC ON, somnolence ON, sensibilité Standard).
+     * Lire les champs directement appliquerait `false`, donc un ESC désactivé — l'inverse.
+     *
+     * La sensibilité est écrite avant le commutateur : sur un système éteint, régler la
+     * sensibilité d'abord évite une alerte au niveau précédent entre les deux appels.
+     */
+    private fun applySafety(profile: DrivingProfile) {
+        if (!MG4Hardware.hasDrowsinessAndEsc()) return
+        val sen = MG4Hardware.setDrowsinessSensitivity(profile.appliesDrowsinessSensitivity)
+        AppLogger.i(TAG, "  DrowsinessSensitivity=${profile.appliesDrowsinessSensitivity} → $sen")
+        val dms = MG4Hardware.setDrowsiness(profile.appliesDrowsiness)
+        AppLogger.i(TAG, "  Drowsiness=${profile.appliesDrowsiness} → $dms")
+        val esc = MG4Hardware.setEsc(profile.appliesEsc)
+        AppLogger.i(TAG, "  Esc=${profile.appliesEsc} → $esc")
+    }
+
     private fun applyElk(elkMode: Int, elkSensitivity: Int, lasAudibleWarning: Boolean = true, lasVibrationReminder: Boolean = true) {
         if (elkMode == 0) {
             AppLogger.i(TAG, "  ELK — valeurs par défaut, skip (évite modification involontaire)")

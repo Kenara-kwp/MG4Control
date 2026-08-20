@@ -44,6 +44,16 @@ data class DrivingProfile(
     val energySaving: Boolean = false,
     val tsrEnabled: Boolean = false,
     val isDefault: Boolean = false,
+    // ESC + avertissement de somnolence + sensibilité de son alerte
+    //
+    // ⚠️ NULLABLES À DESSEIN, comme le volant/les sièges chauffants : Gson n'appelle pas le
+    // constructeur Kotlin, donc un `Boolean = true` ne s'appliquerait PAS aux profils déjà
+    // enregistrés — champ absent du JSON → défaut de la JVM, c'est-à-dire `false`. L'ESC se
+    // retrouverait DÉSACTIVÉ sur tous les anciens profils, l'inverse de ce qu'on veut.
+    // `null` = profil antérieur à la fonctionnalité, et ce sont les accesseurs qui tranchent.
+    val escEnabled: Boolean? = null,
+    val drowsinessEnabled: Boolean? = null,
+    val drowsinessSensitivity: Int? = null,   // 1=Faible, 2=Standard, 3=Élevé
     // [BT-PROFILES] MAC de l'appareil Bluetooth associé à ce profil (null = aucun)
     val btDeviceMac: String? = null
 ) {
@@ -52,4 +62,12 @@ data class DrivingProfile(
 
     /** Sièges chauffants à appliquer ? (idem) */
     val appliesSeatHeat: Boolean get() = seatHeatEnabled ?: true
+
+    // Défauts pour un profil antérieur à la fonctionnalité : ce sont ceux que la voiture
+    // rétablit elle-même à chaque démarrage, donc les appliquer ne change rien à l'état
+    // habituel — et surtout, jamais un ESC désactivé par omission.
+    val appliesEsc: Boolean get() = escEnabled ?: true
+    val appliesDrowsiness: Boolean get() = drowsinessEnabled ?: true
+    /** 2 = Standard. Valeur littérale : le modèle ne doit pas dépendre de la couche matérielle. */
+    val appliesDrowsinessSensitivity: Int get() = drowsinessSensitivity ?: 2
 }
