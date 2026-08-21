@@ -36,11 +36,32 @@ object DataUsage {
         val total: Long get() = rx + tx
     }
 
-    /** Début du mois courant, minuit — la borne qu'utilise l'écran Réglages par défaut. */
-    fun startOfMonth(): Long = Calendar.getInstance().apply {
-        set(Calendar.DAY_OF_MONTH, 1)
+    private fun Calendar.minuit(): Calendar = apply {
         set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
         set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+    }
+
+    /** Minuit aujourd'hui. */
+    fun startOfDay(): Long = Calendar.getInstance().minuit().timeInMillis
+
+    /**
+     * Premier jour de la semaine en cours, à minuit.
+     *
+     * On recule d'un nombre de jours calculé plutôt que d'utiliser
+     * `set(DAY_OF_WEEK, firstDayOfWeek)` : cette forme-là peut sauter EN AVANT selon le jour
+     * courant et la règle de semaine, et afficherait alors une consommation future, donc nulle.
+     *
+     * `firstDayOfWeek` suit la locale — lundi en France, dimanche ailleurs. C'est voulu : la
+     * semaine affichée doit être celle que l'utilisateur a en tête, pas une convention imposée.
+     */
+    fun startOfWeek(): Long = Calendar.getInstance().minuit().apply {
+        val recul = (get(Calendar.DAY_OF_WEEK) - firstDayOfWeek + 7) % 7
+        add(Calendar.DAY_OF_YEAR, -recul)
+    }.timeInMillis
+
+    /** Début du mois courant, minuit — la borne qu'utilise l'écran Réglages par défaut. */
+    fun startOfMonth(): Long = Calendar.getInstance().minuit().apply {
+        set(Calendar.DAY_OF_MONTH, 1)
     }.timeInMillis
 
     /**

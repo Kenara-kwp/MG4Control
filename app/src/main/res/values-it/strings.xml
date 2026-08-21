@@ -388,4 +388,12 @@
     <string name="recirc_inner">Interno</string>
     <string name="recirc_outside">Esterno</string>
     <string name="recirc_auto">Auto</string>
+
+    <!-- Consommation de donnees (Reglages > Infos) -->
+    <string name="data_usage_title">Consumo dati</string>
+    <string name="data_usage_month">Mese corrente</string>
+    <string name="data_usage_30d">Ultimi 30 giorni</string>
+    <string name="data_usage_unavailable">Non disponibile</string>
+    <string name="data_usage_today">Oggi</string>
+    <string name="data_usage_week">Settimana corrente</string>
 </resources>

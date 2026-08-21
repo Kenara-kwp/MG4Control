@@ -38,6 +38,7 @@ import com.mg4.control.R
 import com.mg4.control.util.QrCode
 import com.mg4.control.debug.AppLogger
 import com.mg4.control.debug.DataUsageProbe
+import com.mg4.control.util.DataUsage
 import com.mg4.control.debug.CrashLogger
 import com.mg4.control.hardware.MG4Hardware
 import com.mg4.control.hardware.VehicleWriteGate
@@ -393,6 +394,7 @@ class SettingsFragment : Fragment() {
         // donc être câblé APRÈS toutes les décisions de visibilité ci-dessus (build offline,
         // firmware sans extinction véhicule…), sinon le décompte serait faux.
         setupFirmwareChips(view)
+        setupDataUsage(view)
         bindCategoryRail(view, accentDim, inactiveColor, accentColor, textActive, textInactive)
     }
 
@@ -719,6 +721,33 @@ class SettingsFragment : Fragment() {
     // ── Indicateur firmware (deplace depuis la barre du haut) ────────────────
     // Les pastilles affichent la generation detectee et, quand la voiture n'est pas reconnue,
     // permettent d'en forcer une. Elles vivent desormais dans Reglages > Infos.
+    /**
+     * Consommation de données — Réglages → Infos.
+     *
+     * Lecture hors thread UI : elle traverse un binder vers NetworkStatsService, ce n'est pas
+     * un simple champ. Affiche « Indisponible » plutôt qu'un zéro quand la lecture échoue :
+     * « rien consommé » et « impossible de lire » ne doivent pas se ressembler à l'écran.
+     */
+    private fun setupDataUsage(view: View) {
+        val ctx = requireContext().applicationContext
+        val fin = System.currentTimeMillis()
+        // Une seule liste : ajouter une période ne demande qu'une ligne ici et une au layout.
+        val periodes = listOf(
+            R.id.tv_data_today to DataUsage.startOfDay(),
+            R.id.tv_data_week  to DataUsage.startOfWeek(),
+            R.id.tv_data_month to DataUsage.startOfMonth(),
+            R.id.tv_data_30d   to fin - 30L * 24 * 3600 * 1000
+        ).map { (id, debut) -> view.findViewById<android.widget.TextView>(id) to debut }
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val lues = periodes.map { (tv, debut) -> tv to DataUsage.ethernet(ctx, debut, fin) }
+            withContext(Dispatchers.Main) {
+                if (!isAdded) return@withContext
+                lues.forEach { (tv, usage) -> usage?.let { tv.text = DataUsage.format(it.total) } }
+            }
+        }
+    }
+
     private fun setupFirmwareChips(view: View) {
         val chip133 = view.findViewById<TextView>(R.id.chip_swi133)
         val chip132 = view.findViewById<TextView>(R.id.chip_swi132)
