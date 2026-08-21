@@ -396,4 +396,27 @@
     <string name="data_usage_unavailable">Unavailable</string>
     <string name="data_usage_today">Today</string>
     <string name="data_usage_week">Current week</string>
+
+    <!-- Raccourcis avances (service d accessibilite) -->
+    <string name="shortcuts_cat_advanced">Advanced</string>
+    <string name="adv_sc_title">Advanced shortcuts</string>
+    <string name="adv_sc_desc">Lets MG4Control see steering wheel keys before the launcher. Requires enabling the accessibility service.</string>
+    <string name="adv_sc_service_desc">Lets you use steering wheel keys as MG4Control shortcuts.</string>
+    <string name="adv_sc_open_accessibility">Enable accessibility</string>
+    <string name="adv_sc_status_on">Service active</string>
+    <string name="adv_sc_status_off">Service inactive</string>
+    <string name="adv_sc_record">Record a key</string>
+    <string name="adv_sc_recording">Press a steering wheel key…</string>
+    <string name="adv_sc_cancel">Cancel</string>
+    <string name="adv_sc_last_key">Last key detected</string>
+    <string name="adv_sc_none">none</string>
+    <string name="shortcuts_cat_classic">Shortcuts</string>
+    <string name="adv_sc_list_title">Shortcut list</string>
+    <string name="adv_sc_new">New shortcut</string>
+    <string name="adv_sc_step_key">1 · Key</string>
+    <string name="adv_sc_step_press">2 · Press type</string>
+    <string name="adv_sc_step_action">3 · Function</string>
+    <string name="adv_sc_empty">No advanced shortcut recorded.</string>
+    <string name="adv_sc_claimed_warning">This key will be taken from the launcher, including for the press type you leave unassigned.</string>
+    <string name="adv_sc_delete">Delete</string>
 </resources>

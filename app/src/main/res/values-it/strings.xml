@@ -396,4 +396,27 @@
     <string name="data_usage_unavailable">Non disponibile</string>
     <string name="data_usage_today">Oggi</string>
     <string name="data_usage_week">Settimana corrente</string>
+
+    <!-- Raccourcis avances (service d accessibilite) -->
+    <string name="shortcuts_cat_advanced">Avanzate</string>
+    <string name="adv_sc_title">Scorciatoie avanzate</string>
+    <string name="adv_sc_desc">Consente a MG4Control di vedere i tasti del volante prima del launcher. Richiede l\'attivazione del servizio di accessibilità.</string>
+    <string name="adv_sc_service_desc">Consente di usare i tasti del volante come scorciatoie MG4Control.</string>
+    <string name="adv_sc_open_accessibility">Attiva accessibilità</string>
+    <string name="adv_sc_status_on">Servizio attivo</string>
+    <string name="adv_sc_status_off">Servizio inattivo</string>
+    <string name="adv_sc_record">Registra un tasto</string>
+    <string name="adv_sc_recording">Premi un tasto del volante…</string>
+    <string name="adv_sc_cancel">Annulla</string>
+    <string name="adv_sc_last_key">Ultimo tasto rilevato</string>
+    <string name="adv_sc_none">nessuno</string>
+    <string name="shortcuts_cat_classic">Scorciatoie</string>
+    <string name="adv_sc_list_title">Elenco scorciatoie</string>
+    <string name="adv_sc_new">Nuova scorciatoia</string>
+    <string name="adv_sc_step_key">1 · Tasto</string>
+    <string name="adv_sc_step_press">2 · Tipo di pressione</string>
+    <string name="adv_sc_step_action">3 · Funzione</string>
+    <string name="adv_sc_empty">Nessuna scorciatoia avanzata registrata.</string>
+    <string name="adv_sc_claimed_warning">Questo tasto sarà sottratto al launcher, anche per il tipo di pressione non assegnato.</string>
+    <string name="adv_sc_delete">Elimina</string>
 </resources>

@@ -396,4 +396,27 @@
     <string name="data_usage_unavailable">Indisponível</string>
     <string name="data_usage_today">Hoje</string>
     <string name="data_usage_week">Semana atual</string>
+
+    <!-- Raccourcis avances (service d accessibilite) -->
+    <string name="shortcuts_cat_advanced">Avançados</string>
+    <string name="adv_sc_title">Atalhos avançados</string>
+    <string name="adv_sc_desc">Permite que o MG4Control veja as teclas do volante antes do launcher. Requer ativar o serviço de acessibilidade.</string>
+    <string name="adv_sc_service_desc">Permite usar as teclas do volante como atalhos do MG4Control.</string>
+    <string name="adv_sc_open_accessibility">Ativar acessibilidade</string>
+    <string name="adv_sc_status_on">Serviço ativo</string>
+    <string name="adv_sc_status_off">Serviço inativo</string>
+    <string name="adv_sc_record">Gravar uma tecla</string>
+    <string name="adv_sc_recording">Prima uma tecla do volante…</string>
+    <string name="adv_sc_cancel">Cancelar</string>
+    <string name="adv_sc_last_key">Última tecla detetada</string>
+    <string name="adv_sc_none">nenhuma</string>
+    <string name="shortcuts_cat_classic">Atalhos</string>
+    <string name="adv_sc_list_title">Lista de atalhos</string>
+    <string name="adv_sc_new">Novo atalho</string>
+    <string name="adv_sc_step_key">1 · Tecla</string>
+    <string name="adv_sc_step_press">2 · Tipo de pressão</string>
+    <string name="adv_sc_step_action">3 · Função</string>
+    <string name="adv_sc_empty">Nenhum atalho avançado registado.</string>
+    <string name="adv_sc_claimed_warning">Esta tecla será retirada ao launcher, incluindo para o tipo de pressão não atribuído.</string>
+    <string name="adv_sc_delete">Apagar</string>
 </resources>

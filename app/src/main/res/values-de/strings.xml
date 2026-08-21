@@ -396,4 +396,27 @@
     <string name="data_usage_unavailable">Nicht verfügbar</string>
     <string name="data_usage_today">Heute</string>
     <string name="data_usage_week">Aktuelle Woche</string>
+
+    <!-- Raccourcis avances (service d accessibilite) -->
+    <string name="shortcuts_cat_advanced">Erweitert</string>
+    <string name="adv_sc_title">Erweiterte Tastenkürzel</string>
+    <string name="adv_sc_desc">Erlaubt MG4Control, Lenkradtasten vor dem Launcher zu sehen. Erfordert das Aktivieren des Bedienungshilfen-Dienstes.</string>
+    <string name="adv_sc_service_desc">Erlaubt die Nutzung von Lenkradtasten als MG4Control-Kürzel.</string>
+    <string name="adv_sc_open_accessibility">Bedienungshilfen aktivieren</string>
+    <string name="adv_sc_status_on">Dienst aktiv</string>
+    <string name="adv_sc_status_off">Dienst inaktiv</string>
+    <string name="adv_sc_record">Taste aufzeichnen</string>
+    <string name="adv_sc_recording">Lenkradtaste drücken…</string>
+    <string name="adv_sc_cancel">Abbrechen</string>
+    <string name="adv_sc_last_key">Zuletzt erkannte Taste</string>
+    <string name="adv_sc_none">keine</string>
+    <string name="shortcuts_cat_classic">Tastenkürzel</string>
+    <string name="adv_sc_list_title">Kürzelliste</string>
+    <string name="adv_sc_new">Neues Kürzel</string>
+    <string name="adv_sc_step_key">1 · Taste</string>
+    <string name="adv_sc_step_press">2 · Druckart</string>
+    <string name="adv_sc_step_action">3 · Funktion</string>
+    <string name="adv_sc_empty">Kein erweitertes Kürzel gespeichert.</string>
+    <string name="adv_sc_claimed_warning">Diese Taste wird dem Launcher entzogen, auch für die nicht zugewiesene Druckart.</string>
+    <string name="adv_sc_delete">Löschen</string>
 </resources>

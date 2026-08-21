@@ -4,21 +4,27 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.provider.Settings
 import android.content.pm.ResolveInfo
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.KeyEvent
 import android.widget.ScrollView
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.Switch
+import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.button.MaterialButton
 import com.mg4.control.R
+import com.mg4.control.accessibility.AdvancedShortcuts
+import com.mg4.control.accessibility.KeyCaptureService
+import com.mg4.control.debug.AppLogger
 import com.mg4.control.model.RegenLevel
 import com.mg4.control.profile.ProfileManager
 import com.mg4.control.shortcut.ShortcutAction
@@ -26,6 +32,9 @@ import com.mg4.control.hardware.MG4Hardware
 import com.mg4.control.util.FirmwareInfo
 
 class ShortcutsFragment : Fragment() {
+
+    /** Interrupteur des raccourcis avances. Defaut false : la voie classique reste la norme. */
+    private val PREF_ADV_SHORTCUTS = "advanced_shortcuts_enabled"
 
     private val PREFS = "mg4_shortcuts"
 
@@ -134,6 +143,170 @@ class ShortcutsFragment : Fragment() {
      *  ou disparaître quand l'utilisateur attribue ou retire une action). */
     private var reselectTabs: (() -> Unit)? = null
 
+    // ═════════════════════════════════════════════════════════════════════════
+    //  Raccourcis avancés — interception avant le launcher
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Étape 1 : le service OBSERVE les touches sans en consommer aucune.
+     *
+     * Le toggle n'active pas le service d'accessibilité — Android l'interdit, seul l'utilisateur
+     * peut le faire depuis les réglages système. Le toggle enregistre donc une INTENTION, et
+     * l'état réel du service est affiché à côté, relu à chaque retour à l'écran : sans ça
+     * l'utilisateur croirait avoir activé la fonction alors que rien n'écoute.
+     */
+    private var advancedRefresh: (() -> Unit)? = null
+
+    override fun onResume() {
+        super.onResume()
+        // L utilisateur revient peut-etre des reglages d accessibilite : l etat affiche doit
+        // suivre, sinon il resterait sur "inactif" apres avoir active le service.
+        advancedRefresh?.invoke()
+    }
+
+    override fun onDestroyView() {
+        // Le listener est statique : ne pas le liberer retiendrait ce Fragment detruit.
+        KeyCaptureService.listener = null
+        advancedRefresh = null
+        super.onDestroyView()
+    }
+
+    private fun setupAdvancedShortcuts(view: View) {
+        val sw      = view.findViewById<Switch>(R.id.switch_adv_shortcuts)
+        val status  = view.findViewById<TextView>(R.id.tv_adv_status)
+        val btnAcc  = view.findViewById<MaterialButton>(R.id.btn_adv_accessibility)
+        val cardRec = view.findViewById<View>(R.id.card_adv_record)
+        val btnRec  = view.findViewById<MaterialButton>(R.id.btn_adv_record)
+        val tvKey   = view.findViewById<TextView>(R.id.tv_adv_last_key)
+        val btnSimple = view.findViewById<MaterialButton>(R.id.btn_adv_press_single)
+        val btnLong   = view.findViewById<MaterialButton>(R.id.btn_adv_press_long)
+        val spinner = view.findViewById<Spinner>(R.id.spinner_adv_action)
+
+        // Actions écartées : elles réclament une configuration par emplacement (quelle app,
+        // quel profil) que le système avancé ne stocke pas encore. Les proposer donnerait un
+        // raccourci qui ne ferait rien. PROFILE_PICKER reste, lui n'a besoin de rien.
+        val actionsAvancees = baseActionItems.filter {
+            it.action != ShortcutAction.OPEN_CUSTOM_APP && it.action != ShortcutAction.APPLY_PROFILE
+        }
+        spinner.adapter = ArrayAdapter(
+            requireContext(), android.R.layout.simple_spinner_dropdown_item,
+            actionsAvancees.map { it.label }
+        )
+
+        var toucheChoisie: Int? = null
+        var appuiLong = false
+
+        val actif   = requireContext().getColor(R.color.dash_accent_dim)
+        val inactif = requireContext().getColor(R.color.dash_btn)
+        val txtOn   = requireContext().getColor(R.color.dash_accent)
+        val txtOff  = requireContext().getColor(R.color.text_secondary)
+
+        fun majAppui() {
+            listOf(btnSimple to !appuiLong, btnLong to appuiLong).forEach { (b, on) ->
+                b.backgroundTintList = ColorStateList.valueOf(if (on) actif else inactif)
+                b.setTextColor(if (on) txtOn else txtOff)
+            }
+        }
+
+        fun majEtat() {
+            val serviceOn = KeyCaptureService.isEnabled(requireContext())
+            status.setText(if (serviceOn) R.string.adv_sc_status_on else R.string.adv_sc_status_off)
+            // Enregistrer n'a aucun sens tant que le service ne tourne pas : rien n'arriverait,
+            // et l'utilisateur croirait que sa touche n'est pas reconnue.
+            val utilisable = serviceOn && sw.isChecked
+            cardRec.alpha = if (utilisable) 1f else 0.35f
+            listOf<View>(btnRec, btnSimple, btnLong, spinner).forEach { it.isEnabled = utilisable }
+            refreshAdvancedList(view)
+        }
+
+        sw.isChecked = AdvancedShortcuts.isEnabled(requireContext())
+        sw.setOnCheckedChangeListener { _, checked ->
+            AdvancedShortcuts.setEnabled(requireContext(), checked)
+            majEtat()
+        }
+
+        btnAcc.setOnClickListener {
+            // La liste des services d'accessibilité, pas notre entrée : le lien direct n'est pas
+            // une API publique et varie d'un constructeur à l'autre.
+            val ouvert = runCatching {
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true
+            }.getOrDefault(false)
+            if (!ouvert) {
+                runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                AppLogger.w("MG4_KEYCAP", "réglages d'accessibilité inaccessibles — repli Réglages")
+            }
+        }
+
+        btnRec.setOnClickListener {
+            btnRec.setText(R.string.adv_sc_recording)
+            KeyCaptureService.listener = { keyCode ->
+                // Le service tourne sur son propre thread : revenir à l'UI avant de toucher aux
+                // vues, et se débrancher aussitôt pour ne capter qu'une seule touche.
+                view.post {
+                    if (isAdded) {
+                        toucheChoisie = keyCode
+                        tvKey.text = AdvancedShortcuts.nomTouche(keyCode)
+                            ?.let { "$it ($keyCode)" } ?: "$keyCode"
+                        btnRec.setText(R.string.adv_sc_record)
+                    }
+                }
+                KeyCaptureService.listener = null
+            }
+        }
+
+        btnSimple.setOnClickListener { appuiLong = false; majAppui() }
+        btnLong.setOnClickListener   { appuiLong = true;  majAppui() }
+
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                // C'est le choix de la fonction qui VALIDE : un bouton de confirmation de plus
+                // sur un écran de voiture serait une étape pour rien.
+                val touche = toucheChoisie ?: return
+                val action = actionsAvancees.getOrNull(pos)?.action ?: return
+                if (action == ShortcutAction.NONE) return
+                AdvancedShortcuts.set(requireContext(), touche, appuiLong, action)
+                AppLogger.i("MG4_KEYCAP", "raccourci avancé enregistré : touche=$touche " +
+                    "${if (appuiLong) "long" else "simple"} → ${action.name}")
+                toucheChoisie = null
+                tvKey.setText(R.string.adv_sc_none)
+                spinner.setSelection(0, false)
+                refreshAdvancedList(view)
+            }
+            override fun onNothingSelected(p: AdapterView<*>?) {}
+        }
+
+        majAppui()
+        majEtat()
+        advancedRefresh = ::majEtat
+    }
+
+    /** Reconstruit la liste des raccourcis avancés. Une ligne par couple touche + type d'appui. */
+    private fun refreshAdvancedList(view: View) {
+        val conteneur = view.findViewById<ViewGroup>(R.id.container_adv_list) ?: return
+        val vide      = view.findViewById<View>(R.id.tv_adv_empty)
+        conteneur.removeAllViews()
+        val items = AdvancedShortcuts.all(requireContext())
+        vide?.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+
+        items.forEach { m ->
+            val ligne = layoutInflater.inflate(R.layout.item_advanced_shortcut, conteneur, false)
+            val nom = AdvancedShortcuts.nomTouche(m.keyCode)?.let { "$it (${m.keyCode})" }
+                ?: "${getString(R.string.adv_sc_step_key)} ${m.keyCode}"
+            ligne.findViewById<TextView>(R.id.adv_item_key).text = nom
+            ligne.findViewById<TextView>(R.id.adv_item_press).setText(
+                if (m.longPress) R.string.shortcuts_press_long else R.string.shortcuts_press_single)
+            ligne.findViewById<TextView>(R.id.adv_item_action).text =
+                baseActionItems.firstOrNull { it.action == m.action }?.label ?: m.action.name
+            ligne.findViewById<View>(R.id.adv_item_delete).setOnClickListener {
+                AdvancedShortcuts.remove(requireContext(), m.keyCode, m.longPress)
+                refreshAdvancedList(view)
+            }
+            conteneur.addView(ligne)
+        }
+    }
+
     /**
      * N'affiche un réglage d'action que si l'action est réellement attribuée à un bouton :
      * régler le niveau de retour du mode 1 pédale n'a aucun sens si aucun bouton ne le déclenche.
@@ -153,6 +326,12 @@ class ShortcutsFragment : Fragment() {
         view.findViewById<View>(R.id.config_adas_section)?.visibility =
             if (showAdas) View.VISIBLE else View.GONE
 
+        // Avant, l'onglet « Actions » disparaissait quand il n'avait plus rien à montrer.
+        // Devenue une SECTION de la page Raccourcis, elle doit se masquer elle-même — sinon
+        // on afficherait un titre suivi de rien.
+        view.findViewById<View>(R.id.page_sc_actions)?.visibility =
+            if (showOnePedal || showAdas) View.VISIBLE else View.GONE
+
         reselectTabs?.invoke()
     }
 
@@ -162,10 +341,16 @@ class ShortcutsFragment : Fragment() {
      * visible, l'onglet disparaît et l'écran redevient une page unique.
      */
     private fun bindCategoryRail(view: View) {
+        // « Boutons » et « Actions » ne sont plus deux onglets mais deux sections d'une même
+        // page : leurs conteneurs existent toujours, on les réunit sous page_sc_classic. Rien
+        // de leur câblage n'a bougé.
         val tabs = listOf(
-            view.findViewById<MaterialButton>(R.id.btn_sc_cat_buttons) to view.findViewById<ViewGroup>(R.id.page_sc_buttons),
-            view.findViewById<MaterialButton>(R.id.btn_sc_cat_actions) to view.findViewById<ViewGroup>(R.id.page_sc_actions)
+            view.findViewById<MaterialButton>(R.id.btn_sc_cat_classic)  to view.findViewById<ViewGroup>(R.id.page_sc_classic),
+            view.findViewById<MaterialButton>(R.id.btn_sc_cat_advanced) to view.findViewById<ViewGroup>(R.id.page_sc_advanced),
+            view.findViewById<MaterialButton>(R.id.btn_sc_sub_list)     to view.findViewById<ViewGroup>(R.id.page_sc_list)
         )
+        val btnSubList = tabs[2].first
+        setupAdvancedShortcuts(view)
         val scroll = view.findViewById<ScrollView>(R.id.scroll_shortcuts)
         // Le rail reprend l'accent des deux autres écrans refondus (dash_accent), pas l'accent vert
         // propre aux boutons de cet écran : c'est le même composant de navigation partout.
@@ -193,6 +378,11 @@ class ShortcutsFragment : Fragment() {
                 btn.setTextColor(if (on) railOn else textOff)
                 btn.strokeColor = ColorStateList.valueOf(if (on) railOn else border)
             }
+            // La sous-entrée n'apparaît que dans son contexte : sur l'onglet avancé ou sur
+            // elle-même. Ailleurs elle encombrerait le rail sans rien vouloir dire.
+            val dansAvance = tabs[1].second.visibility == View.VISIBLE ||
+                             tabs[2].second.visibility == View.VISIBLE
+            btnSubList.visibility = if (dansAvance) View.VISIBLE else View.GONE
         }
 
         tabs.forEach { (btn, page) ->

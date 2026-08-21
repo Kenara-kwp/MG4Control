@@ -398,4 +398,27 @@
     <string name="data_usage_unavailable">Indisponible</string>
     <string name="data_usage_today">Aujourd\'hui</string>
     <string name="data_usage_week">Semaine en cours</string>
+
+    <!-- Raccourcis avances (service d accessibilite) -->
+    <string name="shortcuts_cat_advanced">Avancés</string>
+    <string name="adv_sc_title">Raccourcis avancés</string>
+    <string name="adv_sc_desc">Permet à MG4Control de voir les touches du volant avant le launcher. Nécessite d\'activer le service d\'accessibilité.</string>
+    <string name="adv_sc_service_desc">Permet d\'utiliser les touches du volant comme raccourcis MG4Control.</string>
+    <string name="adv_sc_open_accessibility">Activer l\'accessibilité</string>
+    <string name="adv_sc_status_on">Service actif</string>
+    <string name="adv_sc_status_off">Service inactif</string>
+    <string name="adv_sc_record">Enregistrer une touche</string>
+    <string name="adv_sc_recording">Appuyez sur une touche du volant…</string>
+    <string name="adv_sc_cancel">Annuler</string>
+    <string name="adv_sc_last_key">Dernière touche détectée</string>
+    <string name="adv_sc_none">aucune</string>
+    <string name="shortcuts_cat_classic">Raccourcis</string>
+    <string name="adv_sc_list_title">Liste des raccourcis</string>
+    <string name="adv_sc_new">Nouveau raccourci</string>
+    <string name="adv_sc_step_key">1 · Touche</string>
+    <string name="adv_sc_step_press">2 · Type d\'appui</string>
+    <string name="adv_sc_step_action">3 · Fonction</string>
+    <string name="adv_sc_empty">Aucun raccourci avancé enregistré.</string>
+    <string name="adv_sc_claimed_warning">Cette touche sera retirée au launcher, y compris pour le type d\'appui non attribué.</string>
+    <string name="adv_sc_delete">Suppr.</string>
 </resources>

@@ -53,6 +53,11 @@ class MG4ControlService : Service() {
         // Intent action broadcast par le système SAIC pour les touches physiques
         private const val HARDKEY_ACTION   = "com.saic.keyevent.hardkey.report"
 
+        /** Raccourcis avancés (service d'accessibilité) — intent EXPLICITE, jamais exporté. */
+        const val ACTION_ADV_SHORTCUT = "com.mg4.control.internal.ADV_SHORTCUT"
+        const val EXTRA_ADV_ACTION    = "adv_action"
+        const val EXTRA_ADV_SLOT      = "adv_slot"
+
         /**
          * [T-902] Permission exigée de l'ÉMETTEUR du broadcast hardkey. Déclarée en
          * protectionLevel="signature" dans le Manifest : seule une app signée avec la clé
@@ -160,10 +165,33 @@ class MG4ControlService : Service() {
         AppLogger.i(TAG, "onStartCommand")
         // Relais de l'API externe (issue #79) : traité AVANT la routine de démarrage, sinon un
         // simple appel tiers relancerait l'application du profil par défaut à chaque commande.
+        if (handleAdvancedShortcutIntent(intent)) return START_STICKY
         if (handleExternalApiIntent(intent)) return START_STICKY
         tryClimateAutomation("démarrage service")
         scheduleDefaultProfileOnce()
         return START_STICKY
+    }
+
+    /**
+     * Exécute une action déclenchée par [com.mg4.control.accessibility.KeyCaptureService].
+     *
+     * Volontairement séparé du relais de l'API externe : celui-ci est verrouillé par
+     * l'interrupteur des Réglages, alors qu'un raccourci avancé est déclenché par une touche
+     * physique que l'utilisateur a lui-même enregistrée. Passer par la même porte aurait rendu
+     * les raccourcis avancés inopérants tant que l'API tierce est désactivée — c'est-à-dire par
+     * défaut. L'intent est explicite (Intent(ctx, MG4ControlService)), donc non exposé.
+     */
+    private fun handleAdvancedShortcutIntent(intent: Intent?): Boolean {
+        if (intent?.action != ACTION_ADV_SHORTCUT) return false
+        val nom = intent.getStringExtra(EXTRA_ADV_ACTION).orEmpty()
+        val sc = ShortcutAction.values().firstOrNull { it.name == nom }
+        if (sc == null || sc == ShortcutAction.NONE) {
+            AppLogger.w(TAG, "raccourci avancé : action inconnue '$nom'")
+            return true
+        }
+        AppLogger.i(TAG, "raccourci avancé → ${sc.name}")
+        executeToggle(sc, intent.getStringExtra(EXTRA_ADV_SLOT).orEmpty())
+        return true
     }
 
     /**
