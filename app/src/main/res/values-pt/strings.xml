@@ -417,6 +417,8 @@
     <string name="adv_sc_step_press">2 · Tipo de pressão</string>
     <string name="adv_sc_step_action">3 · Função</string>
     <string name="adv_sc_empty">Nenhum atalho avançado registado.</string>
-    <string name="adv_sc_claimed_warning">Esta tecla será retirada ao launcher, incluindo para o tipo de pressão não atribuído.</string>
+    <string name="adv_sc_claimed_warning">A tecla atribuída deixa de poder ser usada para outra coisa além do MG4Control, até apagar o atalho em « LISTA DE ATALHOS ».</string>
     <string name="adv_sc_delete">Apagar</string>
+    <string name="adv_sc_status_label">Estado do serviço</string>
+    <string name="adv_sc_saved">Atalho guardado</string>
 </resources>

@@ -97,7 +97,7 @@ class KeyCaptureService : AccessibilityService() {
             putExtra(MG4ControlService.EXTRA_ADV_ACTION, action.name)
             // Clé de bascule propre aux raccourcis avancés : sans elle, une action à deux états
             // partagerait son état avec le bouton classique du même nom.
-            putExtra(MG4ControlService.EXTRA_ADV_SLOT, "adv_${code}_${if (long) "long" else "single"}")
+            putExtra(MG4ControlService.EXTRA_ADV_SLOT, AdvancedShortcuts.slotKey(code, long))
         }
         runCatching { startForegroundService(i) }
             .onFailure { AppLogger.w(TAG, "relais impossible : ${it.message}") }

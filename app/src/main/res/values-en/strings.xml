@@ -417,6 +417,8 @@
     <string name="adv_sc_step_press">2 · Press type</string>
     <string name="adv_sc_step_action">3 · Function</string>
     <string name="adv_sc_empty">No advanced shortcut recorded.</string>
-    <string name="adv_sc_claimed_warning">This key will be taken from the launcher, including for the press type you leave unassigned.</string>
+    <string name="adv_sc_claimed_warning">The assigned key can no longer be used for anything other than MG4Control, until the shortcut is deleted from « SHORTCUT LIST ».</string>
     <string name="adv_sc_delete">Delete</string>
+    <string name="adv_sc_status_label">Service status</string>
+    <string name="adv_sc_saved">Shortcut saved</string>
 </resources>

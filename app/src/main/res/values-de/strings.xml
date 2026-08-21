@@ -417,6 +417,8 @@
     <string name="adv_sc_step_press">2 · Druckart</string>
     <string name="adv_sc_step_action">3 · Funktion</string>
     <string name="adv_sc_empty">Kein erweitertes Kürzel gespeichert.</string>
-    <string name="adv_sc_claimed_warning">Diese Taste wird dem Launcher entzogen, auch für die nicht zugewiesene Druckart.</string>
+    <string name="adv_sc_claimed_warning">Die zugewiesene Taste kann nur noch für MG4Control verwendet werden, bis das Kürzel unter « KÜRZELLISTE » gelöscht wird.</string>
     <string name="adv_sc_delete">Löschen</string>
+    <string name="adv_sc_status_label">Dienststatus</string>
+    <string name="adv_sc_saved">Kürzel gespeichert</string>
 </resources>

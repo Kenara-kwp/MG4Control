@@ -71,9 +71,26 @@ object AdvancedShortcuts {
             .edit().putInt(cle(keyCode, longPress), action.id).apply()
     }
 
+    /**
+     * Clé d'emplacement transmise au service principal, qui s'en sert pour retrouver
+     * `shortcut_<slot>_custom_app` et `shortcut_<slot>_profile_id`.
+     *
+     * ⚠️ Centralisée à dessein : l'écran d'édition ÉCRIT ces deux réglages et
+     * [KeyCaptureService] transmet la clé qui les fera RELIRE. Deux constructions séparées de
+     * la même chaîne finiraient par diverger, et le raccourci ouvrirait alors « rien ».
+     */
+    fun slotKey(keyCode: Int, longPress: Boolean) =
+        "adv_${keyCode}_${if (longPress) "long" else "single"}"
+
     fun remove(context: Context, keyCode: Int, longPress: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().remove(cle(keyCode, longPress)).apply()
+        // Retirer aussi l'app et le profil associés : les laisser derrière ferait resurgir un
+        // ancien choix si la même touche était réattribuée plus tard à la même action.
+        val slot = slotKey(keyCode, longPress)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .remove(cle(keyCode, longPress))
+            .remove("shortcut_${slot}_custom_app")
+            .remove("shortcut_${slot}_profile_id")
+            .apply()
     }
 
     /** Action attribuée à ce couple, ou null. */

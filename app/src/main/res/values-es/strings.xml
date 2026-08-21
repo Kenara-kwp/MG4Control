@@ -417,6 +417,8 @@
     <string name="adv_sc_step_press">2 · Tipo de pulsación</string>
     <string name="adv_sc_step_action">3 · Función</string>
     <string name="adv_sc_empty">Ningún atajo avanzado registrado.</string>
-    <string name="adv_sc_claimed_warning">Esta tecla se retirará al launcher, incluso para el tipo de pulsación sin asignar.</string>
+    <string name="adv_sc_claimed_warning">La tecla asignada ya no podrá usarse para nada más que MG4Control, hasta que se borre el atajo en « LISTA DE ATAJOS ».</string>
     <string name="adv_sc_delete">Borrar</string>
+    <string name="adv_sc_status_label">Estado del servicio</string>
+    <string name="adv_sc_saved">Atajo guardado</string>
 </resources>

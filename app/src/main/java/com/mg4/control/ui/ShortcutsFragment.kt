@@ -17,6 +17,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.Switch
+import android.widget.Toast
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
@@ -182,12 +183,10 @@ class ShortcutsFragment : Fragment() {
         val btnLong   = view.findViewById<MaterialButton>(R.id.btn_adv_press_long)
         val spinner = view.findViewById<Spinner>(R.id.spinner_adv_action)
 
-        // Actions écartées : elles réclament une configuration par emplacement (quelle app,
-        // quel profil) que le système avancé ne stocke pas encore. Les proposer donnerait un
-        // raccourci qui ne ferait rien. PROFILE_PICKER reste, lui n'a besoin de rien.
-        val actionsAvancees = baseActionItems.filter {
-            it.action != ShortcutAction.OPEN_CUSTOM_APP && it.action != ShortcutAction.APPLY_PROFILE
-        }
+        // Toutes les actions sont proposées. « Ouvrir une app » et « Appliquer un profil »
+        // réclament un choix supplémentaire : il est demandé juste après, et le raccourci n'est
+        // enregistré QUE si ce choix aboutit — sinon on créerait un raccourci qui ne fait rien.
+        val actionsAvancees = baseActionItems
         spinner.adapter = ArrayAdapter(
             requireContext(), android.R.layout.simple_spinner_dropdown_item,
             actionsAvancees.map { it.label }
@@ -211,6 +210,10 @@ class ShortcutsFragment : Fragment() {
         fun majEtat() {
             val serviceOn = KeyCaptureService.isEnabled(requireContext())
             status.setText(if (serviceOn) R.string.adv_sc_status_on else R.string.adv_sc_status_off)
+            // Le bouton disparait une fois le service accorde : il n'a plus rien a demander.
+            // Desactiver la fonctionnalite passe par l'interrupteur ci-dessus, pas par les
+            // reglages Android — au repos le service ne consomme aucune touche.
+            btnAcc.visibility = if (serviceOn) View.GONE else View.VISIBLE
             // Enregistrer n'a aucun sens tant que le service ne tourne pas : rien n'arriverait,
             // et l'utilisateur croirait que sa touche n'est pas reconnue.
             val utilisable = serviceOn && sw.isChecked
@@ -266,13 +269,29 @@ class ShortcutsFragment : Fragment() {
                 val touche = toucheChoisie ?: return
                 val action = actionsAvancees.getOrNull(pos)?.action ?: return
                 if (action == ShortcutAction.NONE) return
-                AdvancedShortcuts.set(requireContext(), touche, appuiLong, action)
-                AppLogger.i("MG4_KEYCAP", "raccourci avancé enregistré : touche=$touche " +
-                    "${if (appuiLong) "long" else "simple"} → ${action.name}")
-                toucheChoisie = null
-                tvKey.setText(R.string.adv_sc_none)
-                spinner.setSelection(0, false)
-                refreshAdvancedList(view)
+
+                val enregistrer = {
+                    AdvancedShortcuts.set(requireContext(), touche, appuiLong, action)
+                    AppLogger.i("MG4_KEYCAP", "raccourci avancé enregistré : touche=$touche " +
+                        "${if (appuiLong) "long" else "simple"} → ${action.name}")
+                    // Sans retour explicite, la remise a zero du formulaire ressemble a une perte
+                    // de saisie plutot qu'a une confirmation.
+                    Toast.makeText(requireContext(), R.string.adv_sc_saved, Toast.LENGTH_SHORT).show()
+                    toucheChoisie = null
+                    tvKey.setText(R.string.adv_sc_none)
+                    spinner.setSelection(0, false)
+                    refreshAdvancedList(view)
+                }
+
+                // Le second choix conditionne l'enregistrement : annuler laisse le formulaire
+                // en l'état plutôt que de créer un raccourci sans cible.
+                when (action) {
+                    ShortcutAction.OPEN_CUSTOM_APP ->
+                        choisirAppAvancee(AdvancedShortcuts.slotKey(touche, appuiLong), enregistrer)
+                    ShortcutAction.APPLY_PROFILE ->
+                        choisirProfilAvance(AdvancedShortcuts.slotKey(touche, appuiLong), enregistrer)
+                    else -> enregistrer()
+                }
             }
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
@@ -280,6 +299,67 @@ class ShortcutsFragment : Fragment() {
         majAppui()
         majEtat()
         advancedRefresh = ::majEtat
+    }
+
+    /**
+     * Sélecteurs propres aux raccourcis avancés.
+     *
+     * Volontairement distincts de [showAppPickerDialog] / [showProfilePickerDialog] : ceux-là
+     * rafraîchissent les spinners de l'écran classique et remettraient un emplacement à NONE en
+     * cas d'annulation. Les réutiliser ici aurait modifié les raccourcis classiques au passage.
+     */
+    private fun choisirAppAvancee(slot: String, apres: () -> Unit) {
+        val pm = requireContext().packageManager
+        val apps = pm.queryIntentActivities(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
+        ).sortedBy { it.loadLabel(pm).toString().lowercase() }
+        val libelles = apps.map { it.loadLabel(pm).toString() }.toTypedArray()
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.shortcuts_pick_app_title)
+            .setItems(libelles) { _, i ->
+                prefs.edit()
+                    .putString("shortcut_${slot}_custom_app", apps[i].activityInfo.packageName)
+                    .apply()
+                apres()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun choisirProfilAvance(slot: String, apres: () -> Unit) {
+        val profils = ProfileManager(requireContext()).getAll()
+        if (profils.isEmpty()) {
+            Toast.makeText(requireContext(), R.string.shortcuts_no_profiles, Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.shortcuts_pick_profile_title)
+            .setItems(profils.map { it.name }.toTypedArray()) { _, i ->
+                prefs.edit().putString("shortcut_${slot}_profile_id", profils[i].id).apply()
+                apres()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /**
+     * Libellé d'une ligne de liste. Pour les deux actions à cible, on affiche la CIBLE et non
+     * l'action générique : « Waze » plutôt que « Ouvrir une app », sans quoi deux raccourcis
+     * différents seraient indiscernables.
+     */
+    private fun libelleAction(m: AdvancedShortcuts.Mapping): String {
+        val slot = AdvancedShortcuts.slotKey(m.keyCode, m.longPress)
+        val generique = baseActionItems.firstOrNull { it.action == m.action }?.label ?: m.action.name
+        return when (m.action) {
+            ShortcutAction.OPEN_CUSTOM_APP ->
+                prefs.getString("shortcut_${slot}_custom_app", null)
+                    ?.let { resolveAppLabel(it) } ?: generique
+            ShortcutAction.APPLY_PROFILE ->
+                prefs.getString("shortcut_${slot}_profile_id", null)
+                    ?.let { id -> ProfileManager(requireContext()).getById(id)?.name } ?: generique
+            else -> generique
+        }
     }
 
     /** Reconstruit la liste des raccourcis avancés. Une ligne par couple touche + type d'appui. */
@@ -297,8 +377,7 @@ class ShortcutsFragment : Fragment() {
             ligne.findViewById<TextView>(R.id.adv_item_key).text = nom
             ligne.findViewById<TextView>(R.id.adv_item_press).setText(
                 if (m.longPress) R.string.shortcuts_press_long else R.string.shortcuts_press_single)
-            ligne.findViewById<TextView>(R.id.adv_item_action).text =
-                baseActionItems.firstOrNull { it.action == m.action }?.label ?: m.action.name
+            ligne.findViewById<TextView>(R.id.adv_item_action).text = libelleAction(m)
             ligne.findViewById<View>(R.id.adv_item_delete).setOnClickListener {
                 AdvancedShortcuts.remove(requireContext(), m.keyCode, m.longPress)
                 refreshAdvancedList(view)

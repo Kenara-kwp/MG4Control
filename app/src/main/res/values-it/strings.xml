@@ -417,6 +417,8 @@
     <string name="adv_sc_step_press">2 · Tipo di pressione</string>
     <string name="adv_sc_step_action">3 · Funzione</string>
     <string name="adv_sc_empty">Nessuna scorciatoia avanzata registrata.</string>
-    <string name="adv_sc_claimed_warning">Questo tasto sarà sottratto al launcher, anche per il tipo di pressione non assegnato.</string>
+    <string name="adv_sc_claimed_warning">Il tasto assegnato non potrà più essere usato per altro che MG4Control, fino all\'eliminazione della scorciatoia in « ELENCO SCORCIATOIE ».</string>
     <string name="adv_sc_delete">Elimina</string>
+    <string name="adv_sc_status_label">Stato del servizio</string>
+    <string name="adv_sc_saved">Scorciatoia salvata</string>
 </resources>
