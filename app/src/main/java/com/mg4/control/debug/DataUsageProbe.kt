@@ -4,6 +4,7 @@ import android.app.usage.NetworkStatsManager
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.TrafficStats
+import com.mg4.control.util.DataUsage
 import java.io.File
 import java.util.Calendar
 
@@ -15,15 +16,17 @@ import java.util.Calendar
  * décompilation ne référence que des classes `android.net.*`). Il n'y a donc aucun dispatch par
  * firmware à prévoir ici, contrairement à tout le reste du projet.
  *
- * ⚠️ Ce qu'il faut trancher, et pourquoi cette sonde existe : sur ce véhicule la consommation
- * est rangée sous **Ethernet** dans les réglages Android. Or sur API 28,
- * [NetworkStatsManager.querySummaryForDevice] ne sait construire un gabarit que pour
- * `TYPE_MOBILE` et `TYPE_WIFI` — tout autre type lève une IllegalArgumentException. La voie
- * publique risque donc de ne PAS savoir lire ce qui nous intéresse, ce qui expliquerait que
- * l'app Réglages passe par `NetworkTemplate.buildTemplateEthernet()`, une API cachée.
+ * ⚠️ MESURÉ SUR VÉHICULE, ne pas re-supposer :
+ *  • le trafic passe par **Ethernet** (mobile = 0, total = 5,1 Mo depuis le démarrage) ;
+ *  • `/sys/class/net` est **illisible** — SELinux ; la voie par interface est morte ;
+ *  • la permission est accordée : MOBILE et WIFI rendent 0 SANS SecurityException ;
+ *  • `querySummaryForDevice(TYPE_ETHERNET, …)` rend **null**, il ne lève PAS d'exception.
+ *    Sur API 28 cette surcharge attrape en interne l'IllegalArgumentException de
+ *    `createTemplate()` et retourne null — d'où un NPE côté appelant si on ne teste pas ;
+ *  • `NetworkTemplate.buildTemplateEthernet()` et `INetworkStatsService` répondent.
  *
- * La sonde essaie les quatre voies et journalise ce que chacune rend, pour qu'on construise
- * ensuite sur celle qui répond réellement plutôt que sur une hypothèse.
+ * La sonde reste utile comme non-régression, et sa dernière section essaie de bout en bout la
+ * voie que [DataUsage] emploie réellement.
  */
 object DataUsageProbe {
 
@@ -35,7 +38,28 @@ object DataUsageProbe {
         trafficStats()
         networkStatsPublic(context)
         gabaritEthernetCache()
+        voieRetenue(context)
         AppLogger.i(TAG, "── fin DIAG données ──")
+    }
+
+    /** Essai de bout en bout de la voie que DataUsage utilisera reellement. */
+    private fun voieRetenue(context: Context) {
+        AppLogger.i(TAG, "— voie retenue (DataUsage) —")
+        val fin = System.currentTimeMillis()
+        listOf(
+            "mois courant" to DataUsage.startOfMonth(),
+            "30 jours"     to fin - 30L * 24 * 3600 * 1000
+        ).forEach { (libelle, debut) ->
+            val u = DataUsage.ethernet(context, debut, fin)
+            if (u == null) {
+                AppLogger.w(TAG, "  Ethernet / $libelle : ÉCHEC — repli TrafficStats nécessaire")
+            } else {
+                AppLogger.i(TAG, "  Ethernet / $libelle : ${DataUsage.format(u.total)} " +
+                    "(rx=${DataUsage.format(u.rx)} tx=${DataUsage.format(u.tx)}) via ${u.source}")
+            }
+        }
+        val boot = DataUsage.sinceBoot()
+        AppLogger.i(TAG, "  repli : ${DataUsage.format(boot.total)} via ${boot.source}")
     }
 
     private fun fmt(octets: Long): String = when {
@@ -120,9 +144,17 @@ object DataUsageProbe {
         types.forEach { (nom, type) ->
             fenetres.forEach { (libelle, debut) ->
                 try {
+                    // API 28 : cette surcharge attrape l IllegalArgumentException de
+                    // createTemplate() et rend NULL au lieu de la propager. Un type non
+                    // supporté (ETHERNET) arrive donc ici en bucket null, pas en exception.
                     val b = nsm.querySummaryForDevice(type, null, debut, fin)
-                    AppLogger.i(TAG, "  $nom / $libelle : rx=${fmt(b.rxBytes)} tx=${fmt(b.txBytes)} " +
-                        "→ ${fmt(b.rxBytes + b.txBytes)}")
+                    if (b == null) {
+                        AppLogger.w(TAG, "  $nom / $libelle : bucket null — type non supporté " +
+                            "par la surcharge publique")
+                    } else {
+                        AppLogger.i(TAG, "  $nom / $libelle : rx=${fmt(b.rxBytes)} tx=${fmt(b.txBytes)} " +
+                            "→ ${fmt(b.rxBytes + b.txBytes)}")
+                    }
                 } catch (e: SecurityException) {
                     // Distinguer explicitement le refus de permission d'un simple zéro : les deux
                     // se ressembleraient à l'écran alors que les causes n'ont rien à voir.
