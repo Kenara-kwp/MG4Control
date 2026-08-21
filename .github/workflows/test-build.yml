@@ -4,6 +4,14 @@ name: Test build
 # Les APK sortent en artifacts du run (onglet Actions → run → section Artifacts).
 # L'OTA interroge /releases/latest, qui ignore artifacts, drafts et prereleases :
 # ce workflow ne peut donc PAS perturber les mises à jour des utilisateurs.
+#
+# NOMMAGE — la version dérive de la DERNIÈRE beta publiée : "2.6.6-beta.13.test.42".
+# Ce format n'est pas cosmétique, il conditionne l'OTA du testeur :
+#   • il est POSTÉRIEUR à beta.13 (plus d'identifiants à préfixe égal) → s'installe par-dessus ;
+#   • il reste ANTÉRIEUR à beta.14 (13 < 14 au 2ᵉ identifiant) → la prochaine beta publique est
+#     toujours proposée.
+# ⚠️ Ne PAS simplifier en "2.6.6-test.42" : "test" > "beta" alphabétiquement, la beta suivante
+# paraîtrait alors plus ancienne et ne serait JAMAIS proposée.
 on:
   workflow_dispatch:
     inputs:
@@ -38,14 +46,48 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Decode platform keystore
-        if: ${{ env.MG4_KEYSTORE_BASE64 != '' }}
         run: |
+          # Sans "if:" : un secret absent sautait l'étape en silence et produisait un APK NON
+          # signé, impossible à installer par-dessus une version signée — et sans le dire.
+          if [ -z "$MG4_KEYSTORE_BASE64" ]; then
+            echo "::error::MG4_KEYSTORE_BASE64 absent : l'APK de test serait non signé."
+            exit 1
+          fi
           printf '%s' "$MG4_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > "$RUNNER_TEMP/platform.keystore"
           if [ "$(head -c1 "$RUNNER_TEMP/platform.keystore" | od -An -tx1 | tr -d ' ')" != "30" ]; then
             echo "::error::MG4_KEYSTORE_BASE64 est invalide. Recréer le secret avec : base64 -w0 platform.keystore"
             exit 1
           fi
           echo "MG4_KEYSTORE=$RUNNER_TEMP/platform.keystore" >> "$GITHUB_ENV"
+
+      # Reprend le suffixe de la dernière prerelease dont le cœur numérique correspond au
+      # versionName courant. Cœur différent = la version a été montée depuis, on repart de
+      # "beta.0" plutôt que d'hériter d'un numéro qui ne veut plus rien dire.
+      - name: Compute version from last beta
+        id: ver
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BASE=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
+          if [ -z "$BASE" ]; then
+            echo "::error::versionName introuvable dans app/build.gradle.kts"; exit 1
+          fi
+          LAST=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=50" \
+                 | jq -r '.[] | select(.prerelease==true) | .tag_name' \
+                 | sed 's/^v//' \
+                 | awk -v base="$BASE" '{ c=$0; sub(/-.*/,"",c); if (c==base) { print; exit } }')
+          if [ -n "$LAST" ]; then
+            PRE="${LAST#$BASE-}"
+            echo "Dernière beta de $BASE : $LAST"
+          else
+            PRE="beta.0"
+            echo "Aucune beta pour $BASE → repli sur beta.0"
+          fi
+          SUFFIX="-${PRE}.test.${{ github.run_number }}"
+          echo "suffix=$SUFFIX"          >> "$GITHUB_OUTPUT"
+          echo "full=${BASE}${SUFFIX}"   >> "$GITHUB_OUTPUT"
+          echo "Version de test : ${BASE}${SUFFIX}"
 
       - name: Build APK(s)
         env:
@@ -65,7 +107,8 @@ jobs:
             offline) TASKS="assembleOffline$SUFFIX" ;;
           esac
           echo "Tâches : $TASKS"
-          ./gradlew $TASKS --no-daemon
+          ./gradlew $TASKS --no-daemon \
+            -Pmg4.versionSuffix='${{ steps.ver.outputs.suffix }}'
 
       - name: Collect APKs
         run: |
@@ -73,23 +116,32 @@ jobs:
           find app/build/outputs/apk -name "*.apk" -exec cp {} dist/ \;
           ls -la dist/
 
-      # Affiche les schémas de signature réellement posés (v1 / v2 / v3) et l'empreinte du
-      # certificat. Permet de contrôler ce que produit VRAIMENT la CI, sans installer l'APK.
-      - name: Signature report
+      # /!\ --min-sdk-version 23 est OBLIGATOIRE pour que ce rapport dise la vérité : sans lui,
+      # apksigner prend le minSdk de l'APK (28), ne vérifie qu'en v3, et affiche
+      # "Verified using v1 scheme: false" sur un APK qui CONTIENT bien une signature v1.
+      - name: Verify signature schemes
         run: |
           APKSIGNER=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -1)
-          echo "apksigner : $APKSIGNER"
           for f in dist/*.apk; do
             echo "── $(basename "$f") ──"
-            "$APKSIGNER" verify --print-certs -v "$f" 2>&1 \
-              | grep -E 'Verified using v[0-9]|certificate SHA-256 digest' || echo "  (non vérifiable)"
+            "$APKSIGNER" verify --print-certs -v --min-sdk-version 23 "$f" \
+              | grep -E 'Verified using v[0-9]|certificate SHA-256 digest'
+            # Présence RÉELLE de la v1, indépendamment de ce qu'apksigner choisit de vérifier :
+            # sans elle, l'app refuse l'installation (getPackageArchiveInfo ne lit aucun
+            # certificat sur AAOS 9). Autant casser ici plutôt que de le découvrir sur la voiture.
+            if ! unzip -l "$f" | grep -qE 'META-INF/.*[.](SF|RSA|DSA|EC)$'; then
+              echo "::error::$(basename "$f") n a PAS de signature v1 (JAR)"
+              exit 1
+            fi
+            echo "  v1 (JAR) presente : OUI"
+            echo "  sha256 : $(sha256sum "$f" | cut -d' ' -f1)"
             echo
           done
 
       - name: Upload APKs (artifacts, PAS une release)
         uses: actions/upload-artifact@v4
         with:
-          name: mg4control-test-${{ inputs.variant }}-${{ inputs.build_type }}-${{ github.run_number }}
+          name: mg4control-${{ steps.ver.outputs.full }}-${{ inputs.variant }}-${{ inputs.build_type }}
           path: dist/*.apk
           retention-days: 14
           if-no-files-found: error
