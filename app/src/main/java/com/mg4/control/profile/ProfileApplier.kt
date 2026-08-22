@@ -325,12 +325,34 @@ object ProfileApplier {
      */
     private fun applySafety(profile: DrivingProfile) {
         if (!MG4Hardware.hasDrowsinessAndEsc()) return
-        val sen = MG4Hardware.setDrowsinessSensitivity(profile.appliesDrowsinessSensitivity)
-        AppLogger.i(TAG, "  DrowsinessSensitivity=${profile.appliesDrowsinessSensitivity} → $sen")
-        val dms = MG4Hardware.setDrowsiness(profile.appliesDrowsiness)
-        AppLogger.i(TAG, "  Drowsiness=${profile.appliesDrowsiness} → $dms")
-        val esc = MG4Hardware.setEsc(profile.appliesEsc)
-        AppLogger.i(TAG, "  Esc=${profile.appliesEsc} → $esc")
+
+        // ⚠️ On lit les champs BRUTS (nullables), pas les accesseurs.
+        //
+        // Les accesseurs rendent « ON » pour un profil antérieur à la fonctionnalité, ce qui
+        // paraissait sûr — forcer un organe de sécurité à ON ne peut pas nuire. C'est faux ici :
+        // l'écriture ESC est une BASCULE pilotée par une relecture. Si la propriété rend une
+        // valeur fausse au démarrage (0 alors que l'ESC est en réalité actif), viser « ON »
+        // fait écrire 1, donc INVERSE l'état et désactive l'ESC.
+        //
+        // Un profil qui n'a jamais configuré ces réglages ne doit donc rien écrire du tout —
+        // même principe que le garde-fou de [applyAeb], qui existait déjà et que j'avais omis.
+        if (profile.escEnabled == null &&
+            profile.drowsinessEnabled == null &&
+            profile.drowsinessSensitivity == null) {
+            AppLogger.i(TAG, "  ESC/somnolence — non configurés dans ce profil, skip " +
+                "(évite toute écriture involontaire sur un organe de sécurité)")
+            return
+        }
+
+        profile.drowsinessSensitivity?.let {
+            AppLogger.i(TAG, "  DrowsinessSensitivity=$it → ${MG4Hardware.setDrowsinessSensitivity(it)}")
+        }
+        profile.drowsinessEnabled?.let {
+            AppLogger.i(TAG, "  Drowsiness=$it → ${MG4Hardware.setDrowsiness(it)}")
+        }
+        profile.escEnabled?.let {
+            AppLogger.i(TAG, "  Esc=$it → ${MG4Hardware.setEsc(it)}")
+        }
     }
 
     private fun applyElk(elkMode: Int, elkSensitivity: Int, lasAudibleWarning: Boolean = true, lasVibrationReminder: Boolean = true) {

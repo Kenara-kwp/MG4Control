@@ -2213,8 +2213,21 @@ object MG4Hardware {
             return true
         }
         AppLogger.i(TAG, "  ESC SET → ${if (on) "ON" else "OFF"} " +
-            "(bascule : écriture de 1 via ${nEscSet()})")
+            "(bascule : écriture de 1 via ${nEscSet()}, état lu avant = $current)")
         val ok = writeEscRaw(1)
+        // Contrôle a posteriori. Sur une bascule, une lecture initiale fausse INVERSE le
+        // résultat : on veut donc pouvoir constater l'écart dans le log plutôt que de le
+        // découvrir au volant. Pas de nouvelle écriture — réécrire sur une bascule dont la
+        // lecture est douteuse ferait osciller l'état.
+        try { Thread.sleep(600) } catch (_: InterruptedException) {}
+        val obtenu = isEscOn()
+        if (obtenu != on) {
+            AppLogger.w(SAFE_TAG, "⚠️ ESC : cible=${if (on) "ON" else "OFF"} mais état relu=" +
+                "${obtenu ?: "illisible"} — la bascule est partie de la mauvaise lecture, " +
+                "AUCUNE réécriture (elle ferait osciller)")
+        } else {
+            AppLogger.i(SAFE_TAG, "ESC conforme après écriture : ${if (on) "ON" else "OFF"}")
+        }
         // ⚠️ Ne PAS relire immédiatement pour juger du résultat : le calculateur applique la
         // consigne avec un délai, donc une relecture collée à l'écriture rend l'ANCIENNE valeur
         // et ferait conclure à tort que la commande a échoué. On journalise seulement ce qui
