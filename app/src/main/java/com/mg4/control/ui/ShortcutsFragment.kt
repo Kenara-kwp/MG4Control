@@ -218,7 +218,8 @@ class ShortcutsFragment : Fragment() {
             // et l'utilisateur croirait que sa touche n'est pas reconnue.
             val utilisable = serviceOn && sw.isChecked
             cardRec.alpha = if (utilisable) 1f else 0.35f
-            listOf<View>(btnRec, btnSimple, btnLong, spinner).forEach { it.isEnabled = utilisable }
+            listOf<View>(btnRec, btnSimple, btnLong, spinner,
+                view.findViewById(R.id.btn_adv_create)).forEach { it.isEnabled = utilisable }
             refreshAdvancedList(view)
         }
 
@@ -262,38 +263,52 @@ class ShortcutsFragment : Fragment() {
         btnSimple.setOnClickListener { appuiLong = false; majAppui() }
         btnLong.setOnClickListener   { appuiLong = true;  majAppui() }
 
+        // La sélection ne fait plus qu'ENREGISTRER le choix. Valider ici imposait un ordre
+        // (touche puis fonction) : choisir la fonction en premier ne produisait rien du tout,
+        // pas même le sélecteur d'app ou de profil, à cause du retour anticipé.
+        var actionChoisie: ShortcutAction? = null
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                // C'est le choix de la fonction qui VALIDE : un bouton de confirmation de plus
-                // sur un écran de voiture serait une étape pour rien.
-                val touche = toucheChoisie ?: return
-                val action = actionsAvancees.getOrNull(pos)?.action ?: return
-                if (action == ShortcutAction.NONE) return
-
-                val enregistrer = {
-                    AdvancedShortcuts.set(requireContext(), touche, appuiLong, action)
-                    AppLogger.i("MG4_KEYCAP", "raccourci avancé enregistré : touche=$touche " +
-                        "${if (appuiLong) "long" else "simple"} → ${action.name}")
-                    // Sans retour explicite, la remise a zero du formulaire ressemble a une perte
-                    // de saisie plutot qu'a une confirmation.
-                    Toast.makeText(requireContext(), R.string.adv_sc_saved, Toast.LENGTH_SHORT).show()
-                    toucheChoisie = null
-                    tvKey.setText(R.string.adv_sc_none)
-                    spinner.setSelection(0, false)
-                    refreshAdvancedList(view)
-                }
-
-                // Le second choix conditionne l'enregistrement : annuler laisse le formulaire
-                // en l'état plutôt que de créer un raccourci sans cible.
-                when (action) {
-                    ShortcutAction.OPEN_CUSTOM_APP ->
-                        choisirAppAvancee(AdvancedShortcuts.slotKey(touche, appuiLong), enregistrer)
-                    ShortcutAction.APPLY_PROFILE ->
-                        choisirProfilAvance(AdvancedShortcuts.slotKey(touche, appuiLong), enregistrer)
-                    else -> enregistrer()
-                }
+                actionChoisie = actionsAvancees.getOrNull(pos)?.action?.takeIf { it != ShortcutAction.NONE }
             }
-            override fun onNothingSelected(p: AdapterView<*>?) {}
+            override fun onNothingSelected(p: AdapterView<*>?) { actionChoisie = null }
+        }
+
+        view.findViewById<MaterialButton>(R.id.btn_adv_create).setOnClickListener {
+            val touche = toucheChoisie
+            val action = actionChoisie
+            // Dire CE QUI MANQUE plutôt que de ne rien faire : c'est le silence qui rendait
+            // l'écran incompréhensible quand on s'y prenait dans l'autre sens.
+            if (touche == null) {
+                Toast.makeText(requireContext(), R.string.adv_sc_need_key, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (action == null) {
+                Toast.makeText(requireContext(), R.string.adv_sc_need_action, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val enregistrer = {
+                AdvancedShortcuts.set(requireContext(), touche, appuiLong, action)
+                AppLogger.i("MG4_KEYCAP", "raccourci avancé enregistré : touche=$touche " +
+                    "${if (appuiLong) "long" else "simple"} → ${action.name}")
+                Toast.makeText(requireContext(), R.string.adv_sc_saved, Toast.LENGTH_SHORT).show()
+                toucheChoisie = null
+                actionChoisie = null
+                tvKey.setText(R.string.adv_sc_none)
+                spinner.setSelection(0, false)
+                refreshAdvancedList(view)
+            }
+
+            // Les deux actions à cible réclament un choix supplémentaire ; annuler laisse le
+            // formulaire en l'état plutôt que de créer un raccourci sans destination.
+            when (action) {
+                ShortcutAction.OPEN_CUSTOM_APP ->
+                    choisirAppAvancee(AdvancedShortcuts.slotKey(touche, appuiLong), enregistrer)
+                ShortcutAction.APPLY_PROFILE ->
+                    choisirProfilAvance(AdvancedShortcuts.slotKey(touche, appuiLong), enregistrer)
+                else -> enregistrer()
+            }
         }
 
         majAppui()

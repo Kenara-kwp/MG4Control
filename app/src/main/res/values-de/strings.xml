@@ -185,7 +185,7 @@
     <string name="info_github_link">github.com/SliDeeN/MG4Control</string>
     <string name="info_gitlab_link">gitlab.com/SliDeeN/mg4control</string>
     <string name="info_made_with_love">Made with ❤ by SliDeeN and Claude IA</string>
-    <string name="info_special_thanks">Danke an confor1max für SWI68-Tests 🙏</string>
+    <string name="info_special_thanks">Danke an confor1max, FrAsErTaG, sixty4h, hojnikb und depippi.p für die Tests vor jeder Version 🙏</string>
     <string name="info_based_on">Basierend auf DriveHub Dort von Merth4n &amp; hotboy_ist</string>
     <string name="info_close">Schließen</string>
 
@@ -421,4 +421,7 @@
     <string name="adv_sc_delete">Löschen</string>
     <string name="adv_sc_status_label">Dienststatus</string>
     <string name="adv_sc_saved">Kürzel gespeichert</string>
+    <string name="adv_sc_create">Kürzel erstellen</string>
+    <string name="adv_sc_need_key">Zuerst eine Taste aufzeichnen</string>
+    <string name="adv_sc_need_action">Funktion wählen</string>
 </resources>

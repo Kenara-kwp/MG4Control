@@ -185,7 +185,7 @@
     <string name="info_github_link">github.com/SliDeeN/MG4Control</string>
     <string name="info_gitlab_link">gitlab.com/SliDeeN/mg4control</string>
     <string name="info_made_with_love">Made with ❤ by SliDeeN and Claude IA</string>
-    <string name="info_special_thanks">Obrigado a confor1max pelos testes SWI68 🙏</string>
+    <string name="info_special_thanks">Obrigado a confor1max, FrAsErTaG, sixty4h, hojnikb e depippi.p pelos testes antes de cada versão 🙏</string>
     <string name="info_based_on">Baseado em DriveHub Dort por Merth4n &amp; hotboy_ist</string>
     <string name="info_close">Fechar</string>
 
@@ -421,4 +421,7 @@
     <string name="adv_sc_delete">Apagar</string>
     <string name="adv_sc_status_label">Estado do serviço</string>
     <string name="adv_sc_saved">Atalho guardado</string>
+    <string name="adv_sc_create">Criar o atalho</string>
+    <string name="adv_sc_need_key">Grave primeiro uma tecla</string>
+    <string name="adv_sc_need_action">Escolha uma função</string>
 </resources>
