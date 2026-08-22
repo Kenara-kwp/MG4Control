@@ -344,14 +344,20 @@ object ProfileApplier {
             return
         }
 
-        profile.drowsinessSensitivity?.let {
-            AppLogger.i(TAG, "  DrowsinessSensitivity=$it → ${MG4Hardware.setDrowsinessSensitivity(it)}")
-        }
-        profile.drowsinessEnabled?.let {
-            AppLogger.i(TAG, "  Drowsiness=$it → ${MG4Hardware.setDrowsiness(it)}")
-        }
-        profile.escEnabled?.let {
-            AppLogger.i(TAG, "  Esc=$it → ${MG4Hardware.setEsc(it)}")
+        // ⚠️ Hors thread principal OBLIGATOIREMENT : whenKatman4Ready republie ses écouteurs
+        // via Handler(Looper.getMainLooper()), donc ce code s'exécute sur le thread UI quand le
+        // service était déjà prêt — et setEsc attend ~1 s pour confirmer l'état. Sans ce
+        // basculement, l'écran gèlerait, et seulement dans certains cas de timing.
+        applierScope.launch {
+            profile.drowsinessSensitivity?.let {
+                AppLogger.i(TAG, "  DrowsinessSensitivity=$it → ${MG4Hardware.setDrowsinessSensitivity(it)}")
+            }
+            profile.drowsinessEnabled?.let {
+                AppLogger.i(TAG, "  Drowsiness=$it → ${MG4Hardware.setDrowsiness(it)}")
+            }
+            profile.escEnabled?.let {
+                AppLogger.i(TAG, "  Esc=$it → ${MG4Hardware.setEsc(it)}")
+            }
         }
     }
 

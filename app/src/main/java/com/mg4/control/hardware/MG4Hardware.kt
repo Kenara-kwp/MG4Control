@@ -2201,39 +2201,88 @@ object MG4Hardware {
      * Refuse plutôt que de deviner quand l'état courant est illisible : sur une bascule, partir
      * d'un état supposé fait l'inverse de ce qui est demandé une fois sur deux.
      */
+    /** Nombre de lectures concordantes exigées avant d'agir sur l'ESC. */
+    private const val ESC_LECTURES = 3
+    /** Intervalle entre deux lectures, en ms. */
+    private const val ESC_INTERVALLE_MS = 300L
+    /** Délai laissé au calculateur pour appliquer la bascule avant de constater l'effet. */
+    private const val ESC_STABILISATION_MS = 600L
+
+    /**
+     * État de l'ESC confirmé par [ESC_LECTURES] lectures concordantes, ou `null` si on ne peut
+     * pas conclure.
+     *
+     * Deux raisons de renoncer, et la seconde est la plus importante :
+     *  • une lecture illisible — on ne devine pas ;
+     *  • des lectures **divergentes**, qui signifient que la voiture est en train d'agir sur
+     *    l'ESC à cet instant précis. C'est exactement le moment où il ne faut surtout pas
+     *    écrire : l'écriture est une bascule, elle s'ajouterait à celle du véhicule et
+     *    produirait l'inverse du résultat voulu.
+     */
+    private fun lireEscStable(): Boolean? {
+        val lectures = ArrayList<Boolean?>(ESC_LECTURES)
+        repeat(ESC_LECTURES) { i ->
+            if (i > 0) try { Thread.sleep(ESC_INTERVALLE_MS) } catch (_: InterruptedException) {}
+            lectures.add(isEscOn())
+        }
+        if (lectures.any { it == null }) {
+            AppLogger.w(SAFE_TAG, "ESC : lecture illisible ($lectures) — aucune action")
+            return null
+        }
+        val distinctes = lectures.distinct()
+        if (distinctes.size > 1) {
+            AppLogger.w(SAFE_TAG, "ESC : lectures DIVERGENTES ($lectures) — la voiture agit " +
+                "en ce moment, on renonce plutôt que de s'ajouter à sa bascule")
+            return null
+        }
+        return distinctes.first()
+    }
+
+    /**
+     * Active ou désactive l'ESC.
+     *
+     * ⚠️ L'écriture est un CYCLE, pas une consigne : vérifié sur cinq chemins de l'UI d'origine,
+     * deux firmwares et deux API différentes — la valeur écrite est **toujours 1**, pour allumer
+     * comme pour éteindre. Il n'existe aucune voie à valeur absolue. C'est donc la lecture
+     * préalable, et elle seule, qui détermine le sens de l'action.
+     *
+     * D'où le protocole : on n'agit QUE si [ESC_LECTURES] lectures concordantes diffèrent de la
+     * cible. Toute incertitude — lecture illisible ou instable — vaut abstention. Le véhicule
+     * remet l'ESC sur ON à chaque démarrage ; ne rien faire est donc toujours sans danger,
+     * contrairement à une écriture au mauvais moment.
+     *
+     * ⚠️ BLOQUE environ une seconde : à n'appeler QUE hors du thread principal.
+     */
     fun setEsc(on: Boolean): Boolean {
         if (!hasDrowsinessAndEsc()) return false
-        val current = isEscOn()
-        if (current == null) {
-            AppLogger.w(TAG, "  ESC SET refusé — état courant illisible")
+        // Garde explicite : whenKatman4Ready republie ses écouteurs sur le Looper principal,
+        // donc un appelant distrait arriverait ici sur le thread UI et gèlerait l'écran.
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            AppLogger.w(SAFE_TAG, "setEsc refusé — appelé sur le thread UI alors qu'il attend " +
+                "~1 s. L'appelant doit basculer sur un contexte IO.")
             return false
         }
-        if (current == on) {
-            AppLogger.i(TAG, "  ESC déjà ${if (on) "ON" else "OFF"} — aucune écriture")
+
+        val stable = lireEscStable() ?: return false
+        if (stable == on) {
+            AppLogger.i(SAFE_TAG, "ESC déjà ${if (on) "ON" else "OFF"} (confirmé " +
+                "$ESC_LECTURES fois) — aucune écriture")
             return true
         }
-        AppLogger.i(TAG, "  ESC SET → ${if (on) "ON" else "OFF"} " +
-            "(bascule : écriture de 1 via ${nEscSet()}, état lu avant = $current)")
+
+        AppLogger.i(SAFE_TAG, "ESC → ${if (on) "ON" else "OFF"} : état confirmé=$stable, " +
+            "bascule via ${nEscSet()} (écriture de 1)")
         val ok = writeEscRaw(1)
-        // Contrôle a posteriori. Sur une bascule, une lecture initiale fausse INVERSE le
-        // résultat : on veut donc pouvoir constater l'écart dans le log plutôt que de le
-        // découvrir au volant. Pas de nouvelle écriture — réécrire sur une bascule dont la
-        // lecture est douteuse ferait osciller l'état.
-        try { Thread.sleep(600) } catch (_: InterruptedException) {}
+
+        try { Thread.sleep(ESC_STABILISATION_MS) } catch (_: InterruptedException) {}
         val obtenu = isEscOn()
         if (obtenu != on) {
             AppLogger.w(SAFE_TAG, "⚠️ ESC : cible=${if (on) "ON" else "OFF"} mais état relu=" +
-                "${obtenu ?: "illisible"} — la bascule est partie de la mauvaise lecture, " +
-                "AUCUNE réécriture (elle ferait osciller)")
+                "${obtenu ?: "illisible"} — AUCUNE réécriture (elle ferait osciller)")
         } else {
             AppLogger.i(SAFE_TAG, "ESC conforme après écriture : ${if (on) "ON" else "OFF"}")
         }
-        // ⚠️ Ne PAS relire immédiatement pour juger du résultat : le calculateur applique la
-        // consigne avec un délai, donc une relecture collée à l'écriture rend l'ANCIENNE valeur
-        // et ferait conclure à tort que la commande a échoué. On journalise seulement ce qui
-        // est certain ici ; l'état réel est constaté par la relecture différée de l'écran.
-        AppLogger.i(SAFE_TAG, "ESC : écriture de 1 (cible ${if (on) "ON" else "OFF"}) → $ok")
-        return ok
+        return ok && obtenu == on
     }
 
     // ── Sonde somnolence / sensibilité / ESC (bouton Diagnostic) ──────────────
