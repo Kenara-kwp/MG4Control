@@ -425,4 +425,14 @@
     <string name="adv_sc_need_key">Grave primeiro uma tecla</string>
     <string name="adv_sc_need_action">Escolha uma função</string>
     <string name="adv_sc_record_cancelled">Gravação cancelada</string>
+
+    <!-- Nouvelles actions de raccourci -->
+    <string name="shortcuts_action_esc">ESC (ON/OFF)</string>
+    <string name="shortcuts_action_drowsiness">Sonolência (ON/OFF)</string>
+    <string name="shortcuts_action_drowsiness_sen">Sonolência: sensibilidade</string>
+    <string name="shortcuts_action_hvac_toggle">Clima (ON/OFF)</string>
+    <string name="shortcuts_action_hvac_temp_up">Clima: temperatura +</string>
+    <string name="shortcuts_action_hvac_temp_down">Clima: temperatura -</string>
+    <string name="shortcuts_action_hvac_fan_up">Clima: ventilação +</string>
+    <string name="shortcuts_action_hvac_fan_down">Clima: ventilação -</string>
 </resources>

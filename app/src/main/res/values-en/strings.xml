@@ -425,4 +425,14 @@
     <string name="adv_sc_need_key">Record a key first</string>
     <string name="adv_sc_need_action">Choose a function</string>
     <string name="adv_sc_record_cancelled">Recording cancelled</string>
+
+    <!-- Nouvelles actions de raccourci -->
+    <string name="shortcuts_action_esc">ESC (ON/OFF)</string>
+    <string name="shortcuts_action_drowsiness">Drowsiness (ON/OFF)</string>
+    <string name="shortcuts_action_drowsiness_sen">Drowsiness: sensitivity</string>
+    <string name="shortcuts_action_hvac_toggle">Climate (ON/OFF)</string>
+    <string name="shortcuts_action_hvac_temp_up">Climate: temperature +</string>
+    <string name="shortcuts_action_hvac_temp_down">Climate: temperature -</string>
+    <string name="shortcuts_action_hvac_fan_up">Climate: fan +</string>
+    <string name="shortcuts_action_hvac_fan_down">Climate: fan -</string>
 </resources>

@@ -14,7 +14,19 @@ enum class ShortcutAction(val id: Int) {
     TSR_TOGGLE(10),
     APPLY_PROFILE(11),
     PROFILE_PICKER(12),
-    VEHICLE_POWER_OFF(13);
+    VEHICLE_POWER_OFF(13),
+
+    // Actions « lues puis écrites » : elles interrogent le véhicule à chaque pression plutôt
+    // que de suivre un état mémorisé. Indispensable ici — l'utilisateur peut agir sur la clim
+    // ou l'ESC depuis l'écran d'origine, un état gardé en mémoire dériverait aussitôt.
+    ESC_TOGGLE(14),
+    DROWSINESS_TOGGLE(15),
+    DROWSINESS_SEN_CYCLE(16),
+    HVAC_TOGGLE(17),
+    HVAC_TEMP_UP(18),
+    HVAC_TEMP_DOWN(19),
+    HVAC_FAN_UP(20),
+    HVAC_FAN_DOWN(21);
 
     companion object {
         fun fromId(id: Int) = values().firstOrNull { it.id == id } ?: NONE
