@@ -26,7 +26,19 @@ enum class ShortcutAction(val id: Int) {
     HVAC_TEMP_UP(18),
     HVAC_TEMP_DOWN(19),
     HVAC_FAN_UP(20),
-    HVAC_FAN_DOWN(21);
+    HVAC_FAN_DOWN(21),
+
+    // Même famille « lue puis écrite » : confort et affichage. Elles reprennent les réglages
+    // que le launcher d'origine met en accès direct, et que les raccourcis ne couvraient pas.
+    REGEN_CYCLE(22),
+    SEAT_HEAT_LEFT_CYCLE(23),
+    SEAT_HEAT_RIGHT_CYCLE(24),
+    STEERING_HEAT_TOGGLE(25),
+    DEFROST_FRONT_TOGGLE(26),
+    DEFROST_REAR_TOGGLE(27),
+    HVAC_RECIRC_CYCLE(28),
+    BRIGHTNESS_UP(29),
+    BRIGHTNESS_DOWN(30);
 
     companion object {
         fun fromId(id: Int) = values().firstOrNull { it.id == id } ?: NONE

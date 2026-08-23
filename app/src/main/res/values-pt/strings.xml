@@ -435,4 +435,26 @@
     <string name="shortcuts_action_hvac_temp_down">Clima: temperatura -</string>
     <string name="shortcuts_action_hvac_fan_up">Clima: ventilação +</string>
     <string name="shortcuts_action_hvac_fan_down">Clima: ventilação -</string>
+
+    <!-- Raccourcis : confort et affichage -->
+    <string name="shortcuts_action_regen_cycle">Regeneração: nível seguinte</string>
+    <string name="shortcuts_action_seat_heat_left">Banco esquerdo aquecido: ciclo</string>
+    <string name="shortcuts_action_seat_heat_right">Banco direito aquecido: ciclo</string>
+    <string name="shortcuts_action_steering_heat">Volante aquecido (ON/OFF)</string>
+    <string name="shortcuts_action_defrost_front">Desembaciamento dianteiro (ON/OFF)</string>
+    <string name="shortcuts_action_defrost_rear">Desembaciamento traseiro (ON/OFF)</string>
+    <string name="shortcuts_action_hvac_recirc">Recirculação: ciclo</string>
+    <string name="shortcuts_action_brightness_up">Brilho +</string>
+    <string name="shortcuts_action_brightness_down">Brilho -</string>
+
+    <!-- Liste des raccourcis avances : modification et remplacement -->
+    <string name="adv_sc_edit">Editar</string>
+    <string name="adv_sc_edit_title">Alterar a função</string>
+    <string name="adv_sc_updated">Atalho alterado</string>
+    <string name="adv_sc_press_short">Pressão curta</string>
+    <string name="adv_sc_press_long_lbl">Pressão longa</string>
+    <string name="adv_sc_key_unknown">Tecla %1$d</string>
+    <string name="adv_sc_replace_title">Botão já utilizado</string>
+    <string name="adv_sc_replace_msg">%1$s em %2$s já executa: %3$s.\n\nSubstituir pela nova função?</string>
+    <string name="adv_sc_replace_ok">Substituir</string>
 </resources>

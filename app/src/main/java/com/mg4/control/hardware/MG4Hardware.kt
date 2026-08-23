@@ -133,7 +133,9 @@ object MG4Hardware {
     // Volume média — ancien SDK (SWI133/68/165) : SmartSoundManager.getVolume/setVolume/getMaxVolume(type).
     // Même SDK systemsettings/BaseManager que GeneralManager (singleton sInstance + init(Context, listener)).
     private const val SMART_SOUND_MANAGER_CLASS = "com.saicmotor.sdk.systemsettings.SmartSoundManager"
-    private const val BRIGHTNESS_MIN_PERCENT = 5   // plancher de sécurité : ne jamais éteindre l'écran
+    // Public : le raccourci « luminosité - » doit clamper sur CE plancher pour que son log dise
+    // la vérité. Le redéfinir de son côté le ferait diverger le jour où cette valeur change.
+    const val BRIGHTNESS_MIN_PERCENT = 5   // plancher de sécurité : ne jamais éteindre l'écran
 
     // SWI69/SWI131 : accès via CarAdapterClient → queryClient(0x8) → CarVehicleSettingClient
     // Architecture réelle : CarAdapterClient se connecte à com.saicmotor.caradapter.CarAdapterService,

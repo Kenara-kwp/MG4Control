@@ -435,4 +435,26 @@
     <string name="shortcuts_action_hvac_temp_down">Klima: Temperatur -</string>
     <string name="shortcuts_action_hvac_fan_up">Klima: Gebläse +</string>
     <string name="shortcuts_action_hvac_fan_down">Klima: Gebläse -</string>
+
+    <!-- Raccourcis : confort et affichage -->
+    <string name="shortcuts_action_regen_cycle">Rekuperation: nächste Stufe</string>
+    <string name="shortcuts_action_seat_heat_left">Sitzheizung links: Wechsel</string>
+    <string name="shortcuts_action_seat_heat_right">Sitzheizung rechts: Wechsel</string>
+    <string name="shortcuts_action_steering_heat">Lenkradheizung (ON/OFF)</string>
+    <string name="shortcuts_action_defrost_front">Entfrosten vorne (ON/OFF)</string>
+    <string name="shortcuts_action_defrost_rear">Entfrosten hinten (ON/OFF)</string>
+    <string name="shortcuts_action_hvac_recirc">Umluft: Wechsel</string>
+    <string name="shortcuts_action_brightness_up">Helligkeit +</string>
+    <string name="shortcuts_action_brightness_down">Helligkeit -</string>
+
+    <!-- Liste des raccourcis avances : modification et remplacement -->
+    <string name="adv_sc_edit">Ändern</string>
+    <string name="adv_sc_edit_title">Funktion ändern</string>
+    <string name="adv_sc_updated">Verknüpfung geändert</string>
+    <string name="adv_sc_press_short">Kurzer Druck</string>
+    <string name="adv_sc_press_long_lbl">Langer Druck</string>
+    <string name="adv_sc_key_unknown">Taste %1$d</string>
+    <string name="adv_sc_replace_title">Taste bereits belegt</string>
+    <string name="adv_sc_replace_msg">%1$s bei %2$s löst bereits aus: %3$s.\n\nDurch die neue Funktion ersetzen?</string>
+    <string name="adv_sc_replace_ok">Ersetzen</string>
 </resources>

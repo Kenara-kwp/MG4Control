@@ -84,6 +84,7 @@ class ShortcutsFragment : Fragment() {
         baseActionItems = buildList {
             add(ActionItem(getString(R.string.shortcuts_action_none),           ShortcutAction.NONE))
             add(ActionItem(getString(R.string.shortcuts_action_one_pedal),      ShortcutAction.ONE_PEDAL))
+            add(ActionItem(getString(R.string.shortcuts_action_regen_cycle),    ShortcutAction.REGEN_CYCLE))
             if (isKnown) {
                 add(ActionItem(getString(R.string.shortcuts_action_aeb),        ShortcutAction.AEB_CYCLE))
             }
@@ -112,12 +113,26 @@ class ShortcutsFragment : Fragment() {
                 add(ActionItem(getString(R.string.shortcuts_action_drowsiness),      ShortcutAction.DROWSINESS_TOGGLE))
                 add(ActionItem(getString(R.string.shortcuts_action_drowsiness_sen),  ShortcutAction.DROWSINESS_SEN_CYCLE))
             }
+            // Chauffages : aucun filtre firmware, exactement comme la carte du Dashboard qui les
+            // affiche partout. Ils passent par des propriétés véhicule dont la lecture nullable
+            // tranche avant d'agir — au pire le raccourci reste sans effet, jamais une écriture
+            // à l'aveugle.
+            add(ActionItem(getString(R.string.shortcuts_action_seat_heat_left),  ShortcutAction.SEAT_HEAT_LEFT_CYCLE))
+            add(ActionItem(getString(R.string.shortcuts_action_seat_heat_right), ShortcutAction.SEAT_HEAT_RIGHT_CYCLE))
+            add(ActionItem(getString(R.string.shortcuts_action_steering_heat),   ShortcutAction.STEERING_HEAT_TOGGLE))
             if (MG4Hardware.hasClimateControl()) {
                 add(ActionItem(getString(R.string.shortcuts_action_hvac_toggle),     ShortcutAction.HVAC_TOGGLE))
                 add(ActionItem(getString(R.string.shortcuts_action_hvac_temp_up),    ShortcutAction.HVAC_TEMP_UP))
                 add(ActionItem(getString(R.string.shortcuts_action_hvac_temp_down),  ShortcutAction.HVAC_TEMP_DOWN))
                 add(ActionItem(getString(R.string.shortcuts_action_hvac_fan_up),     ShortcutAction.HVAC_FAN_UP))
                 add(ActionItem(getString(R.string.shortcuts_action_hvac_fan_down),   ShortcutAction.HVAC_FAN_DOWN))
+                add(ActionItem(getString(R.string.shortcuts_action_defrost_front),   ShortcutAction.DEFROST_FRONT_TOGGLE))
+                add(ActionItem(getString(R.string.shortcuts_action_defrost_rear),    ShortcutAction.DEFROST_REAR_TOGGLE))
+                add(ActionItem(getString(R.string.shortcuts_action_hvac_recirc),     ShortcutAction.HVAC_RECIRC_CYCLE))
+            }
+            if (MG4Hardware.hasBrightnessControl()) {
+                add(ActionItem(getString(R.string.shortcuts_action_brightness_up),   ShortcutAction.BRIGHTNESS_UP))
+                add(ActionItem(getString(R.string.shortcuts_action_brightness_down), ShortcutAction.BRIGHTNESS_DOWN))
             }
             add(ActionItem(getString(R.string.shortcuts_action_apply_profile),   ShortcutAction.APPLY_PROFILE))
             add(ActionItem(getString(R.string.shortcuts_action_profile_picker), ShortcutAction.PROFILE_PICKER))
@@ -288,8 +303,7 @@ class ShortcutsFragment : Fragment() {
                     view.removeCallbacks(finEnregistrement)
                     if (isAdded) {
                         toucheChoisie = keyCode
-                        tvKey.text = AdvancedShortcuts.nomTouche(keyCode)
-                            ?.let { "$it ($keyCode)" } ?: "$keyCode"
+                        tvKey.text = libelleTouche(keyCode)
                         btnRec.setText(R.string.adv_sc_record)
                     }
                 }
@@ -339,13 +353,34 @@ class ShortcutsFragment : Fragment() {
 
             // Les deux actions à cible réclament un choix supplémentaire ; annuler laisse le
             // formulaire en l'état plutôt que de créer un raccourci sans destination.
-            when (action) {
-                ShortcutAction.OPEN_CUSTOM_APP ->
-                    choisirAppAvancee(AdvancedShortcuts.slotKey(touche, appuiLong), enregistrer)
-                ShortcutAction.APPLY_PROFILE ->
-                    choisirProfilAvance(AdvancedShortcuts.slotKey(touche, appuiLong), enregistrer)
-                else -> enregistrer()
+            val poursuivre = {
+                when (action) {
+                    ShortcutAction.OPEN_CUSTOM_APP ->
+                        choisirAppAvancee(AdvancedShortcuts.slotKey(touche, appuiLong), enregistrer)
+                    ShortcutAction.APPLY_PROFILE ->
+                        choisirProfilAvance(AdvancedShortcuts.slotKey(touche, appuiLong), enregistrer)
+                    else -> enregistrer()
+                }
             }
+
+            // Un couple (touche, type d'appui) ne peut pas exister en double : c'est la clé de
+            // stockage elle-même. La deuxième attribution écrasait donc la première EN SILENCE
+            // — l'utilisateur croyait ajouter un raccourci, il en remplaçait un. On le dit, et
+            // on nomme la fonction perdue : sans elle, impossible de décider en connaissance.
+            val existante = AdvancedShortcuts.actionFor(requireContext(), touche, appuiLong)
+            if (existante == null) {
+                poursuivre()
+                return@setOnClickListener
+            }
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.adv_sc_replace_title)
+                .setMessage(getString(R.string.adv_sc_replace_msg,
+                    libelleTouche(touche),
+                    getString(libellePress(appuiLong)),
+                    libelleAction(AdvancedShortcuts.Mapping(touche, appuiLong, existante))))
+                .setPositiveButton(R.string.adv_sc_replace_ok) { _, _ -> poursuivre() }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
 
         majAppui()
@@ -414,6 +449,63 @@ class ShortcutsFragment : Fragment() {
         }
     }
 
+    /**
+     * Identité d'un bouton : son nom quand on le connaît, et TOUJOURS son code.
+     *
+     * Le code n'est pas décoratif — c'est lui qu'on demande dans les remontées de bug, et le
+     * seul repère pour une touche que [AdvancedShortcuts.nomTouche] ne connaît pas encore.
+     */
+    private fun libelleTouche(code: Int): String =
+        AdvancedShortcuts.nomTouche(code)?.let { "$it ($code)" }
+            ?: getString(R.string.adv_sc_key_unknown, code)
+
+    /**
+     * Vocabulaire d'appui propre aux raccourcis avancés : « court » / « long », comme les deux
+     * boutons du formulaire. L'écran classique garde le sien (Simple/Long/Double), qui doit
+     * aussi nommer le double appui.
+     */
+    private fun libellePress(long: Boolean): Int =
+        if (long) R.string.adv_sc_press_long_lbl else R.string.adv_sc_press_short
+
+    /**
+     * Change la FONCTION d'un raccourci existant, sans retoucher ni la touche ni le type
+     * d'appui — refaire les trois étapes pour corriger la seule fonction n'avait pas de raison
+     * d'être, et obligeait à réappuyer sur un bouton que le service consomme.
+     */
+    private fun modifierRaccourci(m: AdvancedShortcuts.Mapping, vue: View) {
+        // Même liste que le formulaire, filtres firmware compris : proposer ici une fonction
+        // absente du firmware fabriquerait un raccourci sans effet.
+        val choix = baseActionItems.filter { it.action != ShortcutAction.NONE }
+        val courant = choix.indexOfFirst { it.action == m.action }
+        var selection = courant
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.adv_sc_edit_title)
+            .setSingleChoiceItems(choix.map { it.label }.toTypedArray(), courant) { _, i ->
+                selection = i
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val action = choix.getOrNull(selection)?.action ?: return@setPositiveButton
+                val enregistrer = {
+                    AdvancedShortcuts.set(requireContext(), m.keyCode, m.longPress, action)
+                    AppLogger.i("MG4_KEYCAP", "raccourci avancé modifié : touche=${m.keyCode} " +
+                        "${if (m.longPress) "long" else "simple"} → ${action.name}")
+                    Toast.makeText(requireContext(), R.string.adv_sc_updated, Toast.LENGTH_SHORT).show()
+                    refreshAdvancedList(vue)
+                }
+                // Mêmes cibles à choisir que dans le formulaire : basculer sur « ouvrir une
+                // app » sans désigner laquelle donnerait un raccourci qui n'ouvre rien.
+                when (action) {
+                    ShortcutAction.OPEN_CUSTOM_APP ->
+                        choisirAppAvancee(AdvancedShortcuts.slotKey(m.keyCode, m.longPress), enregistrer)
+                    ShortcutAction.APPLY_PROFILE ->
+                        choisirProfilAvance(AdvancedShortcuts.slotKey(m.keyCode, m.longPress), enregistrer)
+                    else -> enregistrer()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     /** Reconstruit la liste des raccourcis avancés. Une ligne par couple touche + type d'appui. */
     private fun refreshAdvancedList(view: View) {
         val conteneur = view.findViewById<ViewGroup>(R.id.container_adv_list) ?: return
@@ -424,12 +516,14 @@ class ShortcutsFragment : Fragment() {
 
         items.forEach { m ->
             val ligne = layoutInflater.inflate(R.layout.item_advanced_shortcut, conteneur, false)
-            val nom = AdvancedShortcuts.nomTouche(m.keyCode)?.let { "$it (${m.keyCode})" }
-                ?: "${getString(R.string.adv_sc_step_key)} ${m.keyCode}"
-            ligne.findViewById<TextView>(R.id.adv_item_key).text = nom
-            ligne.findViewById<TextView>(R.id.adv_item_press).setText(
-                if (m.longPress) R.string.shortcuts_press_long else R.string.shortcuts_press_single)
+            // « 1 · Touche 42 » : l'ancien libellé réutilisait le titre de l'étape 1 du
+            // formulaire, numéro compris. Le nom du bouton a désormais sa propre chaîne.
+            ligne.findViewById<TextView>(R.id.adv_item_key).text = libelleTouche(m.keyCode)
+            ligne.findViewById<TextView>(R.id.adv_item_press).setText(libellePress(m.longPress))
             ligne.findViewById<TextView>(R.id.adv_item_action).text = libelleAction(m)
+            ligne.findViewById<View>(R.id.adv_item_edit).setOnClickListener {
+                modifierRaccourci(m, view)
+            }
             ligne.findViewById<View>(R.id.adv_item_delete).setOnClickListener {
                 AdvancedShortcuts.remove(requireContext(), m.keyCode, m.longPress)
                 refreshAdvancedList(view)

@@ -50,11 +50,27 @@ L'application communique avec le véhicule via le SDK propriétaire SAIC, en acc
 - **Mode de conduite** : ECO / NORMAL / SPORT / SNOW / CUSTOM
 - **Régénération** : Off / Faible / Moyen / Fort / Adaptatif / 1 Pédale
 
+### Sécurité
+- **ESC** : ON / OFF
+- **Avertissement de somnolence** : ON / OFF, avec sensibilité Faible / Standard / Élevé
+- **Anti-collision avant (AEB)** : ON / OFF, mode Alerte seule ou Alerte + Freinage, sensibilité
+- **Assistant de sortie de voie (ELK)** : Alerte / Aider / Maintien d'urgence, sensibilité, et sur
+  SWI132 l'alerte sonore et la vibration
+
+> [!WARNING]
+> Couper l'ESC coupe aussi l'anti-collision avant — c'est le véhicule qui l'impose. Les deux
+> reviennent sur ON à chaque démarrage. Dans un profil, ESC et somnolence ne sont écrits **que si
+> le profil les configure** : un profil créé avant ces réglages n'y touche pas.
+
 ### Confort
 - **Volant chauffant** : On / Off
 - **Sièges chauffants gauche et droit** : Off / Niveau 1 / 2 / 3
 - **Climatisation** : consigne de température, ventilation, marche/arrêt, A/C, AUTO,
   recirculation (intérieur / extérieur / auto), dégivrage avant et arrière
+- **Luminosité de l'écran**
+- **Volume à l'ouverture de porte** : baisse le volume média quand une porte avant s'ouvre, avec
+  choix des portes déclencheuses et restauration à la fermeture
+- **Audio** (firmwares A9) : type de son Bose, balance, fader, volume selon la vitesse
 
 ### ADAS (Assistance à la conduite)
 - **SWI133** : Off / Limiteur / Auto / ACC / ICA + alertes excès de vitesse / changement de limite
@@ -63,36 +79,69 @@ L'application communique avec le véhicule via le SDK propriétaire SAIC, en acc
 - **SWI165** : Désactiver / ACC / TJA + Anti-collision avant (AEB) On/Off + mode Alerte / Alerte+Freinage + avertissement sonore
 
 ### Raccourcis volant
-- Configuration des **boutons ★ gauche et droit**, en appui **simple** ou **long**
-- Actions disponibles : 1 Pédale, cycle ADAS, cycle anticollision, alertes sonores,
-  reconnaissance des panneaux, économie d'énergie, lancer un profil, sélecteur de profil,
-  ouvrir MG4Control, lancer une application, éteindre le véhicule
-- Réglages associés affichés **uniquement si l'action correspondante est attribuée**
-  (niveau de repli du mode 1 Pédale, crans du cycle ADAS)
-- Activation / désactivation des raccourcis avec **dialog d'avertissement**
+
+Deux systèmes coexistent, réglés dans le même écran :
+
+- **Raccourcis classiques** — boutons ★ gauche et droit, en appui simple ou long. Ils reposent sur
+  le broadcast émis par le véhicule : si le launcher officiel utilise déjà le bouton, il reste
+  prioritaire.
+- **Raccourcis avancés** — n'importe quelle touche du volant, via un **service d'accessibilité**
+  que l'utilisateur active lui-même dans Android. MG4Control voit alors la touche **avant** le
+  launcher et peut la consommer.
+
+> [!WARNING]
+> Une touche enregistrée en raccourci avancé est réclamée **en bloc**. Pour intercepter un appui
+> long il faut consommer l'appui dès son début, or à cet instant on ignore encore sa durée. Le
+> type d'appui laissé libre ne retombe donc pas sur le launcher : il ne fait rien.
+
+Actions disponibles — celles qui dépendent du firmware n'apparaissent pas sur les autres :
+
+| Catégorie | Actions |
+|---|---|
+| Conduite | 1 Pédale · Régénération : niveau suivant · Éco. énergie |
+| Sécurité | ESC · Somnolence · Somnolence : sensibilité · Système Anticollision · ADAS · Panneaux (TSR) · Alerte survitesse · Alerte changement de limite · Son |
+| Confort | Siège chauffant gauche · Siège chauffant droit · Volant chauffant · Clim ON/OFF · Clim : température ± · Clim : ventilation ± · Dégivrage avant · Dégivrage arrière · Recirculation · Luminosité ± |
+| Application et véhicule | Lancer un profil · Sélecteur de profil · Ouvrir MG4Control · Lancer une application · Éteindre la voiture |
+
+Les actions de confort et de sécurité **relisent l'état sur le véhicule à chaque pression** au lieu
+de mémoriser le leur : l'utilisateur agit aussi depuis l'écran d'origine, un état gardé en mémoire
+dériverait dès le premier usage. Un état illisible vaut abstention — rien n'est écrit à l'aveugle.
+
+La liste des raccourcis avancés affiche pour chaque ligne le **bouton** (nom et code), le **type
+d'appui**, la **fonction**, puis *Modifier* et *Supprimer*. Réattribuer un bouton déjà utilisé sur
+le même type d'appui demande confirmation et nomme la fonction qui va être remplacée.
+
+Les réglages associés à une action ne s'affichent que si cette action est réellement attribuée
+(niveau de repli du mode 1 Pédale, crans du cycle ADAS).
 
 ### Automatisation
 - **Application d'un profil selon la température extérieure** : seuil, sens
   (inférieure/supérieure), profil à appliquer, exécution directe ou popup de confirmation
 - **Déclenchement A/C via la température** : deux règles indépendantes (température supérieure /
-  inférieure), chacune avec son seuil, sa consigne, sa ventilation et ses dégivrages
+  inférieure), chacune avec son seuil, sa consigne, sa ventilation, ses dégivrages, le mode
+  automatique et la recirculation
 - Chaque automatisation est dépliable indépendamment de son interrupteur d'activation
 
 ### Gestion de profils
 - Sauvegarde jusqu'à **5 profils** personnalisés
 - Application instantanée d'un profil en un clic
 - Application automatique du profil par défaut **au démarrage du véhicule**
+- **Association Bluetooth** : un profil peut être lié à un appareil et s'applique à sa connexion
+- **Sauvegarde automatique dans la mémoire du véhicule** : elle survit à la désinstallation de
+  l'application, et une popup propose de restaurer les profils à la réinstallation
+- Précédence entre déclencheurs : manuel → température → Bluetooth → profil par défaut
 
 ### Réglages
 Écran organisé en **quatre onglets** :
 - **Langues** : français, anglais, allemand, espagnol, italien, portugais
 - **Interface** : écran affiché au démarrage, apparence (auto / sombre / clair)
 - **Réglages avancés** : application automatique du profil, vérification des mises à jour au
-  lancement, extinction du véhicule écran allumé, blocage des réglages de conduite au-delà d'une
-  vitesse donnée, **API externe** (cf. section dédiée)
-- **Infos** : vérification des mises à jour, nettoyage des APK, dialog « À propos » (version de
-  l'app, firmware, QR codes), indicateur de firmware, et bouton Diagnostic révélé par 5 clics
-  sur le logo
+  lancement, **canal bêta**, extinction du véhicule écran allumé, blocage des réglages de conduite
+  au-delà d'une vitesse donnée, **API externe** (cf. section dédiée)
+- **Infos** : vérification des mises à jour, nettoyage des APK, **consommation de données**
+  (aujourd'hui, semaine en cours, mois courant, 30 derniers jours), dialog « À propos » (version de
+  l'app, firmware, QR codes), indicateur de firmware, et bouton Diagnostic révélé par 5 clics sur
+  le logo
 
 ### Profils
 - Liste des profils avec application, définition par défaut, modification, suppression
@@ -102,7 +151,7 @@ L'application communique avec le véhicule via le SDK propriétaire SAIC, en acc
   profil ne touche pas au réglage au lieu de l'éteindre
 
 ### Compatibilité firmware inconnue (UNKNOWN)
-- Dialog d'avertissement au démarrage si le firmware n'est ni SWI133 ni SWI68
+- Dialog d'avertissement au démarrage si le firmware n'est pas reconnu
 - L'utilisateur peut fermer l'application ou continuer
 - En mode "Continuer", les pastilles de firmware (*Réglages → Infos*) deviennent cliquables pour
   forcer un mode de compatibilité
@@ -189,20 +238,33 @@ MainActivity (IHM)
 MG4Control/
 ├── app/src/main/
 │   ├── java/com/mg4/control/
-│   │   ├── MG4App.kt                  # Application — mode nuit, locale
+│   │   ├── MG4App.kt                  # Application — mode nuit, locale, journal de plantage
 │   │   ├── MainActivity.kt            # Activité principale, top bar, navigation
 │   │   │
 │   │   ├── model/
 │   │   │   ├── DrivingProfile.kt      # Modèle de données d'un profil
 │   │   │   ├── DriveMode.kt           # Enum modes de conduite (ECO/NORMAL/SPORT/SNOW/CUSTOM)
-│   │   │   └── RegenLevel.kt          # Enum niveaux de régénération
+│   │   │   ├── RegenLevel.kt          # Enum niveaux de régénération + ordre d'usage du cycle
+│   │   │   └── ProfileBackup.kt       # Format de la sauvegarde véhicule
 │   │   │
 │   │   ├── profile/
 │   │   │   ├── ProfileManager.kt      # CRUD profils (SharedPreferences + Gson)
-│   │   │   └── ProfileApplier.kt      # Application des réglages au véhicule (async)
+│   │   │   ├── ProfileApplier.kt      # Application des réglages au véhicule (async)
+│   │   │   └── ProfileBackupManager.kt# Sauvegarde / restauration en mémoire véhicule
 │   │   │
 │   │   ├── hardware/
-│   │   │   └── MG4Hardware.kt         # Abstraction matérielle (4 couches)
+│   │   │   ├── MG4Hardware.kt         # Abstraction matérielle (4 couches)
+│   │   │   └── VehicleWriteGate.kt    # Verrou de vitesse posé dans les primitives d'écriture
+│   │   │
+│   │   ├── accessibility/
+│   │   │   ├── KeyCaptureService.kt   # Service d'accessibilité — voit les touches avant le launcher
+│   │   │   └── AdvancedShortcuts.kt   # Stockage (touche, type d'appui) → action
+│   │   │
+│   │   ├── shortcut/
+│   │   │   └── ShortcutAction.kt      # Catalogue des actions, partagé par les deux systèmes
+│   │   │
+│   │   ├── bluetooth/
+│   │   │   └── BluetoothProfileManager.kt # Profil appliqué à la connexion d'un appareil
 │   │   │
 │   │   ├── api/
 │   │   │   ├── ExternalApi.kt         # Contrat de l'API externe (actions, clés, verrous)
@@ -220,7 +282,7 @@ MG4Control/
 │   │   │   ├── ProfileFragment.kt     # Liste des profils
 │   │   │   ├── ProfileEditFragment.kt # Éditeur plein écran (rail 3 catégories)
 │   │   │   ├── SettingsFragment.kt    # Réglages (rail 4 onglets)
-│   │   │   ├── ShortcutsFragment.kt   # Raccourcis volant (rail 2 onglets)
+│   │   │   ├── ShortcutsFragment.kt   # Raccourcis classiques + avancés + liste
 │   │   │   ├── AutomationFragment.kt  # Automatisations
 │   │   │   ├── AudioFragment.kt       # Audio (A9 uniquement)
 │   │   │   ├── ProfileAdapter.kt      # Adaptateur RecyclerView profils
@@ -230,37 +292,39 @@ MG4Control/
 │   │   │   └── AdasFragment.kt        # Héritage (non utilisé en v2)
 │   │   │
 │   │   ├── service/
-│   │   │   └── MG4ControlService.kt   # Service de premier plan (boot + auto-apply)
+│   │   │   ├── MG4ControlService.kt   # Service de premier plan (boot, raccourcis, API externe)
+│   │   │   ├── ProfilePickerOverlay.kt# Sélecteur de profil en fenêtre flottante
+│   │   │   └── ProfileConfirmOverlay.kt # Confirmation OUI/NON des automatisations
 │   │   │
 │   │   ├── receiver/
 │   │   │   └── BootReceiver.kt        # Récepteur de démarrage système
 │   │   │
 │   │   ├── util/
-│   │   │   ├── FirmwareInfo.kt        # Détection firmware (SWI133/SWI68/UNKNOWN) + mode forcé
+│   │   │   ├── FirmwareInfo.kt        # Détection firmware + mode forcé
 │   │   │   ├── FirmwareHelper.kt      # Lecture version firmware complète (async)
-│   │   │   └── LocaleHelper.kt        # Gestion de la langue (FR / EN)
+│   │   │   ├── LocaleHelper.kt        # Gestion de la langue (6 langues)
+│   │   │   ├── ThemeHelper.kt         # Thème auto / sombre / clair
+│   │   │   └── DataUsage.kt           # Consommation de données (interface Ethernet)
 │   │   │
-│   │   └── update/
-│   │       ├── UpdateChecker.kt       # Vérification dernière release GitHub (API)
-│   │       ├── UpdateDialogManager.kt # Dialog MAJ + DownloadManager + ouverture dossier
+│   │   ├── update/
+│   │   │   ├── UpdateChecker.kt       # Vérification des releases GitHub (stable et bêta)
+│   │   │   ├── UpdateDialogManager.kt # Dialog MAJ + DownloadManager
+│   │   │   ├── UpdateInfo.kt          # Description d'une version disponible
+│   │   │   ├── ApkSecurity.kt         # Contrôle de signature de l'APK téléchargé
+│   │   │   ├── ApkInstaller.kt        # Installation
+│   │   │   └── ApkCleanup.kt          # Nettoyage des anciens APK
 │   │   │
 │   │   └── debug/
-│   │       └── AppLogger.kt           # Buffer de logs en mémoire (400 entrées)
+│   │       ├── AppLogger.kt           # Buffer de logs en mémoire
+│   │       ├── CrashLogger.kt         # Trace de plantage écrite sur disque
+│   │       └── DataUsageProbe.kt      # Sonde de diagnostic réseau
 │   │
 │   ├── res/
-│   │   ├── layout/
-│   │   │   ├── activity_main.xml      # Top bar + NavHostFragment
-│   │   │   ├── fragment_dashboard.xml # Écran principal (conduite + climat + alertes)
-│   │   │   ├── fragment_profile.xml   # Liste des profils
-│   │   │   ├── fragment_settings.xml  # Réglages
-│   │   │   ├── item_profile.xml       # Item liste de profil
-│   │   │   ├── dialog_profile_edit.xml       # Dialog création / édition de profil
-│   │   │   ├── dialog_app_info.xml           # Dialog "À propos"
-│   │   │   └── dialog_unknown_firmware.xml   # Dialog firmware inconnu (UNKNOWN)
-│   │   ├── navigation/nav_graph.xml   # Dashboard → Profils / Réglages
-│   │   ├── values/strings.xml         # Chaînes FR
-│   │   ├── values-en/strings.xml      # Chaînes EN
-│   │   └── values/colors.xml          # Palette dash_* (dark theme)
+│   │   ├── layout/                    # Écrans, dialogs et items de liste
+│   │   ├── navigation/nav_graph.xml   # Dashboard → Profils / Réglages / Raccourcis / …
+│   │   ├── values/strings.xml         # Chaînes FR (+ values-en, -de, -es, -it, -pt)
+│   │   ├── values/colors.xml          # Palette claire
+│   │   └── values-night/colors.xml    # Palette sombre (mêmes noms de token)
 │   │
 │   └── AndroidManifest.xml
 │
@@ -325,15 +389,43 @@ data class DrivingProfile(
     val steeringHeat: Boolean,
     val seatHeatLeft: Int,      // 0–3
     val seatHeatRight: Int,     // 0–3
-    // SWI133 uniquement :
+    // Prise en compte du chauffage, décorrélée de la valeur : null ou true = appliquer
+    val steeringHeatEnabled: Boolean?,
+    val seatHeatEnabled: Boolean?,
+    // ADAS
     val overspeedAlarm: Boolean,
     val speedLimitTone: Boolean,
     val adasMode: Int,          // 0=Off 1=Lim 2=Auto 3=ACC 4=ICA
-    // SWI68 uniquement :
     val soundWarning: Boolean,
-    val swi68AdasMode: Int      // Swi68Mode.OFF / ACC / TJA
+    val swi68AdasMode: Int,     // Swi68Mode.OFF / ACC / TJA
+    val swi132LimiterConfigured: Boolean,
+    val swi132SasMode: Int,     // 0=Désactivé 2=Manuel 3=Intelligent
+    // Anti-collision avant
+    val aebEnabled: Boolean,
+    val aebMode: Int,           // 1=Alerte 2=Alerte+Freinage
+    val aebSensitivity: Int,    // 0=non configuré 1=Faible 2=Standard 3=Élevé
+    // Sortie de voie
+    val elkMode: Int,           // 0=non configuré 1=OFF 2=Alerte 3=Aider 5=Maintien
+    val elkSensitivity: Int,
+    val lasAudibleWarning: Boolean,
+    val lasVibrationReminder: Boolean,
+    // Divers
+    val energySaving: Boolean,
+    val tsrEnabled: Boolean,
+    val isDefault: Boolean,
+    // ESC / somnolence : null = non configuré, le profil n'y touche pas
+    val escEnabled: Boolean?,
+    val drowsinessEnabled: Boolean?,
+    val drowsinessSensitivity: Int?,  // 1=Faible 2=Standard 3=Élevé
+    val btDeviceMac: String?          // Appareil Bluetooth associé
 )
 ```
+
+> **Pourquoi ces champs sont nullables :** Gson n'appelle pas le constructeur Kotlin. Un défaut
+> déclaré `= true` ne s'appliquerait donc **pas** aux profils déjà enregistrés — champ absent du
+> JSON, la JVM met `false`, et l'ESC se retrouverait désactivé sur tous les anciens profils.
+> `null` signifie « profil antérieur à cette fonctionnalité », et ce sont les accesseurs qui
+> tranchent.
 
 ### Persistance
 
@@ -347,7 +439,11 @@ Les profils sont sérialisés en JSON via **Gson** et stockés dans `SharedPrefe
 3. Volant chauffant (~2 s — polling de confirmation d'état)
 4. Siège gauche (~7 s — polling par toggle)
 5. Siège droit (~7 s — polling par toggle)
-6. Attente Katman4 → ADAS (selon firmware)
+6. Attente Katman4, puis ADAS selon firmware, anti-collision avant, ESC et somnolence, sortie de voie
+
+Les réglages de sécurité sont **omis quand le profil ne les configure pas**, plutôt qu'écrits à une
+valeur par défaut : l'écriture de l'ESC est une bascule pilotée par une relecture, viser « ON » à
+partir d'une lecture douteuse le désactiverait.
 
 ---
 
@@ -377,7 +473,7 @@ persistant (nom du profil, interrupteur maître) ou en pied de page (Annuler / E
 | Dashboard | Conduite · Sécurité · Confort |
 | Éditeur de profil | Conduite · Sécurité · Confort |
 | Réglages | Langues · Interface · Réglages avancés · Infos |
-| Raccourcis | Boutons · Actions |
+| Raccourcis | Classiques · Avancés · Liste |
 
 Un onglet dont la page n'a plus aucune section visible sur le firmware courant est **masqué** —
 mieux vaut pas d'onglet qu'un onglet qui ouvre une page vide.
@@ -452,8 +548,12 @@ Ce sont des **bascules** : chaque envoi inverse l'état, il n'existe pas de « m
 
 ### `EXECUTE` — pour Tasker, adb, scripts
 
-`com.mg4.control.action.EXECUTE` avec un extra texte `action` valant l'un des noms ci-dessus, plus
-deux commandes que les actions directes ne peuvent pas couvrir :
+`com.mg4.control.action.EXECUTE` avec un extra texte `action` valant **le nom d'une action de
+raccourci**, à l'exception de celles listées ci-dessus comme hors API. Cela couvre donc bien plus
+que les quatre actions directes : `REGEN_CYCLE`, `SEAT_HEAT_LEFT_CYCLE`, `HVAC_RECIRC_CYCLE`,
+`BRIGHTNESS_UP`… — les noms exacts sont ceux de `shortcut/ShortcutAction.kt`.
+
+Deux d'entre elles réclament un extra, et ne peuvent donc pas exister en action directe :
 
 - `APPLY_PROFILE` — exige un extra `profile` : le nom du profil, insensible à la casse
 - `OPEN_CUSTOM_APP` — ouvre l'application configurée dans les raccourcis
@@ -647,36 +747,111 @@ The app communicates with the vehicle through the proprietary SAIC SDK, accessin
 - **Drive mode**: ECO / NORMAL / SPORT / SNOW / CUSTOM
 - **Regenerative braking**: Off / Low / Medium / High / Adaptive / One Pedal
 
+### Safety
+- **ESC**: ON / OFF
+- **Drowsiness warning**: ON / OFF, with Low / Standard / High sensitivity
+- **Forward collision warning (AEB)**: ON / OFF, Alert only or Alert + Braking, sensitivity
+- **Lane keeping assist (ELK)**: Alert / Assist / Emergency keeping, sensitivity, plus the audible
+  warning and vibration on SWI132
+
+> [!WARNING]
+> Turning the ESC off also turns the forward collision system off — the vehicle enforces that.
+> Both return to ON at every start-up. Inside a profile, ESC and drowsiness are written **only if
+> that profile configures them**: a profile created before these settings existed leaves them alone.
+
 ### Comfort
 - **Heated steering wheel**: On / Off
 - **Heated seats (left & right)**: Off / Level 1 / 2 / 3
 - **Climate control**: temperature setpoint, fan speed, power, A/C, AUTO, recirculation
   (inner / outside / auto), front and rear defrost
+- **Screen brightness**
+- **Door-opening volume**: lowers media volume when a front door opens, with selectable trigger
+  doors and restore on close
+- **Audio** (A9 firmwares): Bose sound type, balance, fader, speed-dependent volume
 
 ### ADAS (Advanced Driver Assistance)
 - **SWI133**: Off / Speed Limiter / Auto / ACC / ICA + overspeed alert / speed limit change alert
 - **SWI68**: Disable / ACC / TJA + audible warning On / Off
 - **SWI69 / SWI131**: Forward Collision Warning (AEB) — On / Off + mode Alert only / Alert + Emergency Braking
+- **SWI165**: Disable / ACC / TJA + Forward Collision Warning (AEB) On/Off + Alert / Alert+Braking mode + audible warning
 
 ### Steering Wheel Shortcuts
-- Configure **4 steering wheel buttons** (left/right side buttons)
-- Available actions: Drive mode / Regeneration / ADAS / **Open app**
-- Enable/disable shortcuts with a **warning dialog**
+
+Two systems live side by side, configured from the same screen:
+
+- **Classic shortcuts** — the left and right ★ buttons, short or long press. They rely on the
+  broadcast the vehicle emits: if the stock launcher already uses that button, the launcher wins.
+- **Advanced shortcuts** — any steering wheel key, through an **accessibility service** the user
+  enables themselves in Android. MG4Control then sees the key **before** the launcher and can
+  consume it.
+
+> [!WARNING]
+> A key registered as an advanced shortcut is claimed **as a whole**. Intercepting a long press
+> means consuming the press as it starts, when its duration is still unknown. The press type left
+> unassigned therefore does *not* fall back to the launcher: it simply does nothing.
+
+Available actions — those depending on the firmware do not show up on the others:
+
+| Category | Actions |
+|---|---|
+| Driving | One Pedal · Regeneration: next level · Energy saving |
+| Safety | ESC · Drowsiness · Drowsiness: sensitivity · Forward collision · ADAS · Traffic signs (TSR) · Overspeed alert · Speed limit change alert · Sound |
+| Comfort | Left seat heating · Right seat heating · Heated steering · Climate ON/OFF · Climate: temperature ± · Climate: fan ± · Front defrost · Rear defrost · Recirculation · Brightness ± |
+| App and vehicle | Apply a profile · Profile picker · Open MG4Control · Launch an app · Power the car off |
+
+Comfort and safety actions **re-read the state from the vehicle on every press** instead of
+remembering their own: the user also acts from the stock screen, so a remembered state would drift
+immediately. An unreadable state means doing nothing — nothing is ever written blind.
+
+Each row of the advanced list shows the **button** (name and code), the **press type**, the
+**action**, then *Edit* and *Delete*. Reassigning a button already used with the same press type
+asks for confirmation and names the action about to be replaced.
+
+Settings attached to an action appear only when that action is actually assigned (One Pedal
+fallback level, ADAS cycle notches).
+
+### Automation
+- **Apply a profile from the outside temperature**: threshold, direction (below/above), profile to
+  apply, direct execution or confirmation popup
+- **Temperature-triggered A/C**: two independent rules (above / below), each with its threshold,
+  setpoint, fan level, defrosters, automatic mode and recirculation
+- Each automation folds open independently of its enable switch
 
 ### Profile Management
 - Save up to **5 custom profiles**
 - Instant one-tap profile application
 - Automatic default profile application **on vehicle startup**
+- **Bluetooth pairing**: a profile can be tied to a device and applied when it connects
+- **Automatic backup into the vehicle's storage**: it survives uninstalling the app, and a popup
+  offers to restore the profiles on reinstall
+- Trigger precedence: manual → temperature → Bluetooth → default profile
 
 ### Settings
-- Language selection (French / English)
-- Enable/disable automatic profile application
-- **Auto-update**: GitHub release check + APK download to Downloads folder
-- **APK cleanup**: removes old `MGControl*.apk` files from Downloads folder
-- "About" dialog showing app version, firmware version, and GitHub QR code
+Screen organised into **four tabs**:
+- **Languages**: French, English, German, Spanish, Italian, Portuguese
+- **Interface**: screen shown at startup, appearance (auto / dark / light)
+- **Advanced**: automatic profile application, update check at launch, **beta channel**, power the
+  car off while keeping the screen on, block driving settings above a given speed, **external API**
+  (see the dedicated section)
+- **Info**: update check, APK cleanup, **data usage** (today, current week, current month, last 30
+  days), "About" dialog (app version, firmware, QR codes), firmware indicator, and a Diagnostic
+  button revealed by 5 taps on the logo
+
+### Profiles
+- Profile list with apply, set as default, edit and delete
+- **Full-screen editor** organised into three categories: Driving, Safety, Comfort
+- The profile name and the "default profile" setting stay visible across the three tabs
+- Heated steering wheel and seats have an **apply** switch: unchecked, the profile leaves the
+  setting alone instead of turning it off
+
+### Unknown firmware (UNKNOWN)
+- Warning dialog at startup when the firmware is not recognised
+- The user can close the app or continue
+- In "continue" mode the firmware chips (*Settings → Info*) become tappable to force a
+  compatibility mode
+- The forced choice is persisted in SharedPreferences and survives app restarts
 
 ---
-
 
 ## Compatibility
 
@@ -755,58 +930,93 @@ MainActivity (UI)
 MG4Control/
 ├── app/src/main/
 │   ├── java/com/mg4/control/
-│   │   ├── MG4App.kt                  # Application — night mode, locale
+│   │   ├── MG4App.kt                  # Application — night mode, locale, crash log
 │   │   ├── MainActivity.kt            # Main activity, top bar, navigation
 │   │   │
 │   │   ├── model/
 │   │   │   ├── DrivingProfile.kt      # Profile data model
 │   │   │   ├── DriveMode.kt           # Drive mode enum (ECO/NORMAL/SPORT/SNOW/CUSTOM)
-│   │   │   └── RegenLevel.kt          # Regen level enum
+│   │   │   ├── RegenLevel.kt          # Regen level enum + shortcut cycle order
+│   │   │   └── ProfileBackup.kt       # Vehicle backup format
 │   │   │
 │   │   ├── profile/
 │   │   │   ├── ProfileManager.kt      # Profile CRUD (SharedPreferences + Gson)
-│   │   │   └── ProfileApplier.kt      # Applies settings to vehicle (async)
+│   │   │   ├── ProfileApplier.kt      # Applies settings to the vehicle (async)
+│   │   │   └── ProfileBackupManager.kt# Backup / restore in vehicle storage
 │   │   │
 │   │   ├── hardware/
-│   │   │   └── MG4Hardware.kt         # Hardware abstraction (4 layers)
+│   │   │   ├── MG4Hardware.kt         # Hardware abstraction (4 layers)
+│   │   │   └── VehicleWriteGate.kt    # Speed lock, enforced inside the write primitives
+│   │   │
+│   │   ├── accessibility/
+│   │   │   ├── KeyCaptureService.kt   # Accessibility service — sees keys before the launcher
+│   │   │   └── AdvancedShortcuts.kt   # Storage for (key, press type) → action
+│   │   │
+│   │   ├── shortcut/
+│   │   │   └── ShortcutAction.kt      # Action catalogue, shared by both systems
+│   │   │
+│   │   ├── bluetooth/
+│   │   │   └── BluetoothProfileManager.kt # Profile applied when a device connects
+│   │   │
+│   │   ├── api/
+│   │   │   ├── ExternalApi.kt         # External API contract (actions, keys, locks)
+│   │   │   ├── ExternalApiReceiver.kt # Third-party intent reception
+│   │   │   └── StateProvider.kt       # State reading (ContentProvider)
+│   │   │
+│   │   ├── automation/
+│   │   │   ├── AutomationSettings.kt        # Profile from temperature
+│   │   │   ├── AutomationDecision.kt        # Pure decision (testable off-device)
+│   │   │   ├── ClimateAutomationSettings.kt # A/C triggering
+│   │   │   └── ClimateAutomationDecision.kt
 │   │   │
 │   │   ├── ui/
-│   │   │   ├── DashboardFragment.kt   # Unified main screen
-│   │   │   ├── ProfileFragment.kt     # Profile management
-│   │   │   ├── SettingsFragment.kt    # Settings & About
-│   │   │   ├── ProfileAdapter.kt      # Profile list RecyclerView adapter
+│   │   │   ├── DashboardFragment.kt   # Main screen (3-category rail)
+│   │   │   ├── ProfileFragment.kt     # Profile list
+│   │   │   ├── ProfileEditFragment.kt # Full-screen editor (3-category rail)
+│   │   │   ├── SettingsFragment.kt    # Settings (4-tab rail)
+│   │   │   ├── ShortcutsFragment.kt   # Classic + advanced shortcuts + list
+│   │   │   ├── AutomationFragment.kt  # Automations
+│   │   │   ├── AudioFragment.kt       # Audio (A9 only)
+│   │   │   ├── ProfileAdapter.kt      # Profile RecyclerView adapter
 │   │   │   ├── ConsoleFragment.kt     # Real-time debug log viewer
 │   │   │   ├── DriveRegenFragment.kt  # Legacy (unused in v2)
 │   │   │   ├── ClimateFragment.kt     # Legacy (unused in v2)
 │   │   │   └── AdasFragment.kt        # Legacy (unused in v2)
 │   │   │
 │   │   ├── service/
-│   │   │   └── MG4ControlService.kt   # Foreground service (boot + auto-apply)
+│   │   │   ├── MG4ControlService.kt   # Foreground service (boot, shortcuts, external API)
+│   │   │   ├── ProfilePickerOverlay.kt# Floating profile picker
+│   │   │   └── ProfileConfirmOverlay.kt # YES/NO confirmation for automations
 │   │   │
 │   │   ├── receiver/
 │   │   │   └── BootReceiver.kt        # System boot receiver
 │   │   │
 │   │   ├── util/
-│   │   │   ├── FirmwareInfo.kt        # Firmware generation detection (SWI133 / SWI68)
+│   │   │   ├── FirmwareInfo.kt        # Firmware detection + forced mode
 │   │   │   ├── FirmwareHelper.kt      # Full firmware version string reader (async)
-│   │   │   └── LocaleHelper.kt        # Language management (FR / EN)
+│   │   │   ├── LocaleHelper.kt        # Language management (6 languages)
+│   │   │   ├── ThemeHelper.kt         # Auto / dark / light theme
+│   │   │   └── DataUsage.kt           # Data usage (Ethernet interface)
+│   │   │
+│   │   ├── update/
+│   │   │   ├── UpdateChecker.kt       # GitHub release check (stable and beta)
+│   │   │   ├── UpdateDialogManager.kt # Update dialog + DownloadManager
+│   │   │   ├── UpdateInfo.kt          # Description of an available version
+│   │   │   ├── ApkSecurity.kt         # Signature check of the downloaded APK
+│   │   │   ├── ApkInstaller.kt        # Installation
+│   │   │   └── ApkCleanup.kt          # Old APK cleanup
 │   │   │
 │   │   └── debug/
-│   │       └── AppLogger.kt           # In-memory log ring buffer (400 entries)
+│   │       ├── AppLogger.kt           # In-memory log ring buffer
+│   │       ├── CrashLogger.kt         # Crash trace written to disk
+│   │       └── DataUsageProbe.kt      # Network diagnostic probe
 │   │
 │   ├── res/
-│   │   ├── layout/
-│   │   │   ├── activity_main.xml      # Top bar + NavHostFragment
-│   │   │   ├── fragment_dashboard.xml # Main screen (drive + climate + alerts)
-│   │   │   ├── fragment_profile.xml   # Profile list
-│   │   │   ├── fragment_settings.xml  # Settings screen
-│   │   │   ├── item_profile.xml       # Profile list item
-│   │   │   ├── dialog_profile_edit.xml# Profile create / edit dialog
-│   │   │   └── dialog_app_info.xml    # About dialog
-│   │   ├── navigation/nav_graph.xml   # Dashboard → Profiles / Settings
-│   │   ├── values/strings.xml         # French strings
-│   │   ├── values-en/strings.xml      # English strings
-│   │   └── values/colors.xml          # dash_* color palette (dark theme)
+│   │   ├── layout/                    # Screens, dialogs and list items
+│   │   ├── navigation/nav_graph.xml   # Dashboard → Profiles / Settings / Shortcuts / …
+│   │   ├── values/strings.xml         # French strings (+ values-en, -de, -es, -it, -pt)
+│   │   ├── values/colors.xml          # Light palette
+│   │   └── values-night/colors.xml    # Dark palette (same token names)
 │   │
 │   └── AndroidManifest.xml
 │
@@ -865,15 +1075,42 @@ data class DrivingProfile(
     val steeringHeat: Boolean,
     val seatHeatLeft: Int,      // 0–3
     val seatHeatRight: Int,     // 0–3
-    // SWI133 only:
+    // Whether heating is applied at all, decoupled from its value: null or true = apply
+    val steeringHeatEnabled: Boolean?,
+    val seatHeatEnabled: Boolean?,
+    // ADAS
     val overspeedAlarm: Boolean,
     val speedLimitTone: Boolean,
     val adasMode: Int,          // 0=Off 1=Limiter 2=Auto 3=ACC 4=ICA
-    // SWI68 only:
     val soundWarning: Boolean,
-    val swi68AdasMode: Int      // Swi68Mode.OFF / ACC / TJA
+    val swi68AdasMode: Int,     // Swi68Mode.OFF / ACC / TJA
+    val swi132LimiterConfigured: Boolean,
+    val swi132SasMode: Int,     // 0=Off 2=Manual 3=Smart
+    // Forward collision
+    val aebEnabled: Boolean,
+    val aebMode: Int,           // 1=Alert 2=Alert+Braking
+    val aebSensitivity: Int,    // 0=unset 1=Low 2=Standard 3=High
+    // Lane keeping
+    val elkMode: Int,           // 0=unset 1=OFF 2=Alert 3=Assist 5=Emergency
+    val elkSensitivity: Int,
+    val lasAudibleWarning: Boolean,
+    val lasVibrationReminder: Boolean,
+    // Misc
+    val energySaving: Boolean,
+    val tsrEnabled: Boolean,
+    val isDefault: Boolean,
+    // ESC / drowsiness: null = unset, the profile leaves them alone
+    val escEnabled: Boolean?,
+    val drowsinessEnabled: Boolean?,
+    val drowsinessSensitivity: Int?,  // 1=Low 2=Standard 3=High
+    val btDeviceMac: String?          // Paired Bluetooth device
 )
 ```
+
+> **Why these fields are nullable:** Gson does not call the Kotlin constructor. A declared default
+> of `= true` would therefore **not** apply to already-saved profiles — the field is missing from
+> the JSON, the JVM writes `false`, and the ESC would end up disabled on every old profile. `null`
+> means "profile older than this feature", and the accessors decide what to do.
 
 ### Persistence
 
@@ -887,7 +1124,11 @@ Profiles are serialized to JSON via **Gson** and stored in `SharedPreferences`. 
 3. Heated steering wheel (~2 s — state confirmation polling)
 4. Left seat heating (~7 s — toggle polling)
 5. Right seat heating (~7 s — toggle polling)
-6. Wait for Katman4 → ADAS (firmware-dependent)
+6. Wait for Katman4, then firmware ADAS, forward collision, ESC and drowsiness, lane keeping
+
+Safety settings are **skipped when the profile does not configure them**, rather than written to a
+default: the ESC write is a toggle driven by a prior read, so aiming for "ON" from a doubtful read
+would disable it.
 
 ---
 
@@ -917,7 +1158,7 @@ content scrolls on the right, and whatever belongs to no category stays in a per
 | Dashboard | Driving · Safety · Comfort |
 | Profile editor | Driving · Safety · Comfort |
 | Settings | Languages · Interface · Advanced · Info |
-| Shortcuts | Buttons · Actions |
+| Shortcuts | Classic · Advanced · List |
 
 A tab whose page has no visible section left on the current firmware is **hidden** — better no tab
 than a tab opening an empty page.
@@ -991,8 +1232,12 @@ paste the string into the *Action* field.
 
 ### `EXECUTE` — for Tasker, adb, scripts
 
-`com.mg4.control.action.EXECUTE` with a string extra `action` holding one of the names above, plus
-two commands the direct actions cannot cover:
+`com.mg4.control.action.EXECUTE` with a string extra `action` holding **the name of any shortcut
+action**, except the ones listed above as out of the API. That covers far more than the four direct
+actions: `REGEN_CYCLE`, `SEAT_HEAT_LEFT_CYCLE`, `HVAC_RECIRC_CYCLE`, `BRIGHTNESS_UP`… — the exact
+names are the ones in `shortcut/ShortcutAction.kt`.
+
+Two of them need an extra, and therefore cannot exist as a direct action:
 
 - `APPLY_PROFILE` — requires a `profile` extra: the profile name, case-insensitive
 - `OPEN_CUSTOM_APP` — opens the app configured in the shortcuts screen
@@ -1140,6 +1385,9 @@ adb shell pm install -r --system /sdcard/app-debug.apk
 | `CONTROL_CAR_CLIMATE` | Seat and steering wheel heating control |
 | `CAR_VENDOR_EXTENSION` | SAIC proprietary extensions |
 | `CAR_ENERGY` | Battery / powertrain information |
+| `INTERNET` | Update check (GitHub API) |
+| `DOWNLOAD_WITHOUT_NOTIFICATION` | Silent download of the update APK |
+| `WRITE_EXTERNAL_STORAGE` | Saving the APK into the Downloads folder |
 
 ---
 
@@ -1149,7 +1397,7 @@ Made with ❤ by **SliDeeN** and **Claude IA**
 
 Basé sur l'application **DriveHub Dort** développée par **Merth4n** & **hotboy_ist**
 
-Remerciements spéciaux à **confor1max** pour les tests approfondis du firmware SWI68 🙏
+Merci à **confor1max**, **FrAsErTaG**, **sixty4h**, **hojnikb** et **depippi.p** pour les tests avant chaque release 🙏
 
 [![GitHub](https://img.shields.io/badge/GitHub-SliDeeN%2FMG4Control-181717?logo=github)](https://github.com/SliDeeN/MG4Control)
 
