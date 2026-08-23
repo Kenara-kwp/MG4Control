@@ -424,4 +424,5 @@
     <string name="adv_sc_create">Criar o atalho</string>
     <string name="adv_sc_need_key">Grave primeiro uma tecla</string>
     <string name="adv_sc_need_action">Escolha uma função</string>
+    <string name="adv_sc_record_cancelled">Gravação cancelada</string>
 </resources>

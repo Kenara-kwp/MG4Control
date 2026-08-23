@@ -243,12 +243,35 @@ class ShortcutsFragment : Fragment() {
             }
         }
 
+        // L'enregistrement consomme la touche : il doit donc pouvoir être interrompu autrement
+        // qu'en appuyant sur une touche. D'où le second appui qui annule, et l'expiration
+        // automatique si l'utilisateur passe à autre chose.
+        var enregistrementEnCours = false
+        val finEnregistrement = Runnable {
+            enregistrementEnCours = false
+            KeyCaptureService.listener = null
+            if (isAdded) {
+                btnRec.setText(R.string.adv_sc_record)
+                Toast.makeText(requireContext(), R.string.adv_sc_record_cancelled,
+                    Toast.LENGTH_SHORT).show()
+            }
+        }
+
         btnRec.setOnClickListener {
+            if (enregistrementEnCours) {
+                view.removeCallbacks(finEnregistrement)
+                finEnregistrement.run()
+                return@setOnClickListener
+            }
+            enregistrementEnCours = true
+            view.postDelayed(finEnregistrement, 15_000)
             btnRec.setText(R.string.adv_sc_recording)
             KeyCaptureService.listener = { keyCode ->
                 // Le service tourne sur son propre thread : revenir à l'UI avant de toucher aux
                 // vues, et se débrancher aussitôt pour ne capter qu'une seule touche.
                 view.post {
+                    enregistrementEnCours = false
+                    view.removeCallbacks(finEnregistrement)
                     if (isAdded) {
                         toucheChoisie = keyCode
                         tvKey.text = AdvancedShortcuts.nomTouche(keyCode)

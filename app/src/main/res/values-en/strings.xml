@@ -424,4 +424,5 @@
     <string name="adv_sc_create">Create shortcut</string>
     <string name="adv_sc_need_key">Record a key first</string>
     <string name="adv_sc_need_action">Choose a function</string>
+    <string name="adv_sc_record_cancelled">Recording cancelled</string>
 </resources>

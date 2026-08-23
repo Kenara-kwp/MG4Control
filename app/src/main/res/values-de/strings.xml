@@ -424,4 +424,5 @@
     <string name="adv_sc_create">Kürzel erstellen</string>
     <string name="adv_sc_need_key">Zuerst eine Taste aufzeichnen</string>
     <string name="adv_sc_need_action">Funktion wählen</string>
+    <string name="adv_sc_record_cancelled">Aufzeichnung abgebrochen</string>
 </resources>

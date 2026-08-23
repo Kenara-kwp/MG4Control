@@ -424,4 +424,5 @@
     <string name="adv_sc_create">Crea la scorciatoia</string>
     <string name="adv_sc_need_key">Registra prima un tasto</string>
     <string name="adv_sc_need_action">Scegli una funzione</string>
+    <string name="adv_sc_record_cancelled">Registrazione annullata</string>
 </resources>

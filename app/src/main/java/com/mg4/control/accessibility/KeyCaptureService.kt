@@ -19,9 +19,11 @@ import com.mg4.control.service.MG4ControlService
  * d'accessibilité portant [AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS] voit la touche
  * AVANT l'application au premier plan, et peut la consommer en renvoyant `true` depuis [onKeyEvent].
  *
- * ⚠️ PÉRIMÈTRE DE LA CONSOMMATION, à ne pas élargir à la légère : seules les touches
- * EXPLICITEMENT enregistrées par l'utilisateur dans [AdvancedShortcuts] sont interceptées, et
- * seulement si l'interrupteur des raccourcis avancés est actif. Tout le reste traverse. Avaler une
+ * ⚠️ PÉRIMÈTRE DE LA CONSOMMATION, à ne pas élargir à la légère. Deux cas seulement :
+ *  • les touches EXPLICITEMENT enregistrées dans [AdvancedShortcuts], et uniquement si
+ *    l'interrupteur des raccourcis avancés est actif ;
+ *  • la touche pressée PENDANT un enregistrement, le temps d'un seul appui.
+ * Tout le reste traverse. Avaler une
  * touche par erreur sur une voiture est autrement plus grave que le désagrément qu'on corrige,
  * d'où ce double verrou et le try/catch qui renvoie false en cas d'imprévu.
  */
@@ -42,6 +44,9 @@ class KeyCaptureService : AccessibilityService() {
     /** Instant du DOWN par touche — sert à mesurer la durée de l'appui. */
     private val debutAppui = mutableMapOf<Int, Long>()
 
+    /** Touche en cours d'apprentissage : sert à avaler aussi la fin de son appui. */
+    private var codeEnregistre: Int? = null
+
     override fun onKeyEvent(event: KeyEvent?): Boolean {
         // Tout est encapsulé : une exception qui remonterait d'ici déciderait à notre place du
         // sort de la touche. On ne laisse jamais une erreur avaler une commande du volant.
@@ -52,10 +57,28 @@ class KeyCaptureService : AccessibilityService() {
             if (event.action == KeyEvent.ACTION_DOWN) {
                 AppLogger.i(TAG, "TOUCHE keycode=$code (${KeyEvent.keyCodeToString(code)}) " +
                     "source=${event.source} repeat=${event.repeatCount}")
-                // L'enregistrement ne consomme JAMAIS : l'utilisateur doit pouvoir apprendre une
-                // touche sans la retirer au véhicule, et sans se retrouver coincé si elle sert à
-                // quitter l'écran.
+            }
+
+            // ── Mode enregistrement : on RÉCLAME la touche le temps de l'apprendre ──
+            //
+            // Sans ça, la touche partait au système pendant qu'on la captait : appuyer sur
+            // « Accueil » basculait vers le launcher MG et l'utilisateur quittait l'écran avant
+            // d'avoir pu terminer. Autrement dit, on ne pouvait enregistrer que les touches qui
+            // ne font rien — l'inverse du besoin.
+            //
+            // Le risque de rester coincé est nul : l'enregistrement est à USAGE UNIQUE, le
+            // listener se détache dès la première touche. Une seule pression est avalée.
+            if (listener != null && event.action == KeyEvent.ACTION_DOWN) {
+                codeEnregistre = code
                 listener?.invoke(code)
+                return true
+            }
+            // Fin de l'appui en cours d'enregistrement : le listener est déjà détaché, mais il
+            // reste les répétitions et le UP. Les laisser passer livrerait au système un UP
+            // orphelin — voire une action sur la touche qu'on vient justement de capturer.
+            if (codeEnregistre == code) {
+                if (event.action == KeyEvent.ACTION_UP) codeEnregistre = null
+                return true
             }
 
             // Seules les touches explicitement enregistrées sont interceptées. Tout le reste

@@ -426,4 +426,5 @@
     <string name="adv_sc_create">Créer le raccourci</string>
     <string name="adv_sc_need_key">Enregistrez d\'abord une touche</string>
     <string name="adv_sc_need_action">Choisissez une fonction</string>
+    <string name="adv_sc_record_cancelled">Enregistrement annulé</string>
 </resources>
