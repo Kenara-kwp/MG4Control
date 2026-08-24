@@ -457,4 +457,5 @@
     <string name="adv_sc_replace_title">Button already used</string>
     <string name="adv_sc_replace_msg">%1$s on %2$s already runs: %3$s.\n\nReplace it with the new action?</string>
     <string name="adv_sc_replace_ok">Replace</string>
+    <string name="adv_sc_press_double">Double press</string>
 </resources>

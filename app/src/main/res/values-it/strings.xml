@@ -457,4 +457,5 @@
     <string name="adv_sc_replace_title">Pulsante già usato</string>
     <string name="adv_sc_replace_msg">%1$s con %2$s esegue già: %3$s.\n\nSostituire con la nuova funzione?</string>
     <string name="adv_sc_replace_ok">Sostituisci</string>
+    <string name="adv_sc_press_double">Doppia pressione</string>
 </resources>

@@ -457,4 +457,5 @@
     <string name="adv_sc_replace_title">Taste bereits belegt</string>
     <string name="adv_sc_replace_msg">%1$s bei %2$s löst bereits aus: %3$s.\n\nDurch die neue Funktion ersetzen?</string>
     <string name="adv_sc_replace_ok">Ersetzen</string>
+    <string name="adv_sc_press_double">Doppelter Druck</string>
 </resources>

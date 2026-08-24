@@ -459,4 +459,5 @@
     <string name="adv_sc_replace_title">Bouton déjà utilisé</string>
     <string name="adv_sc_replace_msg">%1$s en %2$s déclenche déjà : %3$s.\n\nRemplacer par la nouvelle fonction ?</string>
     <string name="adv_sc_replace_ok">Remplacer</string>
+    <string name="adv_sc_press_double">Double appui</string>
 </resources>

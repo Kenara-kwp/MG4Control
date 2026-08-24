@@ -3,11 +3,15 @@ package com.mg4.control.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import com.mg4.control.debug.AppLogger
 import com.mg4.control.service.MG4ControlService
+import com.mg4.control.shortcut.PressType
+import com.mg4.control.shortcut.ShortcutAction
 
 /**
  * Interception des touches volant, AVANT le launcher.
@@ -41,8 +45,19 @@ class KeyCaptureService : AccessibilityService() {
             "interrupteur=${AdvancedShortcuts.isEnabled(this)}")
     }
 
-    /** Instant du DOWN par touche — sert à mesurer la durée de l'appui. */
-    private val debutAppui = mutableMapOf<Int, Long>()
+    private val handler = Handler(Looper.getMainLooper())
+
+    /** Minuterie d'appui long en cours, par touche. */
+    private val minuterieLongue = mutableMapOf<Int, Runnable>()
+
+    /** Fenêtre de double appui ouverte, par touche : sa présence signale « un simple attend ». */
+    private val fenetreDouble = mutableMapOf<Int, Runnable>()
+
+    /** Touches dont l'appui long a déjà agi : leur relâchement ne doit plus rien déclencher. */
+    private val longDeclenche = mutableSetOf<Int>()
+
+    /** Touches dont le second appui a déjà agi : idem pour le relâchement qui suit. */
+    private val doubleDeclenche = mutableSetOf<Int>()
 
     /** Touche en cours d'apprentissage : sert à avaler aussi la fin de son appui. */
     private var codeEnregistre: Int? = null
@@ -88,20 +103,10 @@ class KeyCaptureService : AccessibilityService() {
             }
 
             when (event.action) {
-                KeyEvent.ACTION_DOWN -> {
-                    // Ne mémoriser que le PREMIER down : la répétition automatique en enverrait
-                    // d'autres et écraserait l'instant de départ, rendant tout appui « court ».
-                    if (event.repeatCount == 0) debutAppui[code] = System.currentTimeMillis()
-                }
-                KeyEvent.ACTION_UP -> {
-                    val debut = debutAppui.remove(code)
-                    val duree = if (debut == null) 0L else System.currentTimeMillis() - debut
-                    val long = duree >= AdvancedShortcuts.LONG_PRESS_MS
-                    val action = AdvancedShortcuts.actionFor(this, code, long)
-                    AppLogger.i(TAG, "touche $code réclamée — durée=${duree}ms " +
-                        "type=${if (long) "long" else "simple"} action=${action?.name ?: "aucune"}")
-                    if (action != null) declencher(action, code, long)
-                }
+                // Ne traiter que le PREMIER down : la répétition automatique en envoie d'autres
+                // tant que la touche est tenue, et relancerait la mécanique à chaque fois.
+                KeyEvent.ACTION_DOWN -> if (event.repeatCount == 0) surAppui(code)
+                KeyEvent.ACTION_UP   -> surRelachement(code)
             }
             return true   // touche réclamée : le launcher ne la verra pas
         } catch (e: Exception) {
@@ -111,16 +116,95 @@ class KeyCaptureService : AccessibilityService() {
     }
 
     /**
+     * Début d'un appui.
+     *
+     * Deux cas : soit il tombe dans la fenêtre ouverte par un appui précédent — c'est un double
+     * appui, et il part TOUT DE SUITE — soit c'est un premier appui, et on arme la minuterie de
+     * l'appui long.
+     */
+    private fun surAppui(code: Int) {
+        val fenetre = fenetreDouble.remove(code)
+        if (fenetre != null) {
+            handler.removeCallbacks(fenetre)
+            annulerLong(code)   // un second appui n'ouvre pas d'appui long
+            val action = AdvancedShortcuts.actionFor(this, code, PressType.DOUBLE)
+            AppLogger.i(TAG, "touche $code — DOUBLE appui → ${action?.name ?: "aucune"}")
+            doubleDeclenche.add(code)
+            if (action != null) declencher(action, code, PressType.DOUBLE)
+            return
+        }
+
+        // ── Appui long : déclenché au SEUIL, pas au relâchement ──
+        //
+        // Attendre le relâchement rendait l'action tributaire du moment où l'utilisateur lâche
+        // le bouton — donc jamais deux fois pareil, et toujours en retard sur la sensation
+        // d'avoir « appuyé longtemps ». La minuterie donne un repère fixe : l'action part à
+        // 500 ms précises, la touche est encore enfoncée, et le relâchement ne fait plus rien.
+        val action = AdvancedShortcuts.actionFor(this, code, PressType.LONG) ?: return
+        val minuterie = Runnable {
+            minuterieLongue.remove(code)
+            longDeclenche.add(code)
+            AppLogger.i(TAG, "touche $code — appui LONG au seuil " +
+                "(${AdvancedShortcuts.LONG_PRESS_MS} ms, sans attendre le relâchement) " +
+                "→ ${action.name}")
+            declencher(action, code, PressType.LONG)
+        }
+        minuterieLongue[code] = minuterie
+        handler.postDelayed(minuterie, AdvancedShortcuts.LONG_PRESS_MS)
+    }
+
+    /**
+     * Fin d'un appui.
+     *
+     * Le relâchement ne déclenche plus que l'appui court — et encore, à retardement si la touche
+     * porte aussi un double appui.
+     */
+    private fun surRelachement(code: Int) {
+        annulerLong(code)   // relâchée avant le seuil : l'appui long n'aura pas lieu
+
+        // Ces deux cas ont déjà agi pendant que la touche était enfoncée.
+        if (doubleDeclenche.remove(code)) return
+        if (longDeclenche.remove(code)) return
+
+        val simple = AdvancedShortcuts.actionFor(this, code, PressType.SINGLE)
+        val aDouble = AdvancedShortcuts.actionFor(this, code, PressType.DOUBLE) != null
+
+        // Sans double appui sur cette touche, rien à attendre : l'action part immédiatement.
+        if (!aDouble) {
+            AppLogger.i(TAG, "touche $code — appui court → ${simple?.name ?: "aucune"}")
+            if (simple != null) declencher(simple, code, PressType.SINGLE)
+            return
+        }
+
+        // Avec un double appui, il faut s'assurer qu'aucun second appui n'arrive : déclencher le
+        // simple tout de suite le ferait partir systématiquement AVANT le double. La fenêtre est
+        // ouverte même sans action d'appui court, car c'est elle qui détecte le second appui.
+        val fenetre = Runnable {
+            fenetreDouble.remove(code)
+            AppLogger.i(TAG, "touche $code — appui court confirmé " +
+                "(aucun second appui en ${AdvancedShortcuts.DOUBLE_TAP_MS} ms) " +
+                "→ ${simple?.name ?: "aucune"}")
+            if (simple != null) declencher(simple, code, PressType.SINGLE)
+        }
+        fenetreDouble[code] = fenetre
+        handler.postDelayed(fenetre, AdvancedShortcuts.DOUBLE_TAP_MS)
+    }
+
+    private fun annulerLong(code: Int) {
+        minuterieLongue.remove(code)?.let { handler.removeCallbacks(it) }
+    }
+
+    /**
      * Relaie l'action au service principal, qui détient déjà tout le répartiteur et l'état des
      * bascules. On ne réimplémente rien ici — un second chemin d'exécution finirait par diverger.
      */
-    private fun declencher(action: com.mg4.control.shortcut.ShortcutAction, code: Int, long: Boolean) {
+    private fun declencher(action: ShortcutAction, code: Int, press: PressType) {
         val i = android.content.Intent(this, MG4ControlService::class.java).apply {
             setAction(MG4ControlService.ACTION_ADV_SHORTCUT)
             putExtra(MG4ControlService.EXTRA_ADV_ACTION, action.name)
             // Clé de bascule propre aux raccourcis avancés : sans elle, une action à deux états
             // partagerait son état avec le bouton classique du même nom.
-            putExtra(MG4ControlService.EXTRA_ADV_SLOT, AdvancedShortcuts.slotKey(code, long))
+            putExtra(MG4ControlService.EXTRA_ADV_SLOT, AdvancedShortcuts.slotKey(code, press))
         }
         runCatching { startForegroundService(i) }
             .onFailure { AppLogger.w(TAG, "relais impossible : ${it.message}") }
@@ -131,6 +215,13 @@ class KeyCaptureService : AccessibilityService() {
     override fun onInterrupt() { /* inutilisé */ }
 
     override fun onDestroy() {
+        // Le service peut être coupé pendant qu'une minuterie court : sans ça, elle déclencherait
+        // une action alors que la fonctionnalité vient d'être désactivée.
+        handler.removeCallbacksAndMessages(null)
+        minuterieLongue.clear()
+        fenetreDouble.clear()
+        longDeclenche.clear()
+        doubleDeclenche.clear()
         AppLogger.i(TAG, "service déconnecté")
         super.onDestroy()
     }

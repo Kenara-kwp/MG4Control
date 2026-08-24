@@ -85,14 +85,21 @@ Deux systèmes coexistent, réglés dans le même écran :
 - **Raccourcis classiques** — boutons ★ gauche et droit, en appui simple ou long. Ils reposent sur
   le broadcast émis par le véhicule : si le launcher officiel utilise déjà le bouton, il reste
   prioritaire.
-- **Raccourcis avancés** — n'importe quelle touche du volant, via un **service d'accessibilité**
-  que l'utilisateur active lui-même dans Android. MG4Control voit alors la touche **avant** le
-  launcher et peut la consommer.
+- **Raccourcis avancés** — n'importe quelle touche du volant, en appui **court, long ou double**,
+  via un **service d'accessibilité** que l'utilisateur active lui-même dans Android. MG4Control
+  voit alors la touche **avant** le launcher et peut la consommer.
+
+L'appui long part **dès le seuil de 500 ms atteint**, sans attendre le relâchement : l'action se
+déclenche toujours au même moment, la touche encore enfoncée. Le double appui, lui, a un coût à
+connaître — sur une touche qui en porte un, l'appui court ne peut plus partir au relâchement, il
+attend 300 ms de plus pour s'assurer qu'aucun second appui n'arrive. Les touches sans double appui
+ne paient rien.
 
 > [!WARNING]
 > Une touche enregistrée en raccourci avancé est réclamée **en bloc**. Pour intercepter un appui
-> long il faut consommer l'appui dès son début, or à cet instant on ignore encore sa durée. Le
-> type d'appui laissé libre ne retombe donc pas sur le launcher : il ne fait rien.
+> long il faut consommer l'appui dès son début, or à cet instant on ignore encore s'il sera court,
+> long ou double. Les types d'appui laissés libres ne retombent donc pas sur le launcher : ils ne
+> font rien.
 
 Actions disponibles — celles qui dépendent du firmware n'apparaissent pas sur les autres :
 
@@ -781,14 +788,20 @@ Two systems live side by side, configured from the same screen:
 
 - **Classic shortcuts** — the left and right ★ buttons, short or long press. They rely on the
   broadcast the vehicle emits: if the stock launcher already uses that button, the launcher wins.
-- **Advanced shortcuts** — any steering wheel key, through an **accessibility service** the user
-  enables themselves in Android. MG4Control then sees the key **before** the launcher and can
-  consume it.
+- **Advanced shortcuts** — any steering wheel key, as a **short, long or double** press, through
+  an **accessibility service** the user enables themselves in Android. MG4Control then sees the key
+  **before** the launcher and can consume it.
+
+A long press fires **as soon as the 500 ms threshold is reached**, without waiting for the release:
+the action always happens at the same moment, while the key is still held. A double press has a
+cost worth knowing — on a key carrying one, the short press can no longer fire on release, it waits
+another 300 ms to make sure no second press follows. Keys without a double press pay nothing.
 
 > [!WARNING]
 > A key registered as an advanced shortcut is claimed **as a whole**. Intercepting a long press
-> means consuming the press as it starts, when its duration is still unknown. The press type left
-> unassigned therefore does *not* fall back to the launcher: it simply does nothing.
+> means consuming the press as it starts, when it is still unknown whether it will be short, long
+> or double. Press types left unassigned therefore do *not* fall back to the launcher: they simply
+> do nothing.
 
 Available actions — those depending on the firmware do not show up on the others:
 

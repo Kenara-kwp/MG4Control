@@ -457,4 +457,5 @@
     <string name="adv_sc_replace_title">Botón ya utilizado</string>
     <string name="adv_sc_replace_msg">%1$s en %2$s ya ejecuta: %3$s.\n\n¿Reemplazar por la nueva función?</string>
     <string name="adv_sc_replace_ok">Reemplazar</string>
+    <string name="adv_sc_press_double">Doble pulsación</string>
 </resources>
