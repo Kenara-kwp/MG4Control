@@ -27,6 +27,8 @@ object ClimateAutomationSettings {
     const val DEFAULT_HOT_TARGET     = 20
     const val DEFAULT_COLD_TARGET    = 24
     const val DEFAULT_FAN            = 4
+    /** Recyclage par defaut quand l'utilisateur force : AUTO, le plus neutre des trois. */
+    const val DEFAULT_LOOP           = 2
 
     /** Bornes de saisie — larges à dessein, les vraies limites du véhicule sont lues au moment
      *  d'appliquer (getClimateState) et la consigne y est clampée. */
@@ -44,7 +46,20 @@ object ClimateAutomationSettings {
         val targetTemp: Int,
         val fanLevel: Int,
         val defrostFront: Boolean,
-        val defrostRear: Boolean
+        val defrostRear: Boolean,
+        /**
+         * Mode automatique de la ventilation. Quand il est actif, [fanLevel] n'est PAS appliqué :
+         * choisir une vitesse manuelle fait sortir du mode auto sur ce véhicule, donc appliquer
+         * les deux donnerait un résultat dépendant du seul ordre des appels.
+         */
+        val autoMode: Boolean,
+        /**
+         * Recyclage d'air : `null` = ne pas y toucher, sinon 0=Intérieur, 1=Extérieur, 2=Auto.
+         *
+         * Le `null` par défaut est délibéré : les automatisations déjà configurées par les
+         * utilisateurs ne doivent pas se mettre à piloter un réglage qu'elles ne pilotaient pas.
+         */
+        val loopMode: Int?
     )
 
     data class Config(
@@ -61,7 +76,11 @@ object ClimateAutomationSettings {
             targetTemp   = p.getInt(prefix + "target", defTarget),
             fanLevel     = p.getInt(prefix + "fan", DEFAULT_FAN),
             defrostFront = p.getBoolean(prefix + "def_front", false),
-            defrostRear  = p.getBoolean(prefix + "def_rear", false)
+            defrostRear  = p.getBoolean(prefix + "def_rear", false),
+            autoMode     = p.getBoolean(prefix + "auto", false),
+            loopMode     = if (p.getBoolean(prefix + "recirc_force", false))
+                               p.getInt(prefix + "recirc", DEFAULT_LOOP).coerceIn(0, 2)
+                           else null
         )
         return Config(
             enabled = p.getBoolean(KEY_ENABLED, false),
@@ -77,6 +96,9 @@ object ClimateAutomationSettings {
     fun keyFan(hot: Boolean)       = (if (hot) HOT else COLD) + "fan"
     fun keyDefFront(hot: Boolean)  = (if (hot) HOT else COLD) + "def_front"
     fun keyDefRear(hot: Boolean)   = (if (hot) HOT else COLD) + "def_rear"
+    fun keyAuto(hot: Boolean)      = (if (hot) HOT else COLD) + "auto"
+    fun keyRecircForce(hot: Boolean) = (if (hot) HOT else COLD) + "recirc_force"
+    fun keyRecirc(hot: Boolean)    = (if (hot) HOT else COLD) + "recirc"
 
     fun clampThreshold(raw: Int?, hot: Boolean): Int =
         (raw ?: if (hot) DEFAULT_HOT_THRESHOLD else DEFAULT_COLD_THRESHOLD)

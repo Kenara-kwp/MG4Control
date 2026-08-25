@@ -27,3 +27,11 @@ com.mg4.control.permission.RECEIVE_HARDKEY
 android.permission.INTERNET
 android.permission.ACCESS_NETWORK_STATE
 android.permission.INSTALL_PACKAGES
+# --- lecture des compteurs réseau (les DEUX variantes : déclarée dans le manifest principal) ---
+# Affiche la consommation de données dans Réglages → Infos (util/DataUsage.kt).
+# signature|privileged : obtenue parce que l'app tourne en android.uid.system, jamais accordée
+# à une app tierce.
+# Ce qu'elle permet ici, et rien de plus : relire les TOTAUX d'octets que le noyau compte déjà
+# pour l'interface Ethernet. Lecture seule, aucune connexion ouverte, aucun contenu de trafic,
+# aucune attribution par application — le même chiffre que l'écran de consommation d'AAOS.
+android.permission.READ_NETWORK_USAGE_HISTORY

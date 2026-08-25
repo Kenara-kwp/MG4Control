@@ -53,6 +53,28 @@ class MG4ControlService : Service() {
         // Intent action broadcast par le système SAIC pour les touches physiques
         private const val HARDKEY_ACTION   = "com.saic.keyevent.hardkey.report"
 
+        /** Actions dont l'état est LU sur le véhicule à chaque pression (voir executeVehicleAction). */
+        private val DIRECT_VEHICLE_ACTIONS = setOf(
+            ShortcutAction.ESC_TOGGLE, ShortcutAction.DROWSINESS_TOGGLE,
+            ShortcutAction.DROWSINESS_SEN_CYCLE, ShortcutAction.HVAC_TOGGLE,
+            ShortcutAction.HVAC_TEMP_UP, ShortcutAction.HVAC_TEMP_DOWN,
+            ShortcutAction.HVAC_FAN_UP, ShortcutAction.HVAC_FAN_DOWN,
+            ShortcutAction.REGEN_CYCLE, ShortcutAction.SEAT_HEAT_LEFT_CYCLE,
+            ShortcutAction.SEAT_HEAT_RIGHT_CYCLE, ShortcutAction.STEERING_HEAT_TOGGLE,
+            ShortcutAction.DEFROST_FRONT_TOGGLE, ShortcutAction.DEFROST_REAR_TOGGLE,
+            ShortcutAction.HVAC_RECIRC_CYCLE,
+            ShortcutAction.BRIGHTNESS_UP, ShortcutAction.BRIGHTNESS_DOWN
+        )
+
+
+        /** Pas de luminosité par pression, en % — 10 crans du plancher au maximum. */
+        private const val BRIGHTNESS_STEP = 10
+
+        /** Raccourcis avancés (service d'accessibilité) — intent EXPLICITE, jamais exporté. */
+        const val ACTION_ADV_SHORTCUT = "com.mg4.control.internal.ADV_SHORTCUT"
+        const val EXTRA_ADV_ACTION    = "adv_action"
+        const val EXTRA_ADV_SLOT      = "adv_slot"
+
         /**
          * [T-902] Permission exigée de l'ÉMETTEUR du broadcast hardkey. Déclarée en
          * protectionLevel="signature" dans le Manifest : seule une app signée avec la clé
@@ -160,10 +182,33 @@ class MG4ControlService : Service() {
         AppLogger.i(TAG, "onStartCommand")
         // Relais de l'API externe (issue #79) : traité AVANT la routine de démarrage, sinon un
         // simple appel tiers relancerait l'application du profil par défaut à chaque commande.
+        if (handleAdvancedShortcutIntent(intent)) return START_STICKY
         if (handleExternalApiIntent(intent)) return START_STICKY
         tryClimateAutomation("démarrage service")
         scheduleDefaultProfileOnce()
         return START_STICKY
+    }
+
+    /**
+     * Exécute une action déclenchée par [com.mg4.control.accessibility.KeyCaptureService].
+     *
+     * Volontairement séparé du relais de l'API externe : celui-ci est verrouillé par
+     * l'interrupteur des Réglages, alors qu'un raccourci avancé est déclenché par une touche
+     * physique que l'utilisateur a lui-même enregistrée. Passer par la même porte aurait rendu
+     * les raccourcis avancés inopérants tant que l'API tierce est désactivée — c'est-à-dire par
+     * défaut. L'intent est explicite (Intent(ctx, MG4ControlService)), donc non exposé.
+     */
+    private fun handleAdvancedShortcutIntent(intent: Intent?): Boolean {
+        if (intent?.action != ACTION_ADV_SHORTCUT) return false
+        val nom = intent.getStringExtra(EXTRA_ADV_ACTION).orEmpty()
+        val sc = ShortcutAction.values().firstOrNull { it.name == nom }
+        if (sc == null || sc == ShortcutAction.NONE) {
+            AppLogger.w(TAG, "raccourci avancé : action inconnue '$nom'")
+            return true
+        }
+        AppLogger.i(TAG, "raccourci avancé → ${sc.name}")
+        executeToggle(sc, intent.getStringExtra(EXTRA_ADV_SLOT).orEmpty())
+        return true
     }
 
     /**
@@ -446,6 +491,197 @@ class MG4ControlService : Service() {
 
     // ── Exécution du toggle ──────────────────────────────────────────────────
 
+    /**
+     * Actions à état lu sur le véhicule.
+     *
+     * ⚠️ Bloquant (lectures binder, et ~1 s pour l'ESC qui confirme son état avant d'agir) :
+     * à n'appeler que depuis un contexte IO.
+     */
+    private fun executeVehicleAction(action: ShortcutAction) {
+        when (action) {
+            ShortcutAction.ESC_TOGGLE -> {
+                val actuel = MG4Hardware.isEscOn()
+                if (actuel == null) {
+                    AppLogger.w(TAG, "SHORTCUT ESC — état illisible, aucune action")
+                    return
+                }
+                AppLogger.i(TAG, "SHORTCUT ESC : $actuel → ${!actuel}")
+                MG4Hardware.setEsc(!actuel)
+            }
+
+            ShortcutAction.DROWSINESS_TOGGLE -> {
+                val actuel = MG4Hardware.isDrowsinessOn()
+                if (actuel == null) {
+                    AppLogger.w(TAG, "SHORTCUT somnolence — état illisible, aucune action")
+                    return
+                }
+                AppLogger.i(TAG, "SHORTCUT somnolence : $actuel → ${!actuel}")
+                MG4Hardware.setDrowsiness(!actuel)
+            }
+
+            ShortcutAction.DROWSINESS_SEN_CYCLE -> {
+                val actuel = MG4Hardware.getDrowsinessSensitivity()
+                if (actuel < 1) {
+                    AppLogger.w(TAG, "SHORTCUT sensibilité — état illisible, aucune action")
+                    return
+                }
+                // Réutilise le calcul de bouclage déjà couvert par les tests de l'API externe
+                // plutôt que d'en écrire un second qui pourrait diverger.
+                val suivant = ExternalApi.cycleStep(actuel, 1, 3, 1)
+                AppLogger.i(TAG, "SHORTCUT sensibilité : $actuel → $suivant")
+                MG4Hardware.setDrowsinessSensitivity(suivant)
+            }
+
+            ShortcutAction.REGEN_CYCLE -> {
+                val actuel = MG4Hardware.getRegenLevel()
+                if (actuel == null) {
+                    AppLogger.w(TAG, "SHORTCUT régénération — niveau illisible, aucune action")
+                    return
+                }
+                // En mode SNOW le véhicule impose lui-même la régénération minimale et ignore
+                // les consignes — l'écran Conduite grise d'ailleurs les boutons. Écrire quand
+                // même donnerait un raccourci qui semble en panne une fois sur trois.
+                if (MG4Hardware.getDriveMode() == DriveMode.SNOW) {
+                    AppLogger.i(TAG, "SHORTCUT régénération ignoré — mode SNOW, le niveau est " +
+                        "imposé par le véhicule")
+                    return
+                }
+                // L'ordre du cycle vit à côté de l'enum, où se trouve le piège : l'ordre de
+                // déclaration n'est pas l'ordre d'usage. Il y est couvert par des tests.
+                val suivant = RegenLevel.nextInCycle(actuel)
+                AppLogger.i(TAG, "SHORTCUT régénération : ${actuel.label} → ${suivant.label}")
+                MG4Hardware.setRegenLevel(suivant)
+            }
+
+            ShortcutAction.SEAT_HEAT_LEFT_CYCLE, ShortcutAction.SEAT_HEAT_RIGHT_CYCLE -> {
+                val gauche = action == ShortcutAction.SEAT_HEAT_LEFT_CYCLE
+                // Lectures NULLABLES obligatoires : getSeatHeatLeft() rend 0 aussi bien pour
+                // « éteint » que pour « propriété muette ». Partir d'un 0 supposé coincerait le
+                // cycle à 1, et si le siège est réellement à 3 l'appui ferait DESCENDRE le
+                // chauffage — l'inverse de ce que l'utilisateur demande.
+                val actuel = if (gauche) MG4Hardware.getSeatHeatLeftOrNull()
+                             else        MG4Hardware.getSeatHeatRightOrNull()
+                if (actuel == null) {
+                    AppLogger.w(TAG, "SHORTCUT siège chauffant — niveau illisible, aucune action")
+                    return
+                }
+                val suivant = ExternalApi.cycleStep(actuel, 0, 3, 1)
+                AppLogger.i(TAG, "SHORTCUT siège chauffant ${if (gauche) "gauche" else "droit"} " +
+                    ": $actuel → $suivant")
+                if (gauche) MG4Hardware.setSeatHeatLeft(suivant)
+                else        MG4Hardware.setSeatHeatRight(suivant)
+            }
+
+            ShortcutAction.STEERING_HEAT_TOGGLE -> {
+                val actuel = MG4Hardware.getSteeringHeatOrNull()
+                if (actuel == null) {
+                    AppLogger.w(TAG, "SHORTCUT volant chauffant — état illisible, aucune action")
+                    return
+                }
+                AppLogger.i(TAG, "SHORTCUT volant chauffant : $actuel → ${!actuel}")
+                MG4Hardware.setSteeringHeat(!actuel)
+            }
+
+            ShortcutAction.BRIGHTNESS_UP, ShortcutAction.BRIGHTNESS_DOWN -> {
+                val actuel = MG4Hardware.getScreenBrightnessPercent()
+                if (actuel < 0) {
+                    AppLogger.w(TAG, "SHORTCUT luminosité — valeur illisible, aucune action")
+                    return
+                }
+                val pas = if (action == ShortcutAction.BRIGHTNESS_UP) BRIGHTNESS_STEP
+                          else -BRIGHTNESS_STEP
+                // On CLAMPE, jamais de bouclage : repasser de 100 % au plancher d'une seule
+                // pression, de nuit, serait le pire moment pour une surprise. Le plancher vient
+                // du matériel — le redéfinir ici le ferait diverger.
+                val cible = (actuel + pas).coerceIn(MG4Hardware.BRIGHTNESS_MIN_PERCENT, 100)
+                AppLogger.i(TAG, "SHORTCUT luminosité : $actuel% → $cible%")
+                if (cible != actuel) MG4Hardware.setScreenBrightnessPercent(cible)
+            }
+
+            ShortcutAction.HVAC_TOGGLE, ShortcutAction.HVAC_TEMP_UP,
+            ShortcutAction.HVAC_TEMP_DOWN, ShortcutAction.HVAC_FAN_UP,
+            ShortcutAction.HVAC_FAN_DOWN, ShortcutAction.DEFROST_FRONT_TOGGLE,
+            ShortcutAction.DEFROST_REAR_TOGGLE, ShortcutAction.HVAC_RECIRC_CYCLE -> {
+                // Un SEUL getClimateState() : c'est une lecture binder, pas un champ, et les
+                // bornes viennent du véhicule — jamais de valeurs codées en dur.
+                val etat = MG4Hardware.getClimateState()
+                if (etat == null) {
+                    AppLogger.w(TAG, "SHORTCUT clim — état illisible, aucune action")
+                    return
+                }
+                when (action) {
+                    ShortcutAction.HVAC_TOGGLE -> {
+                        val actuel = etat.powerOn
+                        if (actuel == null) {
+                            AppLogger.w(TAG, "SHORTCUT clim ON/OFF — état illisible")
+                            return
+                        }
+                        AppLogger.i(TAG, "SHORTCUT clim : $actuel → ${!actuel}")
+                        MG4Hardware.setClimatePower(!actuel)
+                    }
+                    ShortcutAction.HVAC_TEMP_UP, ShortcutAction.HVAC_TEMP_DOWN -> {
+                        val actuel = etat.tempC
+                        if (actuel == null) {
+                            AppLogger.w(TAG, "SHORTCUT clim température — consigne illisible")
+                            return
+                        }
+                        val pas = if (action == ShortcutAction.HVAC_TEMP_UP) 1 else -1
+                        // On CLAMPE, on ne boucle pas : arriver à 32 °C et repartir à 16 en
+                        // poussant sur le volant serait une très mauvaise surprise.
+                        val cible = (actuel + pas).coerceIn(etat.tempMin, etat.tempMax)
+                        AppLogger.i(TAG, "SHORTCUT clim température : $actuel → $cible " +
+                            "(bornes ${etat.tempMin}..${etat.tempMax})")
+                        if (cible != actuel) MG4Hardware.setClimateTemp(cible)
+                    }
+                    // ⚠️ Ventilation EXPLICITE, et non plus le `else` du when : depuis que
+                    // dégivrages et recirculation partagent cette lecture d'état, un `else`
+                    // fourre-tout les traiterait comme des commandes de ventilation.
+                    ShortcutAction.HVAC_FAN_UP, ShortcutAction.HVAC_FAN_DOWN -> {
+                        val actuel = etat.fanLevel
+                        if (actuel == null) {
+                            AppLogger.w(TAG, "SHORTCUT clim ventilation — niveau illisible")
+                            return
+                        }
+                        val pas = if (action == ShortcutAction.HVAC_FAN_UP) 1 else -1
+                        val cible = (actuel + pas).coerceIn(etat.fanMin, etat.fanMax)
+                        AppLogger.i(TAG, "SHORTCUT clim ventilation : $actuel → $cible " +
+                            "(bornes ${etat.fanMin}..${etat.fanMax})")
+                        if (cible != actuel) MG4Hardware.setClimateFan(cible)
+                    }
+                    ShortcutAction.DEFROST_FRONT_TOGGLE, ShortcutAction.DEFROST_REAR_TOGGLE -> {
+                        val avant  = action == ShortcutAction.DEFROST_FRONT_TOGGLE
+                        val actuel = if (avant) etat.defrostFront else etat.defrostRear
+                        if (actuel == null) {
+                            AppLogger.w(TAG, "SHORTCUT dégivrage — état illisible, aucune action")
+                            return
+                        }
+                        AppLogger.i(TAG, "SHORTCUT dégivrage ${if (avant) "avant" else "arrière"}" +
+                            " : $actuel → ${!actuel}")
+                        if (avant) MG4Hardware.setClimateDefrostFront(!actuel)
+                        else       MG4Hardware.setClimateDefrostRear(!actuel)
+                    }
+                    ShortcutAction.HVAC_RECIRC_CYCLE -> {
+                        val actuel = etat.loopMode
+                        if (actuel == null) {
+                            AppLogger.w(TAG, "SHORTCUT recirculation — état illisible, aucune action")
+                            return
+                        }
+                        // Ici on BOUCLE, contrairement à la température : trois modes, aucune
+                        // borne désagréable à franchir, et sans bouclage le dernier mode serait
+                        // un cul-de-sac sur une touche qui ne sait qu'avancer.
+                        val suivant = ExternalApi.cycleStep(
+                            actuel, MG4Hardware.LoopMode.INNER, MG4Hardware.LoopMode.AUTO, 1)
+                        AppLogger.i(TAG, "SHORTCUT recirculation : $actuel → $suivant")
+                        MG4Hardware.setClimateLoopMode(suivant)
+                    }
+                    else -> {}
+                }
+            }
+
+            else -> AppLogger.w(TAG, "executeVehicleAction : action non gérée ${action.name}")
+        }
+    }
+
     private fun executeToggle(action: ShortcutAction, pressKey: String = "") {
         val prefs = getSharedPreferences(PREFS_SHORTCUTS, MODE_PRIVATE)
 
@@ -476,6 +712,15 @@ class MG4ControlService : Service() {
         // VEHICLE_POWER_OFF : check P → confirmation (overlay) → extinction. Sinon message "en P".
         if (action == ShortcutAction.VEHICLE_POWER_OFF) {
             showVehiclePowerOffConfirm()
+            return
+        }
+
+        // Actions qui INTERROGENT le véhicule à chaque pression, au lieu de suivre l'état en
+        // mémoire utilisé plus bas. C'est indispensable pour celles-ci : l'utilisateur peut
+        // aussi agir sur la clim, l'ESC ou la somnolence depuis l'écran d'origine ou la carte
+        // du Dashboard, et un état mémorisé serait déphasé dès la première fois.
+        if (action in DIRECT_VEHICLE_ACTIONS) {
+            CoroutineScope(Dispatchers.IO).launch { executeVehicleAction(action) }
             return
         }
 
@@ -854,7 +1099,9 @@ class MG4ControlService : Service() {
                     targetTemp   = rule.targetTemp,
                     fanLevel     = rule.fanLevel,
                     defrostFront = rule.defrostFront,
-                    defrostRear  = rule.defrostRear
+                    defrostRear  = rule.defrostRear,
+                    autoMode     = rule.autoMode,
+                    loopMode     = rule.loopMode
                 )
                 AppLogger.i(TAG, "Auto A/C ($origin) : règle $outcome appliquée — ok=$ok")
             }

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Une ligne de la liste des raccourcis avancés, en trois informations lisibles d'un coup
+     d'œil : identité du bouton (nom quand il est connu, et TOUJOURS son code), type d'appui,
+     fonction déclenchée. Puis modification et suppression.
+
+     Une même touche peut apparaître deux fois, une par type d'appui — d'où le type d'appui
+     affiché juste sous le bouton et non en fin de ligne : c'est lui qui distingue les deux. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/bg_section_rounded"
+    android:padding="14dp"
+    android:layout_marginBottom="8dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- Le code numérique reste affiché même quand le nom est connu : c'est lui qu'on
+             demande dans les remontées de bug, et lui qui identifie une touche inconnue. -->
+        <TextView
+            android:id="@+id/adv_item_key"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/adv_item_press"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/dash_text_lo"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+
+    <!-- Poids plus large que la colonne de gauche : les libellés de fonction sont longs
+         (« Siège chauffant gauche : cycle »), et une ligne tronquée ne dirait plus laquelle. -->
+    <TextView
+        android:id="@+id/adv_item_action"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1.4"
+        android:layout_marginEnd="12dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="16sp" />
+
+    <!-- Modifier : change la seule fonction, sans refaire touche et type d'appui. -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/adv_item_edit"
+        android:layout_width="84dp"
+        android:layout_height="52dp"
+        android:layout_marginEnd="8dp"
+        android:text="@string/adv_sc_edit"
+        android:textColor="@color/text_secondary"
+        android:textSize="16sp"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        app:backgroundTint="@color/dash_btn"
+        app:strokeWidth="1dp"
+        app:strokeColor="@color/dash_border"
+        app:cornerRadius="8dp" />
+
+    <!-- Sans suppression, un raccourci enregistré par erreur serait définitif. -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/adv_item_delete"
+        android:layout_width="84dp"
+        android:layout_height="52dp"
+        android:text="@string/adv_sc_delete"
+        android:textColor="@color/text_secondary"
+        android:textSize="16sp"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        app:backgroundTint="@color/dash_btn"
+        app:strokeWidth="1dp"
+        app:strokeColor="@color/dash_border"
+        app:cornerRadius="8dp" />
+
+</LinearLayout>

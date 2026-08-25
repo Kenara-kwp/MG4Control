@@ -361,6 +361,7 @@
                     </LinearLayout>
 
                     <LinearLayout
+                        android:id="@+id/row_ac_hot_fan"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
@@ -405,6 +406,63 @@
                         android:text="@string/ac_auto_def_rear"
                         android:textColor="@color/text_secondary"
                         android:textSize="16sp" />
+                        <CheckBox
+                            android:id="@+id/check_ac_hot_auto"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/ac_auto_auto_mode"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="16sp" />
+                        <CheckBox
+                            android:id="@+id/check_ac_hot_recirc_force"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/ac_auto_recirc_force"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="16sp" />
+                        <LinearLayout
+                            android:id="@+id/row_ac_hot_recirc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <Button
+                                android:id="@+id/btn_ac_hot_recirc_inner"
+                                android:layout_width="0dp"
+                                android:layout_height="52dp"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="3dp"
+                                android:text="@string/recirc_inner"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+                            <Button
+                                android:id="@+id/btn_ac_hot_recirc_outside"
+                                android:layout_width="0dp"
+                                android:layout_height="52dp"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="3dp"
+                                android:text="@string/recirc_outside"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+                            <Button
+                                android:id="@+id/btn_ac_hot_recirc_auto"
+                                android:layout_width="0dp"
+                                android:layout_height="52dp"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="0dp"
+                                android:text="@string/recirc_auto"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+
+                        </LinearLayout>
 
                 </LinearLayout>
 
@@ -491,6 +549,7 @@
                     </LinearLayout>
 
                     <LinearLayout
+                        android:id="@+id/row_ac_cold_fan"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
@@ -535,6 +594,63 @@
                         android:text="@string/ac_auto_def_rear"
                         android:textColor="@color/text_secondary"
                         android:textSize="16sp" />
+                        <CheckBox
+                            android:id="@+id/check_ac_cold_auto"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/ac_auto_auto_mode"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="16sp" />
+                        <CheckBox
+                            android:id="@+id/check_ac_cold_recirc_force"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/ac_auto_recirc_force"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="16sp" />
+                        <LinearLayout
+                            android:id="@+id/row_ac_cold_recirc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <Button
+                                android:id="@+id/btn_ac_cold_recirc_inner"
+                                android:layout_width="0dp"
+                                android:layout_height="52dp"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="3dp"
+                                android:text="@string/recirc_inner"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+                            <Button
+                                android:id="@+id/btn_ac_cold_recirc_outside"
+                                android:layout_width="0dp"
+                                android:layout_height="52dp"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="3dp"
+                                android:text="@string/recirc_outside"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+                            <Button
+                                android:id="@+id/btn_ac_cold_recirc_auto"
+                                android:layout_width="0dp"
+                                android:layout_height="52dp"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="0dp"
+                                android:text="@string/recirc_auto"
+                                android:textColor="@color/text_secondary"
+                                android:backgroundTint="@color/dash_btn"
+                                android:textSize="16sp"
+                                android:textAllCaps="true" />
+
+                        </LinearLayout>
 
                 </LinearLayout>
 

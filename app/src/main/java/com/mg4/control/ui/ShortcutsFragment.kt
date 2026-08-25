@@ -4,28 +4,39 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.provider.Settings
 import android.content.pm.ResolveInfo
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.KeyEvent
 import android.widget.ScrollView
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.Switch
+import android.widget.Toast
+import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.button.MaterialButton
 import com.mg4.control.R
+import com.mg4.control.accessibility.AdvancedShortcuts
+import com.mg4.control.accessibility.KeyCaptureService
+import com.mg4.control.debug.AppLogger
 import com.mg4.control.model.RegenLevel
 import com.mg4.control.profile.ProfileManager
+import com.mg4.control.shortcut.PressType
 import com.mg4.control.shortcut.ShortcutAction
 import com.mg4.control.hardware.MG4Hardware
 import com.mg4.control.util.FirmwareInfo
 
 class ShortcutsFragment : Fragment() {
+
+    /** Interrupteur des raccourcis avances. Defaut false : la voie classique reste la norme. */
+    private val PREF_ADV_SHORTCUTS = "advanced_shortcuts_enabled"
 
     private val PREFS = "mg4_shortcuts"
 
@@ -74,6 +85,7 @@ class ShortcutsFragment : Fragment() {
         baseActionItems = buildList {
             add(ActionItem(getString(R.string.shortcuts_action_none),           ShortcutAction.NONE))
             add(ActionItem(getString(R.string.shortcuts_action_one_pedal),      ShortcutAction.ONE_PEDAL))
+            add(ActionItem(getString(R.string.shortcuts_action_regen_cycle),    ShortcutAction.REGEN_CYCLE))
             if (isKnown) {
                 add(ActionItem(getString(R.string.shortcuts_action_aeb),        ShortcutAction.AEB_CYCLE))
             }
@@ -94,6 +106,34 @@ class ShortcutsFragment : Fragment() {
             }
             if (isKnown) {
                 add(ActionItem(getString(R.string.shortcuts_action_tsr), ShortcutAction.TSR_TOGGLE))
+            }
+            // ESC + somnolence : même condition que la carte du Dashboard, sinon on
+            // proposerait un raccourci qui échouerait en silence sur les firmwares non câblés.
+            if (MG4Hardware.hasDrowsinessAndEsc()) {
+                add(ActionItem(getString(R.string.shortcuts_action_esc),             ShortcutAction.ESC_TOGGLE))
+                add(ActionItem(getString(R.string.shortcuts_action_drowsiness),      ShortcutAction.DROWSINESS_TOGGLE))
+                add(ActionItem(getString(R.string.shortcuts_action_drowsiness_sen),  ShortcutAction.DROWSINESS_SEN_CYCLE))
+            }
+            // Chauffages : aucun filtre firmware, exactement comme la carte du Dashboard qui les
+            // affiche partout. Ils passent par des propriétés véhicule dont la lecture nullable
+            // tranche avant d'agir — au pire le raccourci reste sans effet, jamais une écriture
+            // à l'aveugle.
+            add(ActionItem(getString(R.string.shortcuts_action_seat_heat_left),  ShortcutAction.SEAT_HEAT_LEFT_CYCLE))
+            add(ActionItem(getString(R.string.shortcuts_action_seat_heat_right), ShortcutAction.SEAT_HEAT_RIGHT_CYCLE))
+            add(ActionItem(getString(R.string.shortcuts_action_steering_heat),   ShortcutAction.STEERING_HEAT_TOGGLE))
+            if (MG4Hardware.hasClimateControl()) {
+                add(ActionItem(getString(R.string.shortcuts_action_hvac_toggle),     ShortcutAction.HVAC_TOGGLE))
+                add(ActionItem(getString(R.string.shortcuts_action_hvac_temp_up),    ShortcutAction.HVAC_TEMP_UP))
+                add(ActionItem(getString(R.string.shortcuts_action_hvac_temp_down),  ShortcutAction.HVAC_TEMP_DOWN))
+                add(ActionItem(getString(R.string.shortcuts_action_hvac_fan_up),     ShortcutAction.HVAC_FAN_UP))
+                add(ActionItem(getString(R.string.shortcuts_action_hvac_fan_down),   ShortcutAction.HVAC_FAN_DOWN))
+                add(ActionItem(getString(R.string.shortcuts_action_defrost_front),   ShortcutAction.DEFROST_FRONT_TOGGLE))
+                add(ActionItem(getString(R.string.shortcuts_action_defrost_rear),    ShortcutAction.DEFROST_REAR_TOGGLE))
+                add(ActionItem(getString(R.string.shortcuts_action_hvac_recirc),     ShortcutAction.HVAC_RECIRC_CYCLE))
+            }
+            if (MG4Hardware.hasBrightnessControl()) {
+                add(ActionItem(getString(R.string.shortcuts_action_brightness_up),   ShortcutAction.BRIGHTNESS_UP))
+                add(ActionItem(getString(R.string.shortcuts_action_brightness_down), ShortcutAction.BRIGHTNESS_DOWN))
             }
             add(ActionItem(getString(R.string.shortcuts_action_apply_profile),   ShortcutAction.APPLY_PROFILE))
             add(ActionItem(getString(R.string.shortcuts_action_profile_picker), ShortcutAction.PROFILE_PICKER))
@@ -134,6 +174,372 @@ class ShortcutsFragment : Fragment() {
      *  ou disparaître quand l'utilisateur attribue ou retire une action). */
     private var reselectTabs: (() -> Unit)? = null
 
+    // ═════════════════════════════════════════════════════════════════════════
+    //  Raccourcis avancés — interception avant le launcher
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Étape 1 : le service OBSERVE les touches sans en consommer aucune.
+     *
+     * Le toggle n'active pas le service d'accessibilité — Android l'interdit, seul l'utilisateur
+     * peut le faire depuis les réglages système. Le toggle enregistre donc une INTENTION, et
+     * l'état réel du service est affiché à côté, relu à chaque retour à l'écran : sans ça
+     * l'utilisateur croirait avoir activé la fonction alors que rien n'écoute.
+     */
+    private var advancedRefresh: (() -> Unit)? = null
+
+    override fun onResume() {
+        super.onResume()
+        // L utilisateur revient peut-etre des reglages d accessibilite : l etat affiche doit
+        // suivre, sinon il resterait sur "inactif" apres avoir active le service.
+        advancedRefresh?.invoke()
+    }
+
+    override fun onDestroyView() {
+        // Le listener est statique : ne pas le liberer retiendrait ce Fragment detruit.
+        KeyCaptureService.listener = null
+        advancedRefresh = null
+        super.onDestroyView()
+    }
+
+    private fun setupAdvancedShortcuts(view: View) {
+        val sw      = view.findViewById<Switch>(R.id.switch_adv_shortcuts)
+        val status  = view.findViewById<TextView>(R.id.tv_adv_status)
+        val btnAcc  = view.findViewById<MaterialButton>(R.id.btn_adv_accessibility)
+        val cardRec = view.findViewById<View>(R.id.card_adv_record)
+        val btnRec  = view.findViewById<MaterialButton>(R.id.btn_adv_record)
+        val tvKey   = view.findViewById<TextView>(R.id.tv_adv_last_key)
+        val btnSimple = view.findViewById<MaterialButton>(R.id.btn_adv_press_single)
+        val btnLong   = view.findViewById<MaterialButton>(R.id.btn_adv_press_long)
+        val btnDouble = view.findViewById<MaterialButton>(R.id.btn_adv_press_double)
+        val spinner = view.findViewById<Spinner>(R.id.spinner_adv_action)
+
+        // Toutes les actions sont proposées. « Ouvrir une app » et « Appliquer un profil »
+        // réclament un choix supplémentaire : il est demandé juste après, et le raccourci n'est
+        // enregistré QUE si ce choix aboutit — sinon on créerait un raccourci qui ne fait rien.
+        val actionsAvancees = baseActionItems
+        spinner.adapter = ArrayAdapter(
+            requireContext(), android.R.layout.simple_spinner_dropdown_item,
+            actionsAvancees.map { it.label }
+        )
+
+        var toucheChoisie: Int? = null
+        var typeAppui = PressType.SINGLE
+
+        val actif   = requireContext().getColor(R.color.dash_accent_dim)
+        val inactif = requireContext().getColor(R.color.dash_btn)
+        val txtOn   = requireContext().getColor(R.color.dash_accent)
+        val txtOff  = requireContext().getColor(R.color.text_secondary)
+
+        fun majAppui() {
+            listOf(btnSimple to PressType.SINGLE, btnLong to PressType.LONG,
+                   btnDouble to PressType.DOUBLE).forEach { (b, t) ->
+                val on = t == typeAppui
+                b.backgroundTintList = ColorStateList.valueOf(if (on) actif else inactif)
+                b.setTextColor(if (on) txtOn else txtOff)
+            }
+        }
+
+        fun majEtat() {
+            val serviceOn = KeyCaptureService.isEnabled(requireContext())
+            status.setText(if (serviceOn) R.string.adv_sc_status_on else R.string.adv_sc_status_off)
+            // Le bouton disparait une fois le service accorde : il n'a plus rien a demander.
+            // Desactiver la fonctionnalite passe par l'interrupteur ci-dessus, pas par les
+            // reglages Android — au repos le service ne consomme aucune touche.
+            btnAcc.visibility = if (serviceOn) View.GONE else View.VISIBLE
+            // Enregistrer n'a aucun sens tant que le service ne tourne pas : rien n'arriverait,
+            // et l'utilisateur croirait que sa touche n'est pas reconnue.
+            val utilisable = serviceOn && sw.isChecked
+            cardRec.alpha = if (utilisable) 1f else 0.35f
+            listOf<View>(btnRec, btnSimple, btnLong, btnDouble, spinner,
+                view.findViewById(R.id.btn_adv_create)).forEach { it.isEnabled = utilisable }
+            refreshAdvancedList(view)
+        }
+
+        sw.isChecked = AdvancedShortcuts.isEnabled(requireContext())
+        sw.setOnCheckedChangeListener { _, checked ->
+            AdvancedShortcuts.setEnabled(requireContext(), checked)
+            majEtat()
+        }
+
+        btnAcc.setOnClickListener {
+            // La liste des services d'accessibilité, pas notre entrée : le lien direct n'est pas
+            // une API publique et varie d'un constructeur à l'autre.
+            val ouvert = runCatching {
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true
+            }.getOrDefault(false)
+            if (!ouvert) {
+                runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                AppLogger.w("MG4_KEYCAP", "réglages d'accessibilité inaccessibles — repli Réglages")
+            }
+        }
+
+        // L'enregistrement consomme la touche : il doit donc pouvoir être interrompu autrement
+        // qu'en appuyant sur une touche. D'où le second appui qui annule, et l'expiration
+        // automatique si l'utilisateur passe à autre chose.
+        var enregistrementEnCours = false
+        val finEnregistrement = Runnable {
+            enregistrementEnCours = false
+            KeyCaptureService.listener = null
+            if (isAdded) {
+                btnRec.setText(R.string.adv_sc_record)
+                Toast.makeText(requireContext(), R.string.adv_sc_record_cancelled,
+                    Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        btnRec.setOnClickListener {
+            if (enregistrementEnCours) {
+                view.removeCallbacks(finEnregistrement)
+                finEnregistrement.run()
+                return@setOnClickListener
+            }
+            enregistrementEnCours = true
+            view.postDelayed(finEnregistrement, 15_000)
+            btnRec.setText(R.string.adv_sc_recording)
+            KeyCaptureService.listener = { keyCode ->
+                // Le service tourne sur son propre thread : revenir à l'UI avant de toucher aux
+                // vues, et se débrancher aussitôt pour ne capter qu'une seule touche.
+                view.post {
+                    enregistrementEnCours = false
+                    view.removeCallbacks(finEnregistrement)
+                    if (isAdded) {
+                        toucheChoisie = keyCode
+                        tvKey.text = libelleTouche(keyCode)
+                        btnRec.setText(R.string.adv_sc_record)
+                    }
+                }
+                KeyCaptureService.listener = null
+            }
+        }
+
+        btnSimple.setOnClickListener { typeAppui = PressType.SINGLE; majAppui() }
+        btnLong.setOnClickListener   { typeAppui = PressType.LONG;   majAppui() }
+        btnDouble.setOnClickListener { typeAppui = PressType.DOUBLE; majAppui() }
+
+        // La sélection ne fait plus qu'ENREGISTRER le choix. Valider ici imposait un ordre
+        // (touche puis fonction) : choisir la fonction en premier ne produisait rien du tout,
+        // pas même le sélecteur d'app ou de profil, à cause du retour anticipé.
+        var actionChoisie: ShortcutAction? = null
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                actionChoisie = actionsAvancees.getOrNull(pos)?.action?.takeIf { it != ShortcutAction.NONE }
+            }
+            override fun onNothingSelected(p: AdapterView<*>?) { actionChoisie = null }
+        }
+
+        view.findViewById<MaterialButton>(R.id.btn_adv_create).setOnClickListener {
+            val touche = toucheChoisie
+            val action = actionChoisie
+            // Dire CE QUI MANQUE plutôt que de ne rien faire : c'est le silence qui rendait
+            // l'écran incompréhensible quand on s'y prenait dans l'autre sens.
+            if (touche == null) {
+                Toast.makeText(requireContext(), R.string.adv_sc_need_key, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (action == null) {
+                Toast.makeText(requireContext(), R.string.adv_sc_need_action, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val enregistrer = {
+                AdvancedShortcuts.set(requireContext(), touche, typeAppui, action)
+                AppLogger.i("MG4_KEYCAP", "raccourci avancé enregistré : touche=$touche " +
+                    "${typeAppui.key} → ${action.name}")
+                Toast.makeText(requireContext(), R.string.adv_sc_saved, Toast.LENGTH_SHORT).show()
+                toucheChoisie = null
+                actionChoisie = null
+                tvKey.setText(R.string.adv_sc_none)
+                spinner.setSelection(0, false)
+                refreshAdvancedList(view)
+            }
+
+            // Les deux actions à cible réclament un choix supplémentaire ; annuler laisse le
+            // formulaire en l'état plutôt que de créer un raccourci sans destination.
+            val poursuivre = {
+                when (action) {
+                    ShortcutAction.OPEN_CUSTOM_APP ->
+                        choisirAppAvancee(AdvancedShortcuts.slotKey(touche, typeAppui), enregistrer)
+                    ShortcutAction.APPLY_PROFILE ->
+                        choisirProfilAvance(AdvancedShortcuts.slotKey(touche, typeAppui), enregistrer)
+                    else -> enregistrer()
+                }
+            }
+
+            // Un couple (touche, type d'appui) ne peut pas exister en double : c'est la clé de
+            // stockage elle-même. La deuxième attribution écrasait donc la première EN SILENCE
+            // — l'utilisateur croyait ajouter un raccourci, il en remplaçait un. On le dit, et
+            // on nomme la fonction perdue : sans elle, impossible de décider en connaissance.
+            val existante = AdvancedShortcuts.actionFor(requireContext(), touche, typeAppui)
+            if (existante == null) {
+                poursuivre()
+                return@setOnClickListener
+            }
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.adv_sc_replace_title)
+                .setMessage(getString(R.string.adv_sc_replace_msg,
+                    libelleTouche(touche),
+                    getString(libellePress(typeAppui)),
+                    libelleAction(AdvancedShortcuts.Mapping(touche, typeAppui, existante))))
+                .setPositiveButton(R.string.adv_sc_replace_ok) { _, _ -> poursuivre() }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+
+        majAppui()
+        majEtat()
+        advancedRefresh = ::majEtat
+    }
+
+    /**
+     * Sélecteurs propres aux raccourcis avancés.
+     *
+     * Volontairement distincts de [showAppPickerDialog] / [showProfilePickerDialog] : ceux-là
+     * rafraîchissent les spinners de l'écran classique et remettraient un emplacement à NONE en
+     * cas d'annulation. Les réutiliser ici aurait modifié les raccourcis classiques au passage.
+     */
+    private fun choisirAppAvancee(slot: String, apres: () -> Unit) {
+        val pm = requireContext().packageManager
+        val apps = pm.queryIntentActivities(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
+        ).sortedBy { it.loadLabel(pm).toString().lowercase() }
+        val libelles = apps.map { it.loadLabel(pm).toString() }.toTypedArray()
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.shortcuts_pick_app_title)
+            .setItems(libelles) { _, i ->
+                prefs.edit()
+                    .putString("shortcut_${slot}_custom_app", apps[i].activityInfo.packageName)
+                    .apply()
+                apres()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun choisirProfilAvance(slot: String, apres: () -> Unit) {
+        val profils = ProfileManager(requireContext()).getAll()
+        if (profils.isEmpty()) {
+            Toast.makeText(requireContext(), R.string.shortcuts_no_profiles, Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.shortcuts_pick_profile_title)
+            .setItems(profils.map { it.name }.toTypedArray()) { _, i ->
+                prefs.edit().putString("shortcut_${slot}_profile_id", profils[i].id).apply()
+                apres()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /**
+     * Libellé d'une ligne de liste. Pour les deux actions à cible, on affiche la CIBLE et non
+     * l'action générique : « Waze » plutôt que « Ouvrir une app », sans quoi deux raccourcis
+     * différents seraient indiscernables.
+     */
+    private fun libelleAction(m: AdvancedShortcuts.Mapping): String {
+        val slot = AdvancedShortcuts.slotKey(m.keyCode, m.press)
+        val generique = baseActionItems.firstOrNull { it.action == m.action }?.label ?: m.action.name
+        return when (m.action) {
+            ShortcutAction.OPEN_CUSTOM_APP ->
+                prefs.getString("shortcut_${slot}_custom_app", null)
+                    ?.let { resolveAppLabel(it) } ?: generique
+            ShortcutAction.APPLY_PROFILE ->
+                prefs.getString("shortcut_${slot}_profile_id", null)
+                    ?.let { id -> ProfileManager(requireContext()).getById(id)?.name } ?: generique
+            else -> generique
+        }
+    }
+
+    /**
+     * Identité d'un bouton : son nom quand on le connaît, et TOUJOURS son code.
+     *
+     * Le code n'est pas décoratif — c'est lui qu'on demande dans les remontées de bug, et le
+     * seul repère pour une touche que [AdvancedShortcuts.nomTouche] ne connaît pas encore.
+     */
+    private fun libelleTouche(code: Int): String =
+        AdvancedShortcuts.nomTouche(code)?.let { "$it ($code)" }
+            ?: getString(R.string.adv_sc_key_unknown, code)
+
+    /**
+     * Vocabulaire d'appui propre aux raccourcis avancés — « appui court / long / double »,
+     * comme les trois boutons du formulaire. L'écran classique garde le sien (Simple / Long /
+     * Double), plus compact parce qu'il tient dans une colonne de tableau.
+     */
+    private fun libellePress(press: PressType): Int = when (press) {
+        PressType.SINGLE -> R.string.adv_sc_press_short
+        PressType.LONG   -> R.string.adv_sc_press_long_lbl
+        PressType.DOUBLE -> R.string.adv_sc_press_double
+    }
+
+    /**
+     * Change la FONCTION d'un raccourci existant, sans retoucher ni la touche ni le type
+     * d'appui — refaire les trois étapes pour corriger la seule fonction n'avait pas de raison
+     * d'être, et obligeait à réappuyer sur un bouton que le service consomme.
+     */
+    private fun modifierRaccourci(m: AdvancedShortcuts.Mapping, vue: View) {
+        // Même liste que le formulaire, filtres firmware compris : proposer ici une fonction
+        // absente du firmware fabriquerait un raccourci sans effet.
+        val choix = baseActionItems.filter { it.action != ShortcutAction.NONE }
+        val courant = choix.indexOfFirst { it.action == m.action }
+        var selection = courant
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.adv_sc_edit_title)
+            .setSingleChoiceItems(choix.map { it.label }.toTypedArray(), courant) { _, i ->
+                selection = i
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val action = choix.getOrNull(selection)?.action ?: return@setPositiveButton
+                val enregistrer = {
+                    AdvancedShortcuts.set(requireContext(), m.keyCode, m.press, action)
+                    AppLogger.i("MG4_KEYCAP", "raccourci avancé modifié : touche=${m.keyCode} " +
+                        "${m.press.key} → ${action.name}")
+                    Toast.makeText(requireContext(), R.string.adv_sc_updated, Toast.LENGTH_SHORT).show()
+                    refreshAdvancedList(vue)
+                }
+                // Mêmes cibles à choisir que dans le formulaire : basculer sur « ouvrir une
+                // app » sans désigner laquelle donnerait un raccourci qui n'ouvre rien.
+                when (action) {
+                    ShortcutAction.OPEN_CUSTOM_APP ->
+                        choisirAppAvancee(AdvancedShortcuts.slotKey(m.keyCode, m.press), enregistrer)
+                    ShortcutAction.APPLY_PROFILE ->
+                        choisirProfilAvance(AdvancedShortcuts.slotKey(m.keyCode, m.press), enregistrer)
+                    else -> enregistrer()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Reconstruit la liste des raccourcis avancés. Une ligne par couple touche + type d'appui. */
+    private fun refreshAdvancedList(view: View) {
+        val conteneur = view.findViewById<ViewGroup>(R.id.container_adv_list) ?: return
+        val vide      = view.findViewById<View>(R.id.tv_adv_empty)
+        conteneur.removeAllViews()
+        val items = AdvancedShortcuts.all(requireContext())
+        vide?.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+
+        items.forEach { m ->
+            val ligne = layoutInflater.inflate(R.layout.item_advanced_shortcut, conteneur, false)
+            // « 1 · Touche 42 » : l'ancien libellé réutilisait le titre de l'étape 1 du
+            // formulaire, numéro compris. Le nom du bouton a désormais sa propre chaîne.
+            ligne.findViewById<TextView>(R.id.adv_item_key).text = libelleTouche(m.keyCode)
+            ligne.findViewById<TextView>(R.id.adv_item_press).setText(libellePress(m.press))
+            ligne.findViewById<TextView>(R.id.adv_item_action).text = libelleAction(m)
+            ligne.findViewById<View>(R.id.adv_item_edit).setOnClickListener {
+                modifierRaccourci(m, view)
+            }
+            ligne.findViewById<View>(R.id.adv_item_delete).setOnClickListener {
+                AdvancedShortcuts.remove(requireContext(), m.keyCode, m.press)
+                refreshAdvancedList(view)
+            }
+            conteneur.addView(ligne)
+        }
+    }
+
     /**
      * N'affiche un réglage d'action que si l'action est réellement attribuée à un bouton :
      * régler le niveau de retour du mode 1 pédale n'a aucun sens si aucun bouton ne le déclenche.
@@ -153,6 +559,12 @@ class ShortcutsFragment : Fragment() {
         view.findViewById<View>(R.id.config_adas_section)?.visibility =
             if (showAdas) View.VISIBLE else View.GONE
 
+        // Avant, l'onglet « Actions » disparaissait quand il n'avait plus rien à montrer.
+        // Devenue une SECTION de la page Raccourcis, elle doit se masquer elle-même — sinon
+        // on afficherait un titre suivi de rien.
+        view.findViewById<View>(R.id.page_sc_actions)?.visibility =
+            if (showOnePedal || showAdas) View.VISIBLE else View.GONE
+
         reselectTabs?.invoke()
     }
 
@@ -162,10 +574,16 @@ class ShortcutsFragment : Fragment() {
      * visible, l'onglet disparaît et l'écran redevient une page unique.
      */
     private fun bindCategoryRail(view: View) {
+        // « Boutons » et « Actions » ne sont plus deux onglets mais deux sections d'une même
+        // page : leurs conteneurs existent toujours, on les réunit sous page_sc_classic. Rien
+        // de leur câblage n'a bougé.
         val tabs = listOf(
-            view.findViewById<MaterialButton>(R.id.btn_sc_cat_buttons) to view.findViewById<ViewGroup>(R.id.page_sc_buttons),
-            view.findViewById<MaterialButton>(R.id.btn_sc_cat_actions) to view.findViewById<ViewGroup>(R.id.page_sc_actions)
+            view.findViewById<MaterialButton>(R.id.btn_sc_cat_classic)  to view.findViewById<ViewGroup>(R.id.page_sc_classic),
+            view.findViewById<MaterialButton>(R.id.btn_sc_cat_advanced) to view.findViewById<ViewGroup>(R.id.page_sc_advanced),
+            view.findViewById<MaterialButton>(R.id.btn_sc_sub_list)     to view.findViewById<ViewGroup>(R.id.page_sc_list)
         )
+        val btnSubList = tabs[2].first
+        setupAdvancedShortcuts(view)
         val scroll = view.findViewById<ScrollView>(R.id.scroll_shortcuts)
         // Le rail reprend l'accent des deux autres écrans refondus (dash_accent), pas l'accent vert
         // propre aux boutons de cet écran : c'est le même composant de navigation partout.
@@ -193,6 +611,11 @@ class ShortcutsFragment : Fragment() {
                 btn.setTextColor(if (on) railOn else textOff)
                 btn.strokeColor = ColorStateList.valueOf(if (on) railOn else border)
             }
+            // La sous-entrée n'apparaît que dans son contexte : sur l'onglet avancé ou sur
+            // elle-même. Ailleurs elle encombrerait le rail sans rien vouloir dire.
+            val dansAvance = tabs[1].second.visibility == View.VISIBLE ||
+                             tabs[2].second.visibility == View.VISIBLE
+            btnSubList.visibility = if (dansAvance) View.VISIBLE else View.GONE
         }
 
         tabs.forEach { (btn, page) ->

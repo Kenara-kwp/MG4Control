@@ -117,6 +117,11 @@ object MG4Hardware {
 
     // SWI68 : VehicleSettingManager class name (loaded via launcher context)
     private const val VSM_CLASS      = "com.saicmotor.sdk.vehiclesettings.manager.VehicleSettingManager"
+
+    // ⚠️ VehicleCONTROLManager, a ne confondre ni avec VehicleSettingManager (sVsm) ni avec
+    // VehicleConditionManager (sVcm). C'est le seul a porter get/setEspSwitch sur SWI68/165 :
+    // chercher ces methodes sur sVsm echouait en silence, l'ESC ne repondait donc pas.
+    private const val VCONTROL_CLASS = "com.saicmotor.sdk.vehiclesettings.manager.VehicleControlManager"
     private const val LAUNCHER68_PKG = "com.saicmotor.hmi.launcher"
 
     // Luminosité écran — ancien SDK (SWI133/68/165) : GeneralManager.setBrightness(Int)/getBrightness().
@@ -128,7 +133,9 @@ object MG4Hardware {
     // Volume média — ancien SDK (SWI133/68/165) : SmartSoundManager.getVolume/setVolume/getMaxVolume(type).
     // Même SDK systemsettings/BaseManager que GeneralManager (singleton sInstance + init(Context, listener)).
     private const val SMART_SOUND_MANAGER_CLASS = "com.saicmotor.sdk.systemsettings.SmartSoundManager"
-    private const val BRIGHTNESS_MIN_PERCENT = 5   // plancher de sécurité : ne jamais éteindre l'écran
+    // Public : le raccourci « luminosité - » doit clamper sur CE plancher pour que son log dise
+    // la vérité. Le redéfinir de son côté le ferait diverger le jour où cette valeur change.
+    const val BRIGHTNESS_MIN_PERCENT = 5   // plancher de sécurité : ne jamais éteindre l'écran
 
     // SWI69/SWI131 : accès via CarAdapterClient → queryClient(0x8) → CarVehicleSettingClient
     // Architecture réelle : CarAdapterClient se connecte à com.saicmotor.caradapter.CarAdapterService,
@@ -218,6 +225,7 @@ object MG4Hardware {
     @Volatile private var sVpmService: Any? = null   // mIVehiclePropertyService field value (SWI133)
     @Volatile private var sVsm: Any? = null          // VehicleSettingManager instance (SWI68, Katman4)
     @Volatile private var sVsmService: Any? = null   // mVehicleSettingService field value (SWI68)
+    @Volatile private var sVcontrol: Any? = null     // VehicleControlManager (ESC, SWI68/165)
     @Volatile private var sVsm133: Any? = null       // VehicleSettingManager instance (SWI133, pour ELK)
     @Volatile private var sGeneral: Any? = null      // GeneralManager instance (SWI133/68/165, luminosité)
     @Volatile private var sSmartSound: Any? = null   // SmartSoundManager instance (SWI133/68/165, loudness)
@@ -612,6 +620,7 @@ object MG4Hardware {
         tryInitVsm133(launcherCtx, context)
 
         // 3b) GeneralManager pour SWI133 (luminosité écran)
+        tryInitVehicleControlManager(launcherCtx, context)   // ESC sur SWI68/165
         tryInitGeneralManager(launcherCtx, context)
 
         // 3c) SmartSoundManager pour SWI133 (loudness audio)
@@ -623,6 +632,7 @@ object MG4Hardware {
             h.postDelayed({
                 if (sVpmService == null) tryGetVpmService(sVpm ?: return@postDelayed)
                 if (sVsm133 == null) tryInitVsm133(launcherCtx, context)
+                if (sVcontrol == null) tryInitVehicleControlManager(launcherCtx, context)
                 if (sGeneral == null) tryInitGeneralManager(launcherCtx, context)
                 if (sSmartSound == null) tryInitSmartSoundManager(launcherCtx, context)
                 if (doorVolumeEnabled() && sCarPropMgr == null) startDoorVolumeWatcher()
@@ -798,6 +808,85 @@ object MG4Hardware {
     // GeneralManager.init(Context, ISettingsServiceListener) — singleton sInstance.
     // Même pattern que tryInitVsm133 ; chargé depuis le launcher com.saicmotor.hmi.launcher.
     // -------------------------------------------------------------------------
+
+    /**
+     * VehicleControlManager — porte l'ESC sur SWI68/165 (get/setEspSwitch).
+     *
+     * Même schéma que [tryInitGeneralManager] : singleton statique, sinon init(Context, listener).
+     * On DOIT appeler init() nous-mêmes : la classe vient du classloader du launcher, mais les
+     * statiques vivent par processus, donc le singleton déjà construit côté launcher ne nous est
+     * pas visible.
+     */
+    private fun tryInitVehicleControlManager(launcherCtx: Context, appCtx: Context) {
+        if (sVcontrol != null) return
+        try {
+            val cls = launcherCtx.classLoader.loadClass(VCONTROL_CLASS)
+            val f = cls.getDeclaredField("sVehicleControlManager")
+            f.isAccessible = true
+            f.get(null)?.let {
+                sVcontrol = it
+                AppLogger.i(TAG, "  VehicleControlManager singleton ✓")
+                return
+            }
+            val initMethod = cls.methods.firstOrNull { m ->
+                m.name == "init" && m.parameterCount == 2 &&
+                Context::class.java.isAssignableFrom(m.parameterTypes[0])
+            } ?: run {
+                AppLogger.w(TAG, "  VehicleControlManager init() non trouvé")
+                return
+            }
+            val listenerType = initMethod.parameterTypes[1]
+            val listener = if (listenerType.isInterface) {
+                java.lang.reflect.Proxy.newProxyInstance(
+                    listenerType.classLoader, arrayOf(listenerType)
+                ) { _, method, _ ->
+                    if (method.name == "onServiceConnected") {
+                        try {
+                            f.get(null)?.let { sVcontrol = it }
+                            AppLogger.i(TAG, "  VehicleControlManager onServiceConnected — " +
+                                "sVcontrol=${if (sVcontrol != null) "OK ✓" else "null"}")
+                        } catch (_: Exception) {}
+                    }
+                    null
+                }
+            } else null
+            initMethod.invoke(null, appCtx, listener)
+            f.get(null)?.let { sVcontrol = it }
+            AppLogger.i(TAG, "  VehicleControlManager.init() appelé — " +
+                "sVcontrol=${if (sVcontrol != null) "OK ✓" else "null"}")
+        } catch (e: Exception) {
+            AppLogger.d(TAG, "  tryInitVehicleControlManager exc: ${e.message}")
+        }
+    }
+
+    /** Lecture sur VehicleControlManager. null si indisponible. */
+    private fun callVcontrol(methodName: String, vararg args: Any?): Any? {
+        val m = sVcontrol ?: return null
+        return try {
+            val types = args.map { if (it is Int) Int::class.javaPrimitiveType!! else it!!.javaClass }.toTypedArray()
+            m.javaClass.getMethod(methodName, *types).invoke(m, *args)
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "  VCTRL: $methodName() exc: ${e.message}")
+            null
+        }
+    }
+
+    /** Écriture sur VehicleControlManager — soumise au verrou de vitesse comme toute écriture. */
+    private fun callVcontrolVoid(methodName: String, vararg args: Any?): Boolean {
+        if (!VehicleWriteGate.allow("VCTRL $methodName")) return false
+        val m = sVcontrol ?: run {
+            AppLogger.w(TAG, "  VCTRL: $methodName() — manager non lié")
+            return false
+        }
+        return try {
+            val types = args.map { if (it is Int) Int::class.javaPrimitiveType!! else it!!.javaClass }.toTypedArray()
+            m.javaClass.getMethod(methodName, *types).invoke(m, *args)
+            true
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "  VCTRL: $methodName() exc: ${e.message}")
+            false
+        }
+    }
 
     private fun tryInitGeneralManager(launcherCtx: Context, appCtx: Context) {
         if (sGeneral != null) return
@@ -1055,6 +1144,7 @@ object MG4Hardware {
         sVsm?.let { tryGetVsmService(it, vsmClass) }
 
         // GeneralManager pour SWI68/SWI165 (luminosité écran) — même launcher context
+        tryInitVehicleControlManager(launcherCtx, context)   // ESC sur SWI68/165
         tryInitGeneralManager(launcherCtx, context)
 
         // SmartSoundManager pour SWI68/SWI165 (loudness audio) — même launcher context
@@ -1073,6 +1163,7 @@ object MG4Hardware {
                     } catch (_: Exception) {}
                 }
                 sVsm?.let { if (sVsmService == null) tryGetVsmService(it, vsmClass) }
+                if (sVcontrol == null) tryInitVehicleControlManager(launcherCtx, context)
                 if (sGeneral == null) tryInitGeneralManager(launcherCtx, context)
                 if (sSmartSound == null) tryInitSmartSoundManager(launcherCtx, context)
             }, delay)
@@ -1949,6 +2040,288 @@ object MG4Hardware {
             AppLogger.i(TAG, "  AEB SET sensitivity=$level via VPM")
             setIntPropertyVpmRecovery(PROP_AEB_SENSITIVITY, level)
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Somnolence (DMS), sensibilité de son alerte, et ESC — SWI133 uniquement
+    //
+    // Décodé du smali de com.saicmotor.hmi.vehiclesettings, classe VehiclePropertyID :
+    //   ID_AAD_UDW_MAIN_SWITCH             0x3010005   1=OFF, 2=ON, 0=OFF
+    //   ID_AAD_UDW_ALARM_TONE_SENSITIVITY  0x3010007   1=Faible, 2=Moyen, 3=Élevé
+    //   ID_ZONED_VEHICLE_ESP               0x4020003   lecture 0=OFF, 1=ON, 2=OFF
+    //
+    // UDW = « Unfit Driver Warning » : la sensibilité appartient bien à la somnolence et non au
+    // FCW — le handler d'origine s'appelle unsteadyDrivingWarningSenOnClick.
+    //
+    // Les autres firmwares exposent les mêmes réglages par d'autres voies, non câblées tant que
+    // SWI133 n'est pas validé sur véhicule :
+    //   SWI68/165     : setEspSwitch / setUnsteadyDrivingWarning / setUnsteadyDrivingWarningSen
+    //   A9 69/131/132 : transactions 0x54 (ESC, nommé « Eps »), 0x90 (DMS), 0x96 (sensibilité)
+    // -------------------------------------------------------------------------
+
+    // ⚠️ 0x3010005 (UDW_MAIN_SWITCH) et NON 0x3010001 (DMS_SWITCH). Les deux existent et
+    // portent des libelles voisins : DMS_SWITCH pilote la surveillance par CAMERA
+    // ("Avertisseur de somnolence du conducteur"), UDW_MAIN_SWITCH l'avertissement de
+    // somnolence de la capture ecran. Ecrire sur DMS_SWITCH n'avait aucun effet visible.
+    // Coherence a verifier a l'avenir : le commutateur et sa sensibilite doivent appartenir
+    // a la MEME famille (ici UDW_*), sinon c'est qu'on a melange deux reglages.
+    private const val PROP_UDW_MAIN_SWITCH = 0x3010005
+    private const val PROP_DMS_SENSITIVITY = 0x3010007
+    private const val PROP_ESC             = 0x4020003
+
+    private const val DMS_OFF = 1
+    private const val DMS_ON  = 2
+
+    /** Sensibilité de l'alerte de somnolence — mêmes paliers que la sensibilité AEB. */
+    object DrowsinessSensitivity {
+        const val LOW    = 1
+        const val MEDIUM = 2
+        const val HIGH   = 3
+    }
+
+    /**
+     * Vrai si ce firmware expose somnolence et ESC par la voie câblée ici (propriétés VPM).
+     *
+     * Volontairement restreint à SWI133 : ces IDs n'existent QUE sur cette génération — vérifié,
+     * ils sont absents du smali SWI68/165 (méthodes nommées) et d'A9 (transactions binder).
+     * Élargir la condition sans câbler ces voies ferait échouer les écritures en silence.
+     */
+    fun hasDrowsinessAndEsc(): Boolean =
+        FirmwareInfo.getGeneration() != FirmwareInfo.Gen.UNKNOWN
+
+    /**
+     * Vrai si ce firmware passe par carapi (A9). Les noms de méthodes y diffèrent de l'old-SDK.
+     *
+     * ⚠️ Ne PAS utiliser `FirmwareInfo.isNewGenVsm()` ici : il ne couvre que SWI69 et SWI131,
+     * il laisse SWI132 de côté alors que c'est bien un A9. Même triplet que isClimateA9().
+     */
+    private fun isA9Vsm(): Boolean {
+        val gen = FirmwareInfo.getGeneration()
+        return gen == FirmwareInfo.Gen.SWI69 || gen == FirmwareInfo.Gen.SWI131 ||
+               gen == FirmwareInfo.Gen.SWI132
+    }
+
+    // Noms de méthodes sur sVsm. Le commutateur et sa sensibilité viennent TOUJOURS de la même
+    // famille (UDW) : c'est la règle que la panne SWI133 a mise en évidence — un setDmsStatus
+    // (surveillance caméra) à côté d'un setUdwSensitivity ne pilote pas le même réglage.
+    // Codes de transaction A9 correspondants, consécutifs, ce qui confirme le regroupement :
+    //   setUdwStatus 0x94 / get 0x95   setUdwSensitivityState 0x96 / get 0x97
+    //   setDrivingEpsMode 0x54 / get 0x55   (ESC, nommé « Eps » et non « Esc »)
+    private fun nUdwSet() = if (isA9Vsm()) "setUdwStatus"           else "setUnsteadyDrivingWarning"
+    private fun nUdwGet() = if (isA9Vsm()) "getUdwStatus"           else "getUnsteadyDrivingWarning"
+    private fun nSenSet() = if (isA9Vsm()) "setUdwSensitivityState" else "setUnsteadyDrivingWarningSen"
+    private fun nSenGet() = if (isA9Vsm()) "getUdwSensitivityState" else "getUnsteadyDrivingWarningSen"
+    private fun nEscSet() = if (isA9Vsm()) "setDrivingEpsMode"      else "setEspSwitch"
+    private fun nEscGet() = if (isA9Vsm()) "getDrivingEpsMode"      else "getEspSwitch"
+
+    /** Lecture brute du commutateur/sensibilité, quelle que soit la voie. -1 si illisible. */
+    private fun readSafety(prop: Int, method: String): Int =
+        if (FirmwareInfo.isVsmBased()) (callVsm(method) as? Int) ?: -1
+        else getIntPropertyVpm(prop)
+
+    private fun writeSafety(prop: Int, method: String, value: Int): Boolean =
+        if (FirmwareInfo.isVsmBased()) callVsmVoid(method, value)
+        else setIntPropertyVpmRecovery(prop, value)
+
+    /**
+     * Avertissement de somnolence : true=ON, false=OFF, null=illisible.
+     *
+     * ⚠️ La valeur **0** compte pour OFF, pas pour « illisible ». C'est ce que fait l'UI d'origine
+     * (onDriverMonitorSysStatusChanged : 1→OFF, 2→ON, 0→OFF, autre→« value error »), et l'ignorer
+     * renvoyait null sur un état parfaitement valide — donc aucun bouton allumé à l'écran.
+     * Seul -1, la sentinelle d'échec de [getIntPropertyVpm], vaut réellement « illisible ».
+     */
+    fun isDrowsinessOn(): Boolean? {
+        if (!hasDrowsinessAndEsc()) return null
+        return when (readSafety(PROP_UDW_MAIN_SWITCH, nUdwGet())) {
+            DMS_ON     -> true
+            DMS_OFF, 0 -> false
+            else       -> null
+        }
+    }
+
+    fun setDrowsiness(on: Boolean): Boolean {
+        if (!hasDrowsinessAndEsc()) return false
+        val v = if (on) DMS_ON else DMS_OFF
+        AppLogger.i(TAG, "  UDW SET switch=$v (${if (on) "ON" else "OFF"}) via ${nUdwSet()}")
+        return writeSafety(PROP_UDW_MAIN_SWITCH, nUdwSet(), v)
+    }
+
+    /** Sensibilité de l'alerte somnolence (1=Faible, 2=Moyen, 3=Élevé), -1 si illisible. */
+    fun getDrowsinessSensitivity(): Int {
+        if (!hasDrowsinessAndEsc()) return -1
+        val raw = readSafety(PROP_DMS_SENSITIVITY, nSenGet())
+        return if (raw in 1..3) raw else -1
+    }
+
+    fun setDrowsinessSensitivity(level: Int): Boolean {
+        if (!hasDrowsinessAndEsc() || level !in 1..3) return false
+        AppLogger.i(TAG, "  UDW SET sensitivity=$level via ${nSenSet()}")
+        return writeSafety(PROP_DMS_SENSITIVITY, nSenSet(), level)
+    }
+
+    /**
+     * Lecture brute de l'ESC. Trois voies DIFFÉRENTES, et c'est le piège :
+     *   • SWI133      : propriété VPM 0x4020003 ;
+     *   • SWI68/165   : **VehicleControlManager**, pas le VehicleSettingManager — get/setEspSwitch
+     *     n'existent que là. Les chercher sur sVsm échouait sans bruit, d'où un ESC inerte ;
+     *   • A9          : CarVehicleSettingClient (setDrivingEpsMode), donc bien sVsm.
+     */
+    private fun readEscRaw(): Int = when {
+        isA9Vsm()                 -> (callVsm(nEscGet()) as? Int) ?: -1
+        FirmwareInfo.isVsmBased() -> (callVcontrol(nEscGet()) as? Int) ?: -1
+        else                      -> getIntPropertyVpm(PROP_ESC)
+    }
+
+    private fun writeEscRaw(value: Int): Boolean = when {
+        isA9Vsm()                 -> callVsmVoid(nEscSet(), value)
+        FirmwareInfo.isVsmBased() -> callVcontrolVoid(nEscSet(), value)
+        else                      -> setIntPropertyVpmRecovery(PROP_ESC, value)
+    }
+
+    /** ESC : true=ON, false=OFF, null=illisible. Lecture 0=OFF, 1=ON, 2=OFF. */
+    fun isEscOn(): Boolean? {
+        if (!hasDrowsinessAndEsc()) return null
+        return when (readEscRaw()) {
+            1    -> true
+            0, 2 -> false
+            else -> null
+        }
+    }
+
+    /**
+     * Active/désactive l'ESC.
+     *
+     * ⚠️ L'écriture n'est PAS un « set » ordinaire : dans l'UI d'origine, l'interrupteur ET son
+     * dialogue de confirmation écrivent tous deux la valeur **1**. C'est la signature d'une
+     * bascule qui ignore son argument, comme les commandes clim SAIC (voir hvacCycleTo).
+     *
+     * On lit donc l'état courant et on n'écrit QUE s'il diffère de la cible. Le helper reste juste
+     * dans les deux hypothèses : si c'était en réalité un « set » où 1=ON, écrire 1 pour passer de
+     * OFF à ON donne le même résultat. [runSafetyDiag] tranche la question.
+     *
+     * Refuse plutôt que de deviner quand l'état courant est illisible : sur une bascule, partir
+     * d'un état supposé fait l'inverse de ce qui est demandé une fois sur deux.
+     */
+    /** Nombre de lectures concordantes exigées avant d'agir sur l'ESC. */
+    private const val ESC_LECTURES = 3
+    /** Intervalle entre deux lectures, en ms. */
+    private const val ESC_INTERVALLE_MS = 300L
+    /** Délai laissé au calculateur pour appliquer la bascule avant de constater l'effet. */
+    private const val ESC_STABILISATION_MS = 600L
+
+    /**
+     * État de l'ESC confirmé par [ESC_LECTURES] lectures concordantes, ou `null` si on ne peut
+     * pas conclure.
+     *
+     * Deux raisons de renoncer, et la seconde est la plus importante :
+     *  • une lecture illisible — on ne devine pas ;
+     *  • des lectures **divergentes**, qui signifient que la voiture est en train d'agir sur
+     *    l'ESC à cet instant précis. C'est exactement le moment où il ne faut surtout pas
+     *    écrire : l'écriture est une bascule, elle s'ajouterait à celle du véhicule et
+     *    produirait l'inverse du résultat voulu.
+     */
+    private fun lireEscStable(): Boolean? {
+        val lectures = ArrayList<Boolean?>(ESC_LECTURES)
+        repeat(ESC_LECTURES) { i ->
+            if (i > 0) try { Thread.sleep(ESC_INTERVALLE_MS) } catch (_: InterruptedException) {}
+            lectures.add(isEscOn())
+        }
+        if (lectures.any { it == null }) {
+            AppLogger.w(SAFE_TAG, "ESC : lecture illisible ($lectures) — aucune action")
+            return null
+        }
+        val distinctes = lectures.distinct()
+        if (distinctes.size > 1) {
+            AppLogger.w(SAFE_TAG, "ESC : lectures DIVERGENTES ($lectures) — la voiture agit " +
+                "en ce moment, on renonce plutôt que de s'ajouter à sa bascule")
+            return null
+        }
+        return distinctes.first()
+    }
+
+    /**
+     * Active ou désactive l'ESC.
+     *
+     * ⚠️ L'écriture est un CYCLE, pas une consigne : vérifié sur cinq chemins de l'UI d'origine,
+     * deux firmwares et deux API différentes — la valeur écrite est **toujours 1**, pour allumer
+     * comme pour éteindre. Il n'existe aucune voie à valeur absolue. C'est donc la lecture
+     * préalable, et elle seule, qui détermine le sens de l'action.
+     *
+     * D'où le protocole : on n'agit QUE si [ESC_LECTURES] lectures concordantes diffèrent de la
+     * cible. Toute incertitude — lecture illisible ou instable — vaut abstention. Le véhicule
+     * remet l'ESC sur ON à chaque démarrage ; ne rien faire est donc toujours sans danger,
+     * contrairement à une écriture au mauvais moment.
+     *
+     * ⚠️ BLOQUE environ une seconde : à n'appeler QUE hors du thread principal.
+     */
+    fun setEsc(on: Boolean): Boolean {
+        if (!hasDrowsinessAndEsc()) return false
+        // Garde explicite : whenKatman4Ready republie ses écouteurs sur le Looper principal,
+        // donc un appelant distrait arriverait ici sur le thread UI et gèlerait l'écran.
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            AppLogger.w(SAFE_TAG, "setEsc refusé — appelé sur le thread UI alors qu'il attend " +
+                "~1 s. L'appelant doit basculer sur un contexte IO.")
+            return false
+        }
+
+        val stable = lireEscStable() ?: return false
+        if (stable == on) {
+            AppLogger.i(SAFE_TAG, "ESC déjà ${if (on) "ON" else "OFF"} (confirmé " +
+                "$ESC_LECTURES fois) — aucune écriture")
+            return true
+        }
+
+        AppLogger.i(SAFE_TAG, "ESC → ${if (on) "ON" else "OFF"} : état confirmé=$stable, " +
+            "bascule via ${nEscSet()} (écriture de 1)")
+        val ok = writeEscRaw(1)
+
+        try { Thread.sleep(ESC_STABILISATION_MS) } catch (_: InterruptedException) {}
+        val obtenu = isEscOn()
+        if (obtenu != on) {
+            AppLogger.w(SAFE_TAG, "⚠️ ESC : cible=${if (on) "ON" else "OFF"} mais état relu=" +
+                "${obtenu ?: "illisible"} — AUCUNE réécriture (elle ferait osciller)")
+        } else {
+            AppLogger.i(SAFE_TAG, "ESC conforme après écriture : ${if (on) "ON" else "OFF"}")
+        }
+        return ok && obtenu == on
+    }
+
+    // ── Sonde somnolence / sensibilité / ESC (bouton Diagnostic) ──────────────
+    private const val SAFE_TAG = "MG4_SAFE"
+
+    /**
+     * Sonde des trois réglages — **lecture seule**.
+     *
+     * Elle est appelée par le bouton Diagnostic, qui enchaîne les sondes pour produire un
+     * rapport : rien de ce qui est déclenché là ne doit modifier l'état du véhicule, et surtout
+     * pas un organe de sécurité active. La question ouverte sur l'encodage d'écriture de l'ESC
+     * est donc tranchée ailleurs — [setEsc] relit et journalise après chaque écriture, donc un
+     * simple appui sur le bouton ESC de l'écran suffit à conclure.
+     */
+    fun runSafetyDiag() {
+        AppLogger.i(SAFE_TAG, "── DIAG somnolence / sensibilité / ESC ──")
+        AppLogger.i(SAFE_TAG, "firmware=${FirmwareInfo.getGeneration()} géré=${hasDrowsinessAndEsc()}")
+        if (!hasDrowsinessAndEsc()) {
+            AppLogger.i(SAFE_TAG, "→ firmware inconnu, aucune voie applicable")
+            return
+        }
+        AppLogger.i(SAFE_TAG, "voie UDW=" +
+            (if (FirmwareInfo.isVsmBased()) "sVsm (" + nUdwGet() + ")" else "VPM") +
+            " | voie ESC=" + when {
+                isA9Vsm()                 -> "sVsm (" + nEscGet() + ")"
+                FirmwareInfo.isVsmBased() -> "VehicleControlManager lié=" + (sVcontrol != null)
+                else                      -> "VPM 0x4020003"
+            })
+
+        val dms = readSafety(PROP_UDW_MAIN_SWITCH, nUdwGet())
+        val sen = readSafety(PROP_DMS_SENSITIVITY, nSenGet())
+        val esc = readEscRaw()
+        AppLogger.i(SAFE_TAG, "UDW_MAIN_SWITCH(0x3010005) = $dms (2=ON, 1 et 0=OFF) → ${isDrowsinessOn()}")
+        AppLogger.i(SAFE_TAG, "UDW_SENSITIVITY(0x3010007) = $sen (1=Faible, 2=Moyen, 3=Élevé)")
+        AppLogger.i(SAFE_TAG, "ESP(0x4020003)             = $esc (0=OFF, 1=ON, 2=OFF) → ${isEscOn()}")
+
+        AppLogger.i(SAFE_TAG, "── fin DIAG ──")
     }
 
     // -------------------------------------------------------------------------
@@ -4046,7 +4419,14 @@ object MG4Hardware {
      *
      * ⚠️ Bloquant (plusieurs secondes avec les bascules) → appeler depuis un thread IO.
      */
-    fun applyClimatePreset(targetTemp: Int, fanLevel: Int, defrostFront: Boolean, defrostRear: Boolean): Boolean {
+    fun applyClimatePreset(
+        targetTemp: Int,
+        fanLevel: Int,
+        defrostFront: Boolean,
+        defrostRear: Boolean,
+        autoMode: Boolean = false,
+        loopMode: Int? = null
+    ): Boolean {
         val state = getClimateState() ?: run {
             AppLogger.w(CLIM_TAG, "Préréglage : état clim illisible → abandon")
             return false
@@ -4054,11 +4434,34 @@ object MG4Hardware {
         var ok = setClimatePower(true)
         ok = setClimateAc(true) && ok
         ok = setClimateTemp(targetTemp.coerceIn(state.tempMin, state.tempMax)) && ok
-        ok = setClimateFan(fanLevel.coerceIn(state.fanMin, state.fanMax)) && ok
+
+        // ⚠️ Mode auto et ventilation manuelle s'excluent : régler une vitesse fait sortir du
+        // mode auto, et activer le mode auto reprend la main sur la vitesse. Appliquer les deux
+        // donnerait un état final décidé par le seul ordre des appels, pas par l'utilisateur.
+        if (autoMode) {
+            ok = setClimateAuto(true) && ok
+        } else {
+            ok = setClimateFan(fanLevel.coerceIn(state.fanMin, state.fanMax)) && ok
+        }
+
         if (state.defrostFront != null) ok = setClimateDefrostFront(defrostFront) && ok
         if (state.defrostRear  != null) ok = setClimateDefrostRear(defrostRear) && ok
-        AppLogger.i(CLIM_TAG, "Préréglage appliqué : consigne=$targetTemp vent=$fanLevel " +
-            "dégAV=$defrostFront dégAR=$defrostRear → ok=$ok")
+
+        // null = l'utilisateur n'a pas demandé à piloter le recyclage : on n'y touche pas, pour
+        // ne pas modifier le comportement des automatisations déjà configurées.
+        if (loopMode != null) {
+            val mode = when (loopMode) {
+                0    -> LoopMode.INNER
+                1    -> LoopMode.OUTSIDE
+                else -> LoopMode.AUTO
+            }
+            ok = setClimateLoopMode(mode) && ok
+        }
+
+        AppLogger.i(CLIM_TAG, "Préréglage appliqué : consigne=$targetTemp " +
+            (if (autoMode) "ventilation=AUTO" else "vent=$fanLevel") +
+            " dégAV=$defrostFront dégAR=$defrostRear " +
+            "recyclage=${loopMode ?: "inchangé"} → ok=$ok")
         return ok
     }
 

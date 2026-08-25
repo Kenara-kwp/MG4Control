@@ -185,7 +185,7 @@
     <string name="info_github_link">github.com/SliDeeN/MG4Control</string>
     <string name="info_gitlab_link">gitlab.com/SliDeeN/mg4control</string>
     <string name="info_made_with_love">Made with ❤ by SliDeeN and Claude IA</string>
-    <string name="info_special_thanks">Danke an confor1max für SWI68-Tests 🙏</string>
+    <string name="info_special_thanks">Danke an confor1max, FrAsErTaG, sixty4h, hojnikb und depippi.p für die Tests vor jeder Version 🙏</string>
     <string name="info_based_on">Basierend auf DriveHub Dort von Merth4n &amp; hotboy_ist</string>
     <string name="info_close">Schließen</string>
 
@@ -327,7 +327,7 @@
     <string name="clim_fan">Gebläse</string>
     <string name="clim_modes_title">Modi</string>
     <string name="clim_section_switches">Steuerung</string>
-    <string name="clim_power">System</string>
+    <string name="clim_power">ON/OFF</string>
     <string name="clim_ac">A/C</string>
     <string name="clim_auto">Auto</string>
     <string name="clim_section_loop">Umluft</string>
@@ -371,4 +371,91 @@
     <!-- Canal beta OTA -->
     <string name="settings_beta_channel">Beta-Update-Kanal</string>
     <string name="settings_beta_channel_desc">Erhält Testversionen vor der offiziellen Veröffentlichung. Sie können Fehler enthalten. Eine Rückkehr zu einer früheren Version ist per Update nicht möglich.</string>
+
+    <!-- Somnolence / sensibilite d'alerte / ESC (SWI133) -->
+    <string name="safety_drowsiness">Müdigkeitswarnung</string>
+    <string name="safety_drowsiness_sensitivity">Warnempfindlichkeit</string>
+    <string name="safety_esc">ESC</string>
+    <string name="sens_low">Niedrig</string>
+    <string name="sens_medium">Standard</string>
+    <string name="sens_high">Hoch</string>
+    <string name="common_on">ON</string>
+    <string name="common_off">OFF</string>
+
+    <!-- Automatisation clim : mode auto + recyclage -->
+    <string name="ac_auto_auto_mode">Automatikmodus</string>
+    <string name="ac_auto_recirc_force">Luftumwälzung erzwingen</string>
+    <string name="recirc_inner">Innen</string>
+    <string name="recirc_outside">Außen</string>
+    <string name="recirc_auto">Auto</string>
+
+    <!-- Consommation de donnees (Reglages > Infos) -->
+    <string name="data_usage_title">Datenverbrauch</string>
+    <string name="data_usage_month">Aktueller Monat</string>
+    <string name="data_usage_30d">Letzte 30 Tage</string>
+    <string name="data_usage_unavailable">Nicht verfügbar</string>
+    <string name="data_usage_today">Heute</string>
+    <string name="data_usage_week">Aktuelle Woche</string>
+
+    <!-- Raccourcis avances (service d accessibilite) -->
+    <string name="shortcuts_cat_advanced">Erweitert</string>
+    <string name="adv_sc_title">Erweiterte Tastenkürzel</string>
+    <string name="adv_sc_desc">Erlaubt MG4Control, Lenkradtasten vor dem Launcher zu sehen. Erfordert das Aktivieren des Bedienungshilfen-Dienstes.</string>
+    <string name="adv_sc_service_desc">Erlaubt die Nutzung von Lenkradtasten als MG4Control-Kürzel.</string>
+    <string name="adv_sc_open_accessibility">Bedienungshilfen aktivieren</string>
+    <string name="adv_sc_status_on">Dienst aktiv</string>
+    <string name="adv_sc_status_off">Dienst inaktiv</string>
+    <string name="adv_sc_record">Taste aufzeichnen</string>
+    <string name="adv_sc_recording">Lenkradtaste drücken…</string>
+    <string name="adv_sc_cancel">Abbrechen</string>
+    <string name="adv_sc_last_key">Zuletzt erkannte Taste</string>
+    <string name="adv_sc_none">keine</string>
+    <string name="shortcuts_cat_classic">Tastenkürzel</string>
+    <string name="adv_sc_list_title">Kürzelliste</string>
+    <string name="adv_sc_new">Neues Kürzel</string>
+    <string name="adv_sc_step_key">1 · Taste</string>
+    <string name="adv_sc_step_press">2 · Druckart</string>
+    <string name="adv_sc_step_action">3 · Funktion</string>
+    <string name="adv_sc_empty">Kein erweitertes Kürzel gespeichert.</string>
+    <string name="adv_sc_claimed_warning">Die zugewiesene Taste kann nur noch für MG4Control verwendet werden, bis das Kürzel unter « KÜRZELLISTE » gelöscht wird.</string>
+    <string name="adv_sc_delete">Löschen</string>
+    <string name="adv_sc_status_label">Dienststatus</string>
+    <string name="adv_sc_saved">Kürzel gespeichert</string>
+    <string name="adv_sc_create">Kürzel erstellen</string>
+    <string name="adv_sc_need_key">Zuerst eine Taste aufzeichnen</string>
+    <string name="adv_sc_need_action">Funktion wählen</string>
+    <string name="adv_sc_record_cancelled">Aufzeichnung abgebrochen</string>
+
+    <!-- Nouvelles actions de raccourci -->
+    <string name="shortcuts_action_esc">ESC (ON/OFF)</string>
+    <string name="shortcuts_action_drowsiness">Müdigkeit (ON/OFF)</string>
+    <string name="shortcuts_action_drowsiness_sen">Müdigkeit: Empfindlichkeit</string>
+    <string name="shortcuts_action_hvac_toggle">Klima (ON/OFF)</string>
+    <string name="shortcuts_action_hvac_temp_up">Klima: Temperatur +</string>
+    <string name="shortcuts_action_hvac_temp_down">Klima: Temperatur -</string>
+    <string name="shortcuts_action_hvac_fan_up">Klima: Gebläse +</string>
+    <string name="shortcuts_action_hvac_fan_down">Klima: Gebläse -</string>
+
+    <!-- Raccourcis : confort et affichage -->
+    <string name="shortcuts_action_regen_cycle">Rekuperation: nächste Stufe</string>
+    <string name="shortcuts_action_seat_heat_left">Sitzheizung links: Wechsel</string>
+    <string name="shortcuts_action_seat_heat_right">Sitzheizung rechts: Wechsel</string>
+    <string name="shortcuts_action_steering_heat">Lenkradheizung (ON/OFF)</string>
+    <string name="shortcuts_action_defrost_front">Entfrosten vorne (ON/OFF)</string>
+    <string name="shortcuts_action_defrost_rear">Entfrosten hinten (ON/OFF)</string>
+    <string name="shortcuts_action_hvac_recirc">Umluft: Wechsel</string>
+    <string name="shortcuts_action_brightness_up">Helligkeit +</string>
+    <string name="shortcuts_action_brightness_down">Helligkeit -</string>
+
+    <!-- Liste des raccourcis avances : modification et remplacement -->
+    <string name="adv_sc_edit">Ändern</string>
+    <string name="adv_sc_edit_title">Funktion ändern</string>
+    <string name="adv_sc_updated">Verknüpfung geändert</string>
+    <string name="adv_sc_press_short">Kurzer Druck</string>
+    <string name="adv_sc_press_long_lbl">Langer Druck</string>
+    <string name="adv_sc_key_unknown">Taste %1$d</string>
+    <string name="adv_sc_replace_title">Taste bereits belegt</string>
+    <string name="adv_sc_replace_msg">%1$s bei %2$s löst bereits aus: %3$s.\n\nDurch die neue Funktion ersetzen?</string>
+    <string name="adv_sc_replace_ok">Ersetzen</string>
+    <string name="adv_sc_press_double">Doppelter Druck</string>
 </resources>

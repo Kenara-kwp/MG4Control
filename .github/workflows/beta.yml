@@ -22,6 +22,10 @@ on:
         description: "Ce qu'il faut tester / ce qui a change"
         type: string
         default: ""
+      keep:
+        description: "Nombre de betas a conserver (1 = seulement celle-ci ; 0 = ne rien supprimer)"
+        type: string
+        default: "3"
 
 permissions:
   contents: write
@@ -154,3 +158,61 @@ jobs:
             |---|---|---|---|
             | **Online** | `MG4Control-online-*.apk` | yes | yes |
             | **Offline** | `MG4Control-offline-*.apk` | none | no |
+
+      # Purge des anciennes betas. Trois garde-fous, dans cet ordre :
+      #   1. on ne touche QU'AUX prereleases (select .prerelease==true) — une erreur de filtre
+      #      effacerait les releases stables, d'ou dependent tous les utilisateurs ;
+      #   2. on ne supprime jamais celle qu'on vient de publier ;
+      #   3. si elle n'apparait pas encore dans l'API, on n'efface RIEN — mieux vaut une liste
+      #      trop longue qu'une suppression decidee sur un etat incomplet.
+      #
+      # On garde les N plus recentes parce que l'OTA ne sait PAS redescendre de version : le seul
+      # retour arriere depuis une beta cassee est de reinstaller l'APK precedent a la main. Purger
+      # jusqu'a une seule supprimerait ce filet.
+      #
+      # Regle supplementaire : une beta dont la STABLE de meme numero est sortie ne sert plus a
+      # rien (la stable la remplace pour tout le monde), elle part quel que soit son rang.
+      - name: Prune old beta releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEEP_TAG: v${{ steps.ver.outputs.full }}
+          KEEP_N: ${{ inputs.keep }}
+        run: |
+          set -euo pipefail
+          if ! [ "$KEEP_N" -gt 0 ] 2>/dev/null; then
+            echo "keep=$KEEP_N : purge desactivee."; exit 0
+          fi
+
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" > all.json
+
+          # Numeros des releases stables publiees (sans le "v" ni le suffixe).
+          jq -r '.[] | select(.prerelease==false and .draft==false) | .tag_name' all.json \
+            | sed 's/^v//' | cut -d- -f1 | sort -u > stables.txt
+          # Prereleases, de la plus recente a la plus ancienne (ordre de l'API).
+          jq -r '.[] | select(.prerelease==true) | .tag_name' all.json > betas.txt
+
+          echo "Stables publiees : $(tr '\n' ' ' < stables.txt)"
+          echo "Prereleases      : $(wc -l < betas.txt)"
+
+          if ! grep -qx "$KEEP_TAG" betas.txt; then
+            echo "::warning::$KEEP_TAG absente de l'API (propagation ?) — purge annulee par securite"
+            exit 0
+          fi
+
+          kept=0
+          while read -r tag; do
+            if [ -z "$tag" ]; then continue; fi
+            base=$(echo "${tag#v}" | cut -d- -f1)
+            if [ "$tag" != "$KEEP_TAG" ] && grep -qx "$base" stables.txt; then
+              echo "  supprime $tag — la stable $base est publiee"
+              gh release delete "$tag" --yes --cleanup-tag
+              continue
+            fi
+            kept=$((kept + 1))
+            if [ "$kept" -le "$KEEP_N" ] || [ "$tag" = "$KEEP_TAG" ]; then
+              echo "  conserve $tag ($kept/$KEEP_N)"
+              continue
+            fi
+            echo "  supprime $tag — au-dela des $KEEP_N conservees"
+            gh release delete "$tag" --yes --cleanup-tag
+          done < betas.txt

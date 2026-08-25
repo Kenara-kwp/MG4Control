@@ -185,7 +185,7 @@
     <string name="info_github_link">github.com/SliDeeN/MG4Control</string>
     <string name="info_gitlab_link">gitlab.com/SliDeeN/mg4control</string>
     <string name="info_made_with_love">Made with ❤ by SliDeeN and Claude IA</string>
-    <string name="info_special_thanks">Grazie a confor1max per i test SWI68 🙏</string>
+    <string name="info_special_thanks">Grazie a confor1max, FrAsErTaG, sixty4h, hojnikb e depippi.p per i test prima di ogni versione 🙏</string>
     <string name="info_based_on">Basato su DriveHub Dort di Merth4n &amp; hotboy_ist</string>
     <string name="info_close">Chiudi</string>
 
@@ -327,7 +327,7 @@
     <string name="clim_fan">Ventilazione</string>
     <string name="clim_modes_title">Modalità</string>
     <string name="clim_section_switches">Comandi</string>
-    <string name="clim_power">Sistema</string>
+    <string name="clim_power">ON/OFF</string>
     <string name="clim_ac">A/C</string>
     <string name="clim_auto">Auto</string>
     <string name="clim_section_loop">Ricircolo</string>
@@ -371,4 +371,91 @@
     <!-- Canal beta OTA -->
     <string name="settings_beta_channel">Canale di aggiornamento beta</string>
     <string name="settings_beta_channel_desc">Riceve versioni di prova prima del rilascio ufficiale. Possono contenere errori. Non è possibile tornare a una versione precedente tramite l\'aggiornamento.</string>
+
+    <!-- Somnolence / sensibilite d'alerte / ESC (SWI133) -->
+    <string name="safety_drowsiness">Avviso di sonnolenza</string>
+    <string name="safety_drowsiness_sensitivity">Sensibilità dell\'avviso</string>
+    <string name="safety_esc">ESC</string>
+    <string name="sens_low">Bassa</string>
+    <string name="sens_medium">Standard</string>
+    <string name="sens_high">Alta</string>
+    <string name="common_on">ON</string>
+    <string name="common_off">OFF</string>
+
+    <!-- Automatisation clim : mode auto + recyclage -->
+    <string name="ac_auto_auto_mode">Modalità automatica</string>
+    <string name="ac_auto_recirc_force">Forza il ricircolo d\'aria</string>
+    <string name="recirc_inner">Interno</string>
+    <string name="recirc_outside">Esterno</string>
+    <string name="recirc_auto">Auto</string>
+
+    <!-- Consommation de donnees (Reglages > Infos) -->
+    <string name="data_usage_title">Consumo dati</string>
+    <string name="data_usage_month">Mese corrente</string>
+    <string name="data_usage_30d">Ultimi 30 giorni</string>
+    <string name="data_usage_unavailable">Non disponibile</string>
+    <string name="data_usage_today">Oggi</string>
+    <string name="data_usage_week">Settimana corrente</string>
+
+    <!-- Raccourcis avances (service d accessibilite) -->
+    <string name="shortcuts_cat_advanced">Avanzate</string>
+    <string name="adv_sc_title">Scorciatoie avanzate</string>
+    <string name="adv_sc_desc">Consente a MG4Control di vedere i tasti del volante prima del launcher. Richiede l\'attivazione del servizio di accessibilità.</string>
+    <string name="adv_sc_service_desc">Consente di usare i tasti del volante come scorciatoie MG4Control.</string>
+    <string name="adv_sc_open_accessibility">Attiva accessibilità</string>
+    <string name="adv_sc_status_on">Servizio attivo</string>
+    <string name="adv_sc_status_off">Servizio inattivo</string>
+    <string name="adv_sc_record">Registra un tasto</string>
+    <string name="adv_sc_recording">Premi un tasto del volante…</string>
+    <string name="adv_sc_cancel">Annulla</string>
+    <string name="adv_sc_last_key">Ultimo tasto rilevato</string>
+    <string name="adv_sc_none">nessuno</string>
+    <string name="shortcuts_cat_classic">Scorciatoie</string>
+    <string name="adv_sc_list_title">Elenco scorciatoie</string>
+    <string name="adv_sc_new">Nuova scorciatoia</string>
+    <string name="adv_sc_step_key">1 · Tasto</string>
+    <string name="adv_sc_step_press">2 · Tipo di pressione</string>
+    <string name="adv_sc_step_action">3 · Funzione</string>
+    <string name="adv_sc_empty">Nessuna scorciatoia avanzata registrata.</string>
+    <string name="adv_sc_claimed_warning">Il tasto assegnato non potrà più essere usato per altro che MG4Control, fino all\'eliminazione della scorciatoia in « ELENCO SCORCIATOIE ».</string>
+    <string name="adv_sc_delete">Elimina</string>
+    <string name="adv_sc_status_label">Stato del servizio</string>
+    <string name="adv_sc_saved">Scorciatoia salvata</string>
+    <string name="adv_sc_create">Crea la scorciatoia</string>
+    <string name="adv_sc_need_key">Registra prima un tasto</string>
+    <string name="adv_sc_need_action">Scegli una funzione</string>
+    <string name="adv_sc_record_cancelled">Registrazione annullata</string>
+
+    <!-- Nouvelles actions de raccourci -->
+    <string name="shortcuts_action_esc">ESC (ON/OFF)</string>
+    <string name="shortcuts_action_drowsiness">Sonnolenza (ON/OFF)</string>
+    <string name="shortcuts_action_drowsiness_sen">Sonnolenza: sensibilità</string>
+    <string name="shortcuts_action_hvac_toggle">Clima (ON/OFF)</string>
+    <string name="shortcuts_action_hvac_temp_up">Clima: temperatura +</string>
+    <string name="shortcuts_action_hvac_temp_down">Clima: temperatura -</string>
+    <string name="shortcuts_action_hvac_fan_up">Clima: ventilazione +</string>
+    <string name="shortcuts_action_hvac_fan_down">Clima: ventilazione -</string>
+
+    <!-- Raccourcis : confort et affichage -->
+    <string name="shortcuts_action_regen_cycle">Rigenerazione: livello successivo</string>
+    <string name="shortcuts_action_seat_heat_left">Sedile sinistro riscaldato: ciclo</string>
+    <string name="shortcuts_action_seat_heat_right">Sedile destro riscaldato: ciclo</string>
+    <string name="shortcuts_action_steering_heat">Volante riscaldato (ON/OFF)</string>
+    <string name="shortcuts_action_defrost_front">Sbrinamento anteriore (ON/OFF)</string>
+    <string name="shortcuts_action_defrost_rear">Sbrinamento posteriore (ON/OFF)</string>
+    <string name="shortcuts_action_hvac_recirc">Ricircolo: ciclo</string>
+    <string name="shortcuts_action_brightness_up">Luminosità +</string>
+    <string name="shortcuts_action_brightness_down">Luminosità -</string>
+
+    <!-- Liste des raccourcis avances : modification et remplacement -->
+    <string name="adv_sc_edit">Modifica</string>
+    <string name="adv_sc_edit_title">Cambia funzione</string>
+    <string name="adv_sc_updated">Scorciatoia modificata</string>
+    <string name="adv_sc_press_short">Pressione breve</string>
+    <string name="adv_sc_press_long_lbl">Pressione lunga</string>
+    <string name="adv_sc_key_unknown">Tasto %1$d</string>
+    <string name="adv_sc_replace_title">Pulsante già usato</string>
+    <string name="adv_sc_replace_msg">%1$s con %2$s esegue già: %3$s.\n\nSostituire con la nuova funzione?</string>
+    <string name="adv_sc_replace_ok">Sostituisci</string>
+    <string name="adv_sc_press_double">Doppia pressione</string>
 </resources>

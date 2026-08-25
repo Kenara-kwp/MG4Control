@@ -187,7 +187,7 @@
     <string name="info_github_link">github.com/SliDeeN/MG4Control</string>
     <string name="info_gitlab_link">gitlab.com/SliDeeN/mg4control</string>
     <string name="info_made_with_love">Made with ❤ by SliDeeN and Claude IA</string>
-    <string name="info_special_thanks">Merci à confor1max pour les tests SWI68 🙏</string>
+    <string name="info_special_thanks">Merci à confor1max, FrAsErTaG, sixty4h, hojnikb et depippi.p pour les tests avant chaque release 🙏</string>
     <string name="info_based_on">Basé sur DriveHub Dort by Merth4n &amp; hotboy_ist</string>
     <string name="info_close">Fermer</string>
 
@@ -329,7 +329,7 @@
     <string name="clim_fan">Ventilation</string>
     <string name="clim_modes_title">Modes</string>
     <string name="clim_section_switches">Commandes</string>
-    <string name="clim_power">Système</string>
+    <string name="clim_power">ON/OFF</string>
     <string name="clim_ac">A/C</string>
     <string name="clim_auto">Auto</string>
     <string name="clim_section_loop">Recirculation</string>
@@ -373,4 +373,91 @@
     <!-- Canal beta OTA -->
     <string name="settings_beta_channel">Canal de mise à jour bêta</string>
     <string name="settings_beta_channel_desc">Reçoit les versions de test avant leur sortie officielle. Elles peuvent contenir des bugs. Le retour à une version antérieure n\'est pas possible par mise à jour.</string>
+
+    <!-- Somnolence / sensibilite d'alerte / ESC (SWI133) -->
+    <string name="safety_drowsiness">Avertissement de somnolence</string>
+    <string name="safety_drowsiness_sensitivity">Sensibilité de l\'alerte</string>
+    <string name="safety_esc">ESC</string>
+    <string name="sens_low">Faible</string>
+    <string name="sens_medium">Standard</string>
+    <string name="sens_high">Élevé</string>
+    <string name="common_on">ON</string>
+    <string name="common_off">OFF</string>
+
+    <!-- Automatisation clim : mode auto + recyclage -->
+    <string name="ac_auto_auto_mode">Mode automatique</string>
+    <string name="ac_auto_recirc_force">Forcer la recirculation d\'air</string>
+    <string name="recirc_inner">Intérieur</string>
+    <string name="recirc_outside">Extérieur</string>
+    <string name="recirc_auto">Auto</string>
+
+    <!-- Consommation de donnees (Reglages > Infos) -->
+    <string name="data_usage_title">Consommation de données</string>
+    <string name="data_usage_month">Mois courant</string>
+    <string name="data_usage_30d">30 derniers jours</string>
+    <string name="data_usage_unavailable">Indisponible</string>
+    <string name="data_usage_today">Aujourd\'hui</string>
+    <string name="data_usage_week">Semaine en cours</string>
+
+    <!-- Raccourcis avances (service d accessibilite) -->
+    <string name="shortcuts_cat_advanced">Avancés</string>
+    <string name="adv_sc_title">Raccourcis avancés</string>
+    <string name="adv_sc_desc">Permet à MG4Control de voir les touches du volant avant le launcher. Nécessite d\'activer le service d\'accessibilité.</string>
+    <string name="adv_sc_service_desc">Permet d\'utiliser les touches du volant comme raccourcis MG4Control.</string>
+    <string name="adv_sc_open_accessibility">Activer l\'accessibilité</string>
+    <string name="adv_sc_status_on">Service actif</string>
+    <string name="adv_sc_status_off">Service inactif</string>
+    <string name="adv_sc_record">Enregistrer une touche</string>
+    <string name="adv_sc_recording">Appuyez sur une touche du volant…</string>
+    <string name="adv_sc_cancel">Annuler</string>
+    <string name="adv_sc_last_key">Dernière touche détectée</string>
+    <string name="adv_sc_none">aucune</string>
+    <string name="shortcuts_cat_classic">Raccourcis</string>
+    <string name="adv_sc_list_title">Liste des raccourcis</string>
+    <string name="adv_sc_new">Nouveau raccourci</string>
+    <string name="adv_sc_step_key">1 · Touche</string>
+    <string name="adv_sc_step_press">2 · Type d\'appui</string>
+    <string name="adv_sc_step_action">3 · Fonction</string>
+    <string name="adv_sc_empty">Aucun raccourci avancé enregistré.</string>
+    <string name="adv_sc_claimed_warning">La touche attribuée ne pourra plus être utilisée pour autre chose que MG4Control, jusqu\'à la suppression du raccourci dans « LISTE DES RACCOURCIS ».</string>
+    <string name="adv_sc_delete">Suppr.</string>
+    <string name="adv_sc_status_label">Statut du service</string>
+    <string name="adv_sc_saved">Raccourci enregistré</string>
+    <string name="adv_sc_create">Créer le raccourci</string>
+    <string name="adv_sc_need_key">Enregistrez d\'abord une touche</string>
+    <string name="adv_sc_need_action">Choisissez une fonction</string>
+    <string name="adv_sc_record_cancelled">Enregistrement annulé</string>
+
+    <!-- Nouvelles actions de raccourci -->
+    <string name="shortcuts_action_esc">ESC (ON/OFF)</string>
+    <string name="shortcuts_action_drowsiness">Somnolence (ON/OFF)</string>
+    <string name="shortcuts_action_drowsiness_sen">Somnolence : sensibilité</string>
+    <string name="shortcuts_action_hvac_toggle">Clim (ON/OFF)</string>
+    <string name="shortcuts_action_hvac_temp_up">Clim : température +</string>
+    <string name="shortcuts_action_hvac_temp_down">Clim : température -</string>
+    <string name="shortcuts_action_hvac_fan_up">Clim : ventilation +</string>
+    <string name="shortcuts_action_hvac_fan_down">Clim : ventilation -</string>
+
+    <!-- Raccourcis : confort et affichage -->
+    <string name="shortcuts_action_regen_cycle">Régénération : niveau suivant</string>
+    <string name="shortcuts_action_seat_heat_left">Siège chauffant gauche : cycle</string>
+    <string name="shortcuts_action_seat_heat_right">Siège chauffant droit : cycle</string>
+    <string name="shortcuts_action_steering_heat">Volant chauffant (ON/OFF)</string>
+    <string name="shortcuts_action_defrost_front">Dégivrage avant (ON/OFF)</string>
+    <string name="shortcuts_action_defrost_rear">Dégivrage arrière (ON/OFF)</string>
+    <string name="shortcuts_action_hvac_recirc">Recirculation : cycle</string>
+    <string name="shortcuts_action_brightness_up">Luminosité +</string>
+    <string name="shortcuts_action_brightness_down">Luminosité -</string>
+
+    <!-- Liste des raccourcis avances : modification et remplacement -->
+    <string name="adv_sc_edit">Modif.</string>
+    <string name="adv_sc_edit_title">Modifier la fonction</string>
+    <string name="adv_sc_updated">Raccourci modifié</string>
+    <string name="adv_sc_press_short">Appui court</string>
+    <string name="adv_sc_press_long_lbl">Appui long</string>
+    <string name="adv_sc_key_unknown">Touche %1$d</string>
+    <string name="adv_sc_replace_title">Bouton déjà utilisé</string>
+    <string name="adv_sc_replace_msg">%1$s en %2$s déclenche déjà : %3$s.\n\nRemplacer par la nouvelle fonction ?</string>
+    <string name="adv_sc_replace_ok">Remplacer</string>
+    <string name="adv_sc_press_double">Double appui</string>
 </resources>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    canRequestFilterKeyEvents déclare la CAPACITÉ de filtrer les touches. Elle ne suffit pas :
+    le drapeau FLAG_REQUEST_FILTER_KEY_EVENTS doit être posé à l'exécution dans
+    onServiceConnected(), sinon aucune touche n'arrive à onKeyEvent().
+
+    accessibilityEventTypes est vide à dessein : on ne veut AUCUN événement d'accessibilité,
+    seulement les touches. En demander déclencherait un flux permanent sans usage pour nous.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeViewFocused"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRequestFilterKeyEvents="true"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/adv_sc_service_desc"
+    android:notificationTimeout="200" />

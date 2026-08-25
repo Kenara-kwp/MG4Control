@@ -185,7 +185,7 @@
     <string name="info_github_link">github.com/SliDeeN/MG4Control</string>
     <string name="info_gitlab_link">gitlab.com/SliDeeN/mg4control</string>
     <string name="info_made_with_love">Made with ❤ by SliDeeN and Claude IA</string>
-    <string name="info_special_thanks">Obrigado a confor1max pelos testes SWI68 🙏</string>
+    <string name="info_special_thanks">Obrigado a confor1max, FrAsErTaG, sixty4h, hojnikb e depippi.p pelos testes antes de cada versão 🙏</string>
     <string name="info_based_on">Baseado em DriveHub Dort por Merth4n &amp; hotboy_ist</string>
     <string name="info_close">Fechar</string>
 
@@ -327,7 +327,7 @@
     <string name="clim_fan">Ventilação</string>
     <string name="clim_modes_title">Modos</string>
     <string name="clim_section_switches">Comandos</string>
-    <string name="clim_power">Sistema</string>
+    <string name="clim_power">ON/OFF</string>
     <string name="clim_ac">A/C</string>
     <string name="clim_auto">Auto</string>
     <string name="clim_section_loop">Recirculação</string>
@@ -371,4 +371,91 @@
     <!-- Canal beta OTA -->
     <string name="settings_beta_channel">Canal de atualização beta</string>
     <string name="settings_beta_channel_desc">Recebe versões de teste antes do lançamento oficial. Podem conter erros. Não é possível voltar a uma versão anterior através da atualização.</string>
+
+    <!-- Somnolence / sensibilite d'alerte / ESC (SWI133) -->
+    <string name="safety_drowsiness">Aviso de sonolência</string>
+    <string name="safety_drowsiness_sensitivity">Sensibilidade do alerta</string>
+    <string name="safety_esc">ESC</string>
+    <string name="sens_low">Baixa</string>
+    <string name="sens_medium">Standard</string>
+    <string name="sens_high">Alta</string>
+    <string name="common_on">ON</string>
+    <string name="common_off">OFF</string>
+
+    <!-- Automatisation clim : mode auto + recyclage -->
+    <string name="ac_auto_auto_mode">Modo automático</string>
+    <string name="ac_auto_recirc_force">Forçar a recirculação de ar</string>
+    <string name="recirc_inner">Interior</string>
+    <string name="recirc_outside">Exterior</string>
+    <string name="recirc_auto">Auto</string>
+
+    <!-- Consommation de donnees (Reglages > Infos) -->
+    <string name="data_usage_title">Consumo de dados</string>
+    <string name="data_usage_month">Mês atual</string>
+    <string name="data_usage_30d">Últimos 30 dias</string>
+    <string name="data_usage_unavailable">Indisponível</string>
+    <string name="data_usage_today">Hoje</string>
+    <string name="data_usage_week">Semana atual</string>
+
+    <!-- Raccourcis avances (service d accessibilite) -->
+    <string name="shortcuts_cat_advanced">Avançados</string>
+    <string name="adv_sc_title">Atalhos avançados</string>
+    <string name="adv_sc_desc">Permite que o MG4Control veja as teclas do volante antes do launcher. Requer ativar o serviço de acessibilidade.</string>
+    <string name="adv_sc_service_desc">Permite usar as teclas do volante como atalhos do MG4Control.</string>
+    <string name="adv_sc_open_accessibility">Ativar acessibilidade</string>
+    <string name="adv_sc_status_on">Serviço ativo</string>
+    <string name="adv_sc_status_off">Serviço inativo</string>
+    <string name="adv_sc_record">Gravar uma tecla</string>
+    <string name="adv_sc_recording">Prima uma tecla do volante…</string>
+    <string name="adv_sc_cancel">Cancelar</string>
+    <string name="adv_sc_last_key">Última tecla detetada</string>
+    <string name="adv_sc_none">nenhuma</string>
+    <string name="shortcuts_cat_classic">Atalhos</string>
+    <string name="adv_sc_list_title">Lista de atalhos</string>
+    <string name="adv_sc_new">Novo atalho</string>
+    <string name="adv_sc_step_key">1 · Tecla</string>
+    <string name="adv_sc_step_press">2 · Tipo de pressão</string>
+    <string name="adv_sc_step_action">3 · Função</string>
+    <string name="adv_sc_empty">Nenhum atalho avançado registado.</string>
+    <string name="adv_sc_claimed_warning">A tecla atribuída deixa de poder ser usada para outra coisa além do MG4Control, até apagar o atalho em « LISTA DE ATALHOS ».</string>
+    <string name="adv_sc_delete">Apagar</string>
+    <string name="adv_sc_status_label">Estado do serviço</string>
+    <string name="adv_sc_saved">Atalho guardado</string>
+    <string name="adv_sc_create">Criar o atalho</string>
+    <string name="adv_sc_need_key">Grave primeiro uma tecla</string>
+    <string name="adv_sc_need_action">Escolha uma função</string>
+    <string name="adv_sc_record_cancelled">Gravação cancelada</string>
+
+    <!-- Nouvelles actions de raccourci -->
+    <string name="shortcuts_action_esc">ESC (ON/OFF)</string>
+    <string name="shortcuts_action_drowsiness">Sonolência (ON/OFF)</string>
+    <string name="shortcuts_action_drowsiness_sen">Sonolência: sensibilidade</string>
+    <string name="shortcuts_action_hvac_toggle">Clima (ON/OFF)</string>
+    <string name="shortcuts_action_hvac_temp_up">Clima: temperatura +</string>
+    <string name="shortcuts_action_hvac_temp_down">Clima: temperatura -</string>
+    <string name="shortcuts_action_hvac_fan_up">Clima: ventilação +</string>
+    <string name="shortcuts_action_hvac_fan_down">Clima: ventilação -</string>
+
+    <!-- Raccourcis : confort et affichage -->
+    <string name="shortcuts_action_regen_cycle">Regeneração: nível seguinte</string>
+    <string name="shortcuts_action_seat_heat_left">Banco esquerdo aquecido: ciclo</string>
+    <string name="shortcuts_action_seat_heat_right">Banco direito aquecido: ciclo</string>
+    <string name="shortcuts_action_steering_heat">Volante aquecido (ON/OFF)</string>
+    <string name="shortcuts_action_defrost_front">Desembaciamento dianteiro (ON/OFF)</string>
+    <string name="shortcuts_action_defrost_rear">Desembaciamento traseiro (ON/OFF)</string>
+    <string name="shortcuts_action_hvac_recirc">Recirculação: ciclo</string>
+    <string name="shortcuts_action_brightness_up">Brilho +</string>
+    <string name="shortcuts_action_brightness_down">Brilho -</string>
+
+    <!-- Liste des raccourcis avances : modification et remplacement -->
+    <string name="adv_sc_edit">Editar</string>
+    <string name="adv_sc_edit_title">Alterar a função</string>
+    <string name="adv_sc_updated">Atalho alterado</string>
+    <string name="adv_sc_press_short">Pressão curta</string>
+    <string name="adv_sc_press_long_lbl">Pressão longa</string>
+    <string name="adv_sc_key_unknown">Tecla %1$d</string>
+    <string name="adv_sc_replace_title">Botão já utilizado</string>
+    <string name="adv_sc_replace_msg">%1$s em %2$s já executa: %3$s.\n\nSubstituir pela nova função?</string>
+    <string name="adv_sc_replace_ok">Substituir</string>
+    <string name="adv_sc_press_double">Pressão dupla</string>
 </resources>

@@ -112,6 +112,11 @@ class ProfileEditFragment : Fragment() {
         var aebEnabledSel   = data.aebEnabled
         var aebModeSel      = data.aebMode
         var aebSenSel       = data.aebSensitivity.let { if (it == 0) AebSensitivity.STANDARD else it }
+        // Accesseurs et non champs bruts : ils rendent les défauts (ON / ON / Standard) pour un
+        // profil enregistré avant la fonctionnalité, dont les champs valent null.
+        var escSel          = data.appliesEsc
+        var dmsSel          = data.appliesDrowsiness
+        var dmsSenSel       = data.appliesDrowsinessSensitivity
         var elkModeSel      = data.elkMode.let { if (it == 0) ElkMode.EMERGENCY else it }
         var elkSenSel       = data.elkSensitivity.let { if (it == 0) ElkSensitivity.STANDARD else it }
         var elkEnabledSel   = elkModeSel != ElkMode.OFF
@@ -255,6 +260,27 @@ class ProfileEditFragment : Fragment() {
                 btnAebSenStdD  to AebSensitivity.STANDARD,
                 btnAebSenHighD to AebSensitivity.HIGH
             ), aebSenSel) { aebSenSel = it }
+        }
+
+        // ── Section ESC + somnolence + sensibilité ───────────────────────────
+        // Même présentation que la carte de l'écran principal, pour que l'utilisateur retrouve
+        // les mêmes contrôles au même endroit logique. Masquée si le firmware ne l'expose pas.
+        val sectionDmsEsc = view.findViewById<View>(R.id.safety_dms_esc_section_d)
+        if (MG4Hardware.hasDrowsinessAndEsc()) {
+            sectionDmsEsc.visibility = View.VISIBLE
+            bindGroup(listOf(
+                view.findViewById<MaterialButton>(R.id.btn_esc_on_d)  to true,
+                view.findViewById<MaterialButton>(R.id.btn_esc_off_d) to false
+            ), escSel) { escSel = it }
+            bindGroup(listOf(
+                view.findViewById<MaterialButton>(R.id.btn_dms_on_d)  to true,
+                view.findViewById<MaterialButton>(R.id.btn_dms_off_d) to false
+            ), dmsSel) { dmsSel = it }
+            bindGroup(listOf(
+                view.findViewById<MaterialButton>(R.id.btn_dms_sen_low_d)    to 1,
+                view.findViewById<MaterialButton>(R.id.btn_dms_sen_medium_d) to 2,
+                view.findViewById<MaterialButton>(R.id.btn_dms_sen_high_d)   to 3
+            ), dmsSenSel) { dmsSenSel = it }
         }
 
         // ── Section ELK (tous firmwares connus) ──────────────────────────────
@@ -502,6 +528,9 @@ class ProfileEditFragment : Fragment() {
                 aebEnabled     = aebEnabledSel,
                 aebMode        = aebModeSel,
                 aebSensitivity = aebSenSel,
+                escEnabled            = escSel,
+                drowsinessEnabled     = dmsSel,
+                drowsinessSensitivity = dmsSenSel,
                 elkMode        = elkModeSel,
                 elkSensitivity = elkSenSel,
                 lasAudibleWarning    = lasAudibleWarningSel,
