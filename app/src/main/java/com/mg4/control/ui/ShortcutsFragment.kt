@@ -256,10 +256,35 @@ class ShortcutsFragment : Fragment() {
             refreshAdvancedList(view)
         }
 
+        // ⚠️ L'état est posé AVANT l'écouteur : sinon l'avertissement d'activation ci-dessous
+        // s'afficherait à chaque ouverture de l'écran, sans que l'utilisateur ait rien demandé.
         sw.isChecked = AdvancedShortcuts.isEnabled(requireContext())
         sw.setOnCheckedChangeListener { _, checked ->
-            AdvancedShortcuts.setEnabled(requireContext(), checked)
-            majEtat()
+            // Désactivation : rien à expliquer, les touches sont rendues au système.
+            if (!checked) {
+                AdvancedShortcuts.setEnabled(requireContext(), false)
+                majEtat()
+                return@setOnCheckedChangeListener
+            }
+
+            // Activation : on prévient AVANT d'armer quoi que ce soit. Qu'un bouton du volant
+            // perde sa fonction d'origine ne se devine pas depuis un interrupteur, et se
+            // découvrirait au volant — c'est exactement ce qui est arrivé à un testeur avec la
+            // touche Accueil, qui a cru à un plantage.
+            //
+            // Rien n'est enregistré tant que l'utilisateur n'a pas confirmé : annuler, ou fermer
+            // la boîte de dialogue, remet l'interrupteur sur off — ce qui repasse par ce même
+            // écouteur avec `checked = false`, donc par la désactivation propre ci-dessus.
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.adv_sc_enable_warn_title)
+                .setMessage(R.string.adv_sc_enable_warn_msg)
+                .setPositiveButton(R.string.adv_sc_enable_warn_ok) { _, _ ->
+                    AdvancedShortcuts.setEnabled(requireContext(), true)
+                    majEtat()
+                }
+                .setNegativeButton(android.R.string.cancel) { _, _ -> sw.isChecked = false }
+                .setOnCancelListener { _ -> sw.isChecked = false }
+                .show()
         }
 
         btnAcc.setOnClickListener {

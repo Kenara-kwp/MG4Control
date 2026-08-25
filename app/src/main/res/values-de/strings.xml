@@ -458,4 +458,9 @@
     <string name="adv_sc_replace_msg">%1$s bei %2$s löst bereits aus: %3$s.\n\nDurch die neue Funktion ersetzen?</string>
     <string name="adv_sc_replace_ok">Ersetzen</string>
     <string name="adv_sc_press_double">Doppelter Druck</string>
+
+    <!-- Avertissement a l'activation des raccourcis avances -->
+    <string name="adv_sc_enable_warn_title">Belegte Taste ändert ihre Rolle</string>
+    <string name="adv_sc_enable_warn_msg">Eine belegte Taste verliert ihre ursprüngliche Funktion: MG4Control fängt die Taste vor dem Launcher ab, der sie gar nicht mehr sieht.\n\nBeispiel: Wird die Home-Taste belegt, führt sie nicht mehr zum MG-Launcher zurück. Um das wiederherzustellen, weisen Sie ihr die Aktion App starten zu und wählen Sie den Launcher.\n\nDie Taste wird komplett beansprucht: Wird nur der lange Druck belegt, sind auch kurzer und doppelter Druck wirkungslos.\n\nAlles wird wieder normal, sobald die Verknüpfung in der Kürzelliste gelöscht wird.</string>
+    <string name="adv_sc_enable_warn_ok">Aktivieren</string>
 </resources>

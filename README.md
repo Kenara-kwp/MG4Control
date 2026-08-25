@@ -78,16 +78,17 @@ L'application communique avec le véhicule via le SDK propriétaire SAIC, en acc
 - **SWI69 / SWI131** : Anti-collision avant (AEB) — On / Off + mode Alerte uniquement / Alerte + Freinage
 - **SWI165** : Désactiver / ACC / TJA + Anti-collision avant (AEB) On/Off + mode Alerte / Alerte+Freinage + avertissement sonore
 
-### Raccourcis volant
+### Raccourcis sur boutons physiques
 
 Deux systèmes coexistent, réglés dans le même écran :
 
 - **Raccourcis classiques** — boutons ★ gauche et droit, en appui simple ou long. Ils reposent sur
   le broadcast émis par le véhicule : si le launcher officiel utilise déjà le bouton, il reste
   prioritaire.
-- **Raccourcis avancés** — n'importe quelle touche du volant, en appui **court, long ou double**,
-  via un **service d'accessibilité** que l'utilisateur active lui-même dans Android. MG4Control
-  voit alors la touche **avant** le launcher et peut la consommer.
+- **Raccourcis avancés** — n'importe quelle touche physique, au volant **comme sur la façade
+  sous l'écran**, en appui **court, long ou double**, via un **service d'accessibilité** que
+  l'utilisateur active lui-même dans Android. MG4Control voit alors la touche **avant** le
+  launcher et peut la consommer.
 
 L'appui long part **dès le seuil de 500 ms atteint**, sans attendre le relâchement : l'action se
 déclenche toujours au même moment, la touche encore enfoncée. Le double appui, lui, a un coût à
@@ -782,15 +783,16 @@ The app communicates with the vehicle through the proprietary SAIC SDK, accessin
 - **SWI69 / SWI131**: Forward Collision Warning (AEB) — On / Off + mode Alert only / Alert + Emergency Braking
 - **SWI165**: Disable / ACC / TJA + Forward Collision Warning (AEB) On/Off + Alert / Alert+Braking mode + audible warning
 
-### Steering Wheel Shortcuts
+### Physical Button Shortcuts
 
 Two systems live side by side, configured from the same screen:
 
 - **Classic shortcuts** — the left and right ★ buttons, short or long press. They rely on the
   broadcast the vehicle emits: if the stock launcher already uses that button, the launcher wins.
-- **Advanced shortcuts** — any steering wheel key, as a **short, long or double** press, through
-  an **accessibility service** the user enables themselves in Android. MG4Control then sees the key
-  **before** the launcher and can consume it.
+- **Advanced shortcuts** — any physical key, on the steering wheel **as well as on the panel
+  below the screen**, as a **short, long or double** press, through an **accessibility service**
+  the user enables themselves in Android. MG4Control then sees the key **before** the launcher and
+  can consume it.
 
 A long press fires **as soon as the 500 ms threshold is reached**, without waiting for the release:
 the action always happens at the same moment, while the key is still held. A double press has a

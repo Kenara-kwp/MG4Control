@@ -460,4 +460,9 @@
     <string name="adv_sc_replace_msg">%1$s en %2$s déclenche déjà : %3$s.\n\nRemplacer par la nouvelle fonction ?</string>
     <string name="adv_sc_replace_ok">Remplacer</string>
     <string name="adv_sc_press_double">Double appui</string>
+
+    <!-- Avertissement a l'activation des raccourcis avances -->
+    <string name="adv_sc_enable_warn_title">Le bouton attribué change de rôle</string>
+    <string name="adv_sc_enable_warn_msg">Un bouton attribué à un raccourci avancé perd sa fonction d\'origine : MG4Control intercepte la touche avant le launcher, qui ne la voit plus du tout.\n\nExemple : si vous attribuez le bouton Accueil, il ne ramènera plus au launcher MG. Pour retrouver ce comportement, donnez-lui l\'action « Lancer une application » et choisissez le launcher.\n\nLa touche est réclamée en entier : n\'attribuer que l\'appui long neutralise aussi l\'appui court et le double appui.\n\nTout redevient normal en supprimant le raccourci dans « Liste des raccourcis ».</string>
+    <string name="adv_sc_enable_warn_ok">Activer</string>
 </resources>
