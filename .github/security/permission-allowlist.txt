@@ -35,3 +35,11 @@ android.permission.INSTALL_PACKAGES
 # pour l'interface Ethernet. Lecture seule, aucune connexion ouverte, aucun contenu de trafic,
 # aucune attribution par application — le même chiffre que l'écran de consommation d'AAOS.
 android.permission.READ_NETWORK_USAGE_HISTORY
+# --- pilotage des sessions média (les DEUX variantes) ---
+# Nécessaire aux raccourcis Piste suivante / précédente / Lecture-Pause.
+# signature|privileged : obtenue parce que l'app tourne en android.uid.system.
+# Ce qu'elle permet ici : énumérer les sessions média actives et envoyer une commande de
+# transport à celle qui joue. C'est exactement ce que fait le launcher d'origine sur A9.
+# Ce qu'elle NE fait pas : lire le contenu, le micro, ou agir sur une source à l'arrêt — le
+# code ne commande qu'une session dont l'état déclaré est « en lecture ».
+android.permission.MEDIA_CONTENT_CONTROL

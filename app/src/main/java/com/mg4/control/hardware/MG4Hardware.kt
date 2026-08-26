@@ -5,6 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.media.AudioManager
+import android.media.session.MediaController
+import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -3711,7 +3714,7 @@ object MG4Hardware {
      */
     private const val SRC_RADIO_MIN = 1       // 1 radio, 2 FM, 3 AM, 4 DAB
     private const val SRC_RADIO_MAX = 4
-    private const val SRC_BT        = 5       // candidat
+    private const val SRC_BT        = 5       // certain (relevé véhicule 2026-08-26)
     private const val SRC_ONLINE    = 6       // candidat
     private const val SRC_USB       = 7       // candidat
     private const val SRC_USB_VIDEO = 0x12    // certain (USB_VIDEO_SOURCE_CODE)
@@ -3994,6 +3997,65 @@ object MG4Hardware {
      *    où ce service SAIC n'existe pas, et la seule qui atteigne une session Bluetooth.
      */
     /**
+     * Pilotage par **session média** — la voie du framework Android.
+     *
+     * C'est ainsi que le launcher d'origine procède sur les firmwares A9 : son `MediaModel`
+     * appelle `MediaSessionManager.getActiveSessions()` puis les `TransportControls` du
+     * contrôleur. Chaque source y publie son propre MediaBrowserService (Bluetooth, projection
+     * allgo, CarPlay, en ligne, USB). C'est donc la seule voie sur A9, où le service média SAIC
+     * n'existe pas — et le seul recours pour CarPlay/Android Auto sur SWI68 et SWI165, dont le
+     * SDK média ne contient pas l'interface de projection.
+     *
+     * ⚠️ SÛRE PAR CONSTRUCTION, contrairement à l'envoi d'une touche média : on ne commande que
+     * la session dont l'état DÉCLARE qu'elle joue — c'est-à-dire la source déjà audible. Elle ne
+     * peut donc pas réveiller une source endormie, l'erreur qui faisait changer de source.
+     * Seule exception, la reprise : elle n'agit que si AUCUNE session ne joue.
+     */
+    private fun sessionMedia(cmd: CmdMedia): Boolean {
+        val ctx = sAppContext ?: return false
+        val msm = ctx.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
+            ?: return false
+        val sessions: List<MediaController> = try {
+            msm.getActiveSessions(null)
+        } catch (e: SecurityException) {
+            AppLogger.w(MEDIA_TAG, "sessions inaccessibles — MEDIA_CONTENT_CONTROL absente " +
+                "de cette build ? (${e.message})")
+            return false
+        } catch (e: Exception) {
+            AppLogger.w(MEDIA_TAG, "sessions illisibles : ${(e.cause ?: e).message}")
+            return false
+        }
+
+        val joue = sessions.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+        val cible = joue
+            ?: if (cmd == CmdMedia.LECTURE_PAUSE)
+                   sessions.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PAUSED }
+               else null
+
+        if (cible == null) {
+            AppLogger.i(MEDIA_TAG, "aucune session exploitable parmi ${sessions.size} " +
+                "(${sessions.joinToString { "${it.packageName}:${it.playbackState?.state}" }})")
+            return false
+        }
+
+        return try {
+            when (cmd) {
+                CmdMedia.SUIVANT -> cible.transportControls.skipToNext()
+                CmdMedia.PRECEDENT -> cible.transportControls.skipToPrevious()
+                CmdMedia.LECTURE_PAUSE ->
+                    if (joue != null) cible.transportControls.pause()
+                    else cible.transportControls.play()
+            }
+            AppLogger.i(MEDIA_TAG, "session ${cible.packageName} → ${cmd.name} " +
+                "(état ${cible.playbackState?.state})")
+            true
+        } catch (e: Exception) {
+            AppLogger.w(MEDIA_TAG, "commande de session refusée : ${(e.cause ?: e).message}")
+            false
+        }
+    }
+
+    /**
      * Quand le code de source est inconnu, on DEMANDE aux lecteurs lequel joue.
      *
      * C'est ce qui rend le pilotage robuste malgré une table de sources incomplète : on ne
@@ -4013,7 +4075,22 @@ object MG4Hardware {
         // Service SAIC muet : c'est le cas des firmwares A9, où il n'existe pas. La touche
         // média d'Android devient alors la seule voie — elle atteindra au moins le Bluetooth.
         if (src < 0) {
-            AppLogger.i(MEDIA_TAG, "service média SAIC indisponible — touche média Android")
+            // Firmwares A9 : le service média SAIC n'existe pas, et leur launcher n'en utilise
+            // pas non plus — il pilote les sessions média du framework. C'est donc la voie
+            // normale ici, pas un pis-aller.
+            AppLogger.i(MEDIA_TAG, "service média SAIC absent — pilotage par session")
+            if (sessionMedia(cmd)) return true
+
+            // Ultime recours, si l'énumération des sessions est refusée : la touche média, mais
+            // UNIQUEMENT si quelque chose joue. Sans ce garde-fou, l'envoyer pendant que la
+            // radio joue (isMusicActive = faux, mesuré) réveillerait la session Bluetooth et
+            // changerait la source — le défaut corrigé plus haut, revenu par la porte de
+            // derrière. Contrepartie assumée : pas de reprise d'une lecture déjà arrêtée.
+            if (!musiqueEnCours()) {
+                AppLogger.i(MEDIA_TAG, "aucune session exploitable et aucune lecture en cours — " +
+                    "aucune touche envoyée")
+                return false
+            }
             return envoyerToucheMedia(when (cmd) {
                 CmdMedia.SUIVANT -> KeyEvent.KEYCODE_MEDIA_NEXT
                 CmdMedia.PRECEDENT -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
@@ -4031,7 +4108,7 @@ object MG4Hardware {
                         AppLogger.i(MEDIA_TAG, "code $src inconnu — lecteur identifié : ${nomSource(it)}")
                     } ?: src
 
-        return when {
+        val ok = when {
             cible in SRC_RADIO_MIN..SRC_RADIO_MAX -> {
                 // La radio a son propre service : next/previous y changent de station, et
                 // srcPlayRadio/srcPauseRadio sont les commandes que le launcher utilise.
@@ -4080,16 +4157,21 @@ object MG4Hardware {
 
             else -> {
                 AppLogger.i(MEDIA_TAG, "source ${nomSource(cible)} sans lecteur identifié — " +
-                    "façade générique seule")
-                val ok = mediaTransact(ACT_MEDIA, DESC_MEDIA, when (cmd) {
+                    "façade générique")
+                mediaTransact(ACT_MEDIA, DESC_MEDIA, when (cmd) {
                     CmdMedia.SUIVANT -> 5
                     CmdMedia.PRECEDENT -> 4
                     CmdMedia.LECTURE_PAUSE -> if (enLecture(cible)) 3 else 2
                 })
-                if (!ok) AppLogger.i(MEDIA_TAG, "aucune action possible sur ${nomSource(cible)}")
-                ok
             }
         }
+        if (ok) return true
+
+        // Repli universel, et sans danger : la voie des sessions ne commande que ce qui joue
+        // déjà. C'est elle qui rattrape CarPlay et Android Auto sur SWI68 et SWI165, dont le
+        // SDK média ne contient pas l'interface de projection.
+        AppLogger.i(MEDIA_TAG, "voie SAIC sans effet sur ${nomSource(cible)} — essai par session")
+        return sessionMedia(cmd)
     }
 
     fun mediaNext(): Boolean = commandeMedia(CmdMedia.SUIVANT)
