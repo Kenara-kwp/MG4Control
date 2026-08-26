@@ -4928,10 +4928,26 @@ object MG4Hardware {
     /**
      * État clim sur A9, via CarHvacClient.
      *
-     * ⚠️ Deux inconnues à mesurer sur véhicule (l'API n'expose pas de bornes) :
-     *   • la plage de température et le niveau de ventilation max — valeurs par défaut prudentes ;
-     *   • l'encodage de `getAirCirculationStatus()` : on suppose la même convention que l'old-SDK
-     *     (0=intérieur, 1=extérieur, 2=auto), à confirmer par la sonde Diagnostic.
+     * ⚠️ Les bornes sont ÉCRITES EN DUR, contrairement à l'ancien SDK qui les demande au
+     * véhicule : `ICarHvacService` n'expose aucun `getMinTemp` / `getMaxTemp` / niveau de
+     * ventilation maximal — vérifié dans le service décompilé. Il n'y a donc rien à lire.
+     *
+     * Les valeurs ci-dessous ne sont plus des estimations prudentes : elles ont été MESURÉES sur
+     * SWI132 (rapports de diagnostic du 2026-08-25, réglages poussés aux extrêmes) puis
+     * recoupées avec les constantes du launcher d'origine — variante EH32 :
+     * `AUTO_TEMP_MIN_LEVEL=0x12` (18), `AUTO_TEMP_MAX_LEVEL=0x20` (32),
+     * `AUTO_FANS_MIN_LEVEL=1`, `AUTO_FANS_MAX_LEVEL=0xb` (11).
+     *
+     * L'écart entre 18–32 (le launcher) et 17–33 (la mesure) n'est pas une contradiction : 18–32
+     * est la plage NUMÉRIQUE, tandis que 17 et 33 sont les positions LO et HI qui l'encadrent.
+     * On garde donc 17–33, ce que le véhicule accepte réellement.
+     *
+     * ⚠️ Le launcher connaît une seconde variante (ventilation 1–8, température 16–28). Si un
+     * jour un A9 refuse ces bornes, c'est la première piste — et il faudra alors trouver comment
+     * le véhicule déclare sa variante, le SDK ne le disant pas.
+     *
+     * Reste supposé : l'encodage de `getAirCirculationStatus()` — même convention que l'old-SDK
+     * (0=intérieur, 1=extérieur, 2=auto), à confirmer par la sonde Diagnostic.
      */
     private fun getClimateStateA9(): ClimateState? {
         if (hvacA9() == null) return null
@@ -4939,11 +4955,11 @@ object MG4Hardware {
         return ClimateState(
             powerOn      = a9Get("getHvacPowerStatus") as? Boolean,
             tempC        = temp,
-            tempMin      = 16,
-            tempMax      = 32,
+            tempMin      = 17,        // LO, mesuré
+            tempMax      = 33,        // HI, mesuré
             fanLevel     = (a9Get("getFanSpeed") as? Int)?.takeIf { it >= 0 },
-            fanMin       = 1,
-            fanMax       = 10,
+            fanMin       = 1,         // 0 = éteint, ce qui relève de l'interrupteur, pas du cran
+            fanMax       = 11,        // mesuré, et identique à AUTO_FANS_MAX_LEVEL du launcher
             acOn         = a9Get("getACStatus") as? Boolean,
             autoOn       = a9Get("getAutoStatus") as? Boolean,
             loopMode     = (a9Get("getAirCirculationStatus") as? Int)?.takeIf { it >= 0 },
