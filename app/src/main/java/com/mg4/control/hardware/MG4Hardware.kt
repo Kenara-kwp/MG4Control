@@ -3907,6 +3907,43 @@ object MG4Hardware {
         }
     }
 
+    /**
+     * CarPlay / Android Auto joue-t-il ? `null` si on ne peut pas conclure.
+     *
+     * `getLastCpAaAudioInfoBean` (tx 0x7) rend un `AudioInfoBean` dont le champ `mPlayState`
+     * vaut 3 en lecture — la carte média du launcher le compare à cette valeur exacte. Il faut
+     * dérouler le bean dans l'ordre de son `writeToParcel` : id(long), durée(long), puis sept
+     * chaînes, deux longs, une chaîne, et enfin **l'état(int)**.
+     *
+     * Sans cette lecture, la projection retombait sur `isMusicActive`, qui reste vrai deux à
+     * trois secondes après une pause : le raccourci renvoyait une pause au lieu d'une reprise,
+     * et il fallait patienter avant que la bascule redevienne possible.
+     */
+    private fun cpAaEnLecture(): Boolean? {
+        val binder = serviceBinder(ACT_CPAA, MEDIA_PKG, MEDIA_CLS) ?: return null
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(DESC_CPAA)
+            binder.transact(0x7, data, reply, 0)
+            reply.readException()
+            if (reply.readInt() == 0) return null       // bean nul : rien à conclure
+            reply.readLong(); reply.readLong()          // id, durée
+            repeat(7) { reply.readString() }            // nom, pochette, chemin, artiste, utilisateur, avatar, album
+            reply.readLong(); reply.readLong()          // ajout, dernière lecture
+            reply.readString()                          // position lisible
+            val etat = reply.readInt()
+            AppLogger.i(MEDIA_TAG, "état projection = $etat ($PLAYER_STATUS_START = en lecture)")
+            etat == PLAYER_STATUS_START
+        } catch (e: Exception) {
+            AppLogger.w(MEDIA_TAG, "état projection illisible : ${(e.cause ?: e).message}")
+            null
+        } finally {
+            data.recycle()
+            reply.recycle()
+        }
+    }
+
     /** Source audio réellement active, ou -1 si le service SAIC ne répond pas. */
     private fun mediaSourceCourante(): Int {
         val v = mediaLireInt(ACT_STATUS, DESC_STATUS, 0x9) ?: return -1   // getCurrentMediaSource
@@ -3928,6 +3965,8 @@ object MG4Hardware {
             SRC_BT -> mediaLireInt(ACT_BT, DESC_BT, 0x9)?.let { it != 0 }
             // getPlayerStatus : un état parmi PLAYER_STATUS_*.
             SRC_ONLINE -> mediaLireInt(ACT_ONLINE, DESC_ONLINE, 0x6)?.let { it == PLAYER_STATUS_START }
+            // La projection expose son état dans son bean, pas par un getter direct.
+            SRC_CARPLAY, SRC_AA -> cpAaEnLecture()
             else -> null
         }
         if (reel != null) {
@@ -4036,8 +4075,6 @@ object MG4Hardware {
             cible == SRC_CARPLAY || cible == SRC_AA -> mediaTransact(ACT_CPAA, DESC_CPAA, when (cmd) {
                 CmdMedia.SUIVANT -> 4
                 CmdMedia.PRECEDENT -> 3
-                // La projection n'expose pas son état : isMusicActive est le seul indice, et il
-                // suffit ici — il retombe à faux quand la lecture s'arrête vraiment.
                 CmdMedia.LECTURE_PAUSE -> if (enLecture(cible)) 2 else 1
             })
 
