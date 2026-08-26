@@ -3777,12 +3777,101 @@ object MG4Hardware {
         else -> "inconnue ($v)"
     }
 
+    // ── Projection : le service allgo, hors SDK SAIC ────────────────────────
+    //
+    // CarPlay et Android Auto ne se pilotent PAS par le même chemin selon le firmware, et les
+    // deux voies sont exactement complémentaires — vérifié dans les 6 launchers :
+    //   • SWI133 : `ICpAaBinderInterface` du SDK média SAIC ;
+    //   • SWI68 / 165 / 69 / 131 / 132 : ce service-ci, celui de la pile de projection allgo,
+    //     que le launcher appelle lui-même.
+    // Aucun firmware n'a les deux, aucun n'en est dépourvu.
+    private const val RUI_PKG = "com.allgo.rui"
+    private const val RUI_CLS = "com.allgo.rui.RemoteUIService"
+    private const val DESC_RUI = "com.allgo.rui.IRemoteUIService"
+    private const val TX_RUI_MEDIA_KEY = 0x12   // sendMediaPlayControlKey(int) : int
+
+    /**
+     * Valeurs de `sendMediaPlayControlKey`, relevées dans les méthodes du launcher SWI68 :
+     * `playRemoteUIyMusicResource`, `pauseRemoteUIyMusicResource`, `touchNextRemoteUiMusic`,
+     * `touchPreviousRemoteUiMusic`. Ce ne sont PAS des keycodes Android — c'est une énumération
+     * propre à allgo, qu'il aurait été impossible de deviner.
+     *
+     * Piste suivante et précédente se donnent en DEUX temps, appui puis relâchement, comme le
+     * fait le launcher.
+     */
+    private const val RUI_PLAY      = 1
+    private const val RUI_PAUSE     = 2
+    private const val RUI_NEXT_DOWN = 7
+    private const val RUI_PREV_DOWN = 8
+    private const val RUI_NEXT_UP   = 11
+    private const val RUI_PREV_UP   = 12
+
+    /** Envoie une commande à la pile de projection. Rend faux si le service ne répond pas. */
+    private fun ruiEnvoyer(valeur: Int): Boolean {
+        val binder = serviceBinder("", RUI_PKG, RUI_CLS) ?: return false
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(DESC_RUI)
+            data.writeInt(valeur)
+            binder.transact(TX_RUI_MEDIA_KEY, data, reply, 0)
+            reply.readException()
+            // La méthode rend un entier : on le journalise sans l'interpréter. Sa signification
+            // est inconnue, mais il distinguera un refus d'un acquittement le jour où il faudra.
+            val retour = if (reply.dataAvail() > 0) reply.readInt() else 0
+            AppLogger.i(MEDIA_TAG, "projection : sendMediaPlayControlKey($valeur) → $retour")
+            true
+        } catch (e: Exception) {
+            AppLogger.w(MEDIA_TAG, "projection : commande $valeur refusée — ${(e.cause ?: e).message}")
+            false
+        } finally {
+            data.recycle()
+            reply.recycle()
+        }
+    }
+
+    /**
+     * Commande média de la projection par la voie allgo.
+     *
+     * [joue] décide du sens de la bascule lecture/pause : ce service n'expose pas d'état, c'est
+     * l'appelant qui l'a déjà déterminé (session, ou `isMusicActive` à défaut).
+     */
+    private fun ruiMedia(cmd: CmdMedia, joue: Boolean): Boolean = when (cmd) {
+        // Appui PUIS relâchement : un appui laissé « enfoncé » serait interprété comme une
+        // avance rapide, c'est le rôle des deux codes distincts.
+        CmdMedia.SUIVANT ->
+            ruiEnvoyer(RUI_NEXT_DOWN) && ruiEnvoyer(RUI_NEXT_UP)
+        CmdMedia.PRECEDENT ->
+            ruiEnvoyer(RUI_PREV_DOWN) && ruiEnvoyer(RUI_PREV_UP)
+        CmdMedia.LECTURE_PAUSE ->
+            ruiEnvoyer(if (joue) RUI_PAUSE else RUI_PLAY)
+    }
+
     private enum class CmdMedia { SUIVANT, PRECEDENT, LECTURE_PAUSE }
 
     // Accès croisé : onServiceConnected arrive sur le thread principal, la lecture se fait
     // depuis le contexte IO du raccourci. Des HashMap simples se corrompraient silencieusement.
     private val sMediaBinders = ConcurrentHashMap<String, IBinder>()
     private val sMediaConns = ConcurrentHashMap<String, ServiceConnection>()
+
+    /**
+     * Actions dont la liaison n'aboutit pas, avec l'instant du constat.
+     *
+     * ⚠️ Sans cette mémoire, un service absent du firmware coûtait [MEDIA_BIND_MS] à CHAQUE
+     * appui : mesuré sur SWI68, où `CPAA_PLAYER_ACTION` n'existe pas, 1,2 s d'attente avant
+     * même d'essayer la voie suivante. Un raccourci de volant qui répond en une seconde et
+     * demie passe pour cassé, même quand il finit par agir.
+     *
+     * Le constat est daté plutôt que définitif : un service peut être simplement lent à
+     * démarrer, et l'exclure pour toujours sur un seul échec serait excessif.
+     */
+    private val sMediaSansReponse = ConcurrentHashMap<String, Long>()
+
+    /** Délai d'attente d'une liaison, en ms. */
+    private const val MEDIA_BIND_MS = 1200L
+
+    /** Durée pendant laquelle on ne retente pas une action qui n'a pas répondu. */
+    private const val MEDIA_ABSENT_MS = 300_000L
 
     /**
      * Binder du service média pour une action donnée, ou null.
@@ -3804,45 +3893,75 @@ object MG4Hardware {
      * c'est ainsi que `RadioOptionManager` procède, et une liaison par classe échouerait.
      */
     private fun serviceBinder(action: String, pkg: String, cls: String?,
-                              attenteMs: Long = 1200): IBinder? {
-        sMediaBinders[action]?.let { if (it.isBinderAlive) return it else sMediaBinders.remove(action) }
+                              attenteMs: Long = MEDIA_BIND_MS): IBinder? {
+        // Clé de cache : l'action quand il y en a une, sinon le composant visé. Le service de
+        // projection allgo se lie en effet par COMPOSANT seul, sans action — deux services
+        // différents ne doivent pas se partager une entrée de cache.
+        val cle = if (action.isEmpty()) "$pkg/$cls" else action
+        sMediaBinders[cle]?.let { if (it.isBinderAlive) return it else sMediaBinders.remove(cle) }
         val ctx = sAppContext ?: return null
 
-        if (!sMediaConns.containsKey(action)) {
+        // Cible déjà constatée sans réponse récemment : on rend la main tout de suite plutôt
+        // que de refaire attendre l'utilisateur pour le même constat.
+        sMediaSansReponse[cle]?.let { instant ->
+            if (SystemClock.uptimeMillis() - instant < MEDIA_ABSENT_MS) return null
+            sMediaSansReponse.remove(cle)
+        }
+
+        if (!sMediaConns.containsKey(cle)) {
             val conn = object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                    if (service != null) sMediaBinders[action] = service
-                    AppLogger.i(MEDIA_TAG, "lié à ${action.substringAfterLast('.')}")
+                    if (service != null) sMediaBinders[cle] = service
+                    sMediaSansReponse.remove(cle)
+                    AppLogger.i(MEDIA_TAG, "lié à ${cle.substringAfterLast('.')}")
                 }
                 override fun onServiceDisconnected(name: ComponentName?) {
-                    sMediaBinders.remove(action)
-                    AppLogger.w(MEDIA_TAG, "liaison perdue : ${action.substringAfterLast('.')}")
+                    sMediaBinders.remove(cle)
+                    AppLogger.w(MEDIA_TAG, "liaison perdue : ${cle.substringAfterLast('.')}")
+                }
+                // Le service existe mais refuse CETTE action : son onBind rend null. Le système
+                // nous le dit ici, immédiatement — inutile d'attendre le délai pour le découvrir.
+                override fun onNullBinding(name: ComponentName?) {
+                    sMediaSansReponse[cle] = SystemClock.uptimeMillis()
+                    AppLogger.i(MEDIA_TAG, "${cle.substringAfterLast('.')} : " +
+                        "le service ne fournit pas cette interface sur ce firmware")
                 }
             }
-            sMediaConns[action] = conn
+            sMediaConns[cle] = conn
             val ok = try {
-                val intent = Intent(action)
+                val intent = if (action.isEmpty()) Intent() else Intent(action)
                 if (cls != null) intent.setClassName(pkg, cls) else intent.setPackage(pkg)
                 ctx.bindService(intent, conn, Context.BIND_AUTO_CREATE)
             } catch (e: Exception) {
-                AppLogger.w(MEDIA_TAG, "bindService ${action.substringAfterLast('.')} : " +
+                AppLogger.w(MEDIA_TAG, "bindService ${cle.substringAfterLast('.')} : " +
                     "${(e.cause ?: e).message}")
                 false
             }
             if (!ok) {
-                sMediaConns.remove(action)
-                AppLogger.w(MEDIA_TAG, "service média indisponible pour " +
-                    "${action.substringAfterLast('.')} (absent de ce firmware ?)")
+                sMediaConns.remove(cle)
+                sMediaSansReponse[cle] = SystemClock.uptimeMillis()
+                AppLogger.w(MEDIA_TAG, "service indisponible pour " +
+                    "${cle.substringAfterLast('.')} (absent de ce firmware ?)")
                 return null
             }
         }
 
         val limite = SystemClock.uptimeMillis() + attenteMs
         while (SystemClock.uptimeMillis() < limite) {
-            sMediaBinders[action]?.let { return it }
+            sMediaBinders[cle]?.let { return it }
             try { Thread.sleep(40) } catch (_: InterruptedException) {}
         }
-        AppLogger.w(MEDIA_TAG, "liaison ${action.substringAfterLast('.')} non établie en ${attenteMs} ms")
+        // Seule une attente COMPLÈTE vaut constat. La sonde de diagnostic interroge avec un
+        // délai raccourci : en tirer une conclusion mettrait de côté un service simplement lent,
+        // et le raccourci suivant en pâtirait sans raison.
+        if (attenteMs >= MEDIA_BIND_MS) {
+            sMediaSansReponse[cle] = SystemClock.uptimeMillis()
+            AppLogger.w(MEDIA_TAG, "liaison ${cle.substringAfterLast('.')} non établie en " +
+                "${attenteMs} ms — mise de côté ${MEDIA_ABSENT_MS / 1000} s")
+        } else {
+            AppLogger.w(MEDIA_TAG, "liaison ${cle.substringAfterLast('.')} non établie en " +
+                "${attenteMs} ms (sondage court, aucun constat retenu)")
+        }
         return null
     }
 
@@ -4095,23 +4214,14 @@ object MG4Hardware {
                         else cible.transportControls.play()
                 }
             } else {
-                // Repli : le bouton média, envoyé À CETTE SESSION précise. Beaucoup
-                // d'applications — les projections en particulier — traitent les touches média
-                // sans rien déclarer dans `actions`.
+                // Action non déclarée : on ne tente RIEN par cette voie et on rend la main.
                 //
-                // ⚠️ Ce n'est PAS le `dispatchMediaKeyEvent` global qui avait causé le
-                // changement de source : celui-ci vise le contrôleur qu'on a identifié comme
-                // étant celui qui joue. Aucune autre session ne peut l'intercepter.
-                val code = when (cmd) {
-                    CmdMedia.SUIVANT -> KeyEvent.KEYCODE_MEDIA_NEXT
-                    CmdMedia.PRECEDENT -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
-                    CmdMedia.LECTURE_PAUSE -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
-                }
-                val t = SystemClock.uptimeMillis()
-                cible.dispatchMediaButtonEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, code, 0))
-                cible.dispatchMediaButtonEvent(KeyEvent(t, t, KeyEvent.ACTION_UP, code, 0))
-                AppLogger.i(MEDIA_TAG, "action non déclarée — bouton média ${
-                    KeyEvent.keyCodeToString(code)} envoyé à ${cible.packageName}")
+                // Le bouton média envoyé à la session avait été essayé ici — sans effet, mesuré
+                // sur SWI68 et SWI131. La vraie réponse pour la projection est le service allgo,
+                // et rendre « vrai » à tort empêcherait l'appelant de l'essayer.
+                AppLogger.i(MEDIA_TAG, "${cmd.name} non déclarée par ${cible.packageName} — " +
+                    "voie session abandonnée")
+                return false
             }
             true
         } catch (e: Exception) {
@@ -4137,14 +4247,19 @@ object MG4Hardware {
     private fun commandeMedia(cmd: CmdMedia): Boolean {
         val src = mediaSourceCourante()
 
-        // Service SAIC muet : c'est le cas des firmwares A9, où il n'existe pas. La touche
-        // média d'Android devient alors la seule voie — elle atteindra au moins le Bluetooth.
+        // Service SAIC muet : c'est le cas des firmwares A9, où il n'existe pas. Trois voies
+        // s'y succèdent, de la plus précise à la plus grossière.
         if (src < 0) {
             // Firmwares A9 : le service média SAIC n'existe pas, et leur launcher n'en utilise
             // pas non plus — il pilote les sessions média du framework. C'est donc la voie
             // normale ici, pas un pis-aller.
             AppLogger.i(MEDIA_TAG, "service média SAIC absent — pilotage par session")
             if (sessionMedia(cmd)) return true
+
+            // La session couvre radio, Bluetooth et USB sur ces firmwares. Ce qu'elle ne couvre
+            // pas, c'est la projection : elle ne déclare ni piste suivante ni précédente. D'où
+            // le service allgo, qui est justement la voie que leur launcher emprunte.
+            if (ruiMedia(cmd, musiqueEnCours())) return true
 
             // Ultime recours, si l'énumération des sessions est refusée : la touche média, mais
             // UNIQUEMENT si quelque chose joue. Sans ce garde-fou, l'envoyer pendant que la
@@ -4214,11 +4329,18 @@ object MG4Hardware {
                 CmdMedia.LECTURE_PAUSE -> if (enLecture(cible)) 1 else 2
             })
 
-            cible == SRC_CARPLAY || cible == SRC_AA -> mediaTransact(ACT_CPAA, DESC_CPAA, when (cmd) {
-                CmdMedia.SUIVANT -> 4
-                CmdMedia.PRECEDENT -> 3
-                CmdMedia.LECTURE_PAUSE -> if (enLecture(cible)) 2 else 1
-            })
+            cible == SRC_CARPLAY || cible == SRC_AA -> {
+                // L'état n'est lu que si la commande en dépend : inutile d'imposer une lecture
+                // binder à « piste suivante », qui n'en a que faire.
+                val joue = cmd == CmdMedia.LECTURE_PAUSE && enLecture(cible)
+                // SWI133 par le SDK SAIC, tous les autres par le service allgo. Les deux voies
+                // sont exclusives selon le firmware : celle qui est absente échoue sans effet.
+                mediaTransact(ACT_CPAA, DESC_CPAA, when (cmd) {
+                    CmdMedia.SUIVANT -> 4
+                    CmdMedia.PRECEDENT -> 3
+                    CmdMedia.LECTURE_PAUSE -> if (joue) 2 else 1
+                }) || ruiMedia(cmd, joue)
+            }
 
             else -> {
                 AppLogger.i(MEDIA_TAG, "source ${nomSource(cible)} sans lecteur identifié — " +
