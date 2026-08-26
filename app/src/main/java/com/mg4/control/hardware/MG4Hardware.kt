@@ -3701,39 +3701,46 @@ object MG4Hardware {
     private const val DESC_STATUS = "com.saicmotor.sdk.media.IPlayStatusBinderInterface"
 
     /**
-     * Sources rendues par `getCurrentMediaSource` — table `MediaConstants` du SDK launcher,
-     * relevée telle quelle.
+     * Valeurs rendues par `getCurrentMediaSource`.
      *
-     * ⚠️ C'est `getCurrentMediaSource` qu'il faut interroger, PAS `getCurrentPlayer`. Ce dernier
-     * ne connaît que les trois lecteurs de musique : passé sur la radio, il continue de rendre
-     * le lecteur précédent. On commandait alors le Bluetooth alors que la radio jouait — et
-     * comme lui dire « piste suivante » le réveille, le raccourci **changeait de source**.
+     * ⚠️ L'espace de valeurs est HYBRIDE, et ça ne se devine pas : le SDK y mélange ses
+     * `MEDIA_TYPE_*` (petits entiers) et ses `*_SOURCE_CODE` (0x12, 0x32, 0x46). Seules quatre
+     * valeurs sont CERTAINES — les trois constantes du SDK, et le 3 relevé sur véhicule en
+     * radio. Les autres restent des candidats, d'où l'identification de secours plus bas :
+     * quand le code est inconnu, on demande aux lecteurs lequel joue au lieu de parier.
      */
-    private const val SRC_NONE      = 0
-    private const val SRC_RADIO     = 1
-    private const val SRC_RADIO_FM  = 2
-    private const val SRC_RADIO_AM  = 3
-    private const val SRC_RADIO_DAB = 4
-    private const val SRC_BT        = 5
-    private const val SRC_ONLINE    = 6
-    private const val SRC_USB       = 7
-    private const val SRC_CP        = 8
-    private const val SRC_AA        = 9
-    private const val SRC_USB_VIDEO = 10
+    private const val SRC_RADIO_MIN = 1       // 1 radio, 2 FM, 3 AM, 4 DAB
+    private const val SRC_RADIO_MAX = 4
+    private const val SRC_BT        = 5       // candidat
+    private const val SRC_ONLINE    = 6       // candidat
+    private const val SRC_USB       = 7       // candidat
+    private const val SRC_USB_VIDEO = 0x12    // certain (USB_VIDEO_SOURCE_CODE)
+    private const val SRC_CARPLAY   = 0x32    // certain (CP_MEDIA_SOURCE_CODE)
+    private const val SRC_AA        = 0x46    // certain (AA_MEDIA_SOURCE_CODE)
 
     /** États de lecture (`MediaConstants`) : seul START vaut « en train de jouer ». */
     private const val PLAYER_STATUS_START = 3
 
-    private fun nomSource(v: Int): String = when (v) {
-        SRC_NONE -> "aucune"
-        SRC_RADIO, SRC_RADIO_FM, SRC_RADIO_AM, SRC_RADIO_DAB -> "radio"
-        SRC_BT -> "Bluetooth"
-        SRC_ONLINE -> "en ligne"
-        SRC_USB -> "USB"
-        SRC_CP -> "CarPlay"
-        SRC_AA -> "Android Auto"
-        SRC_USB_VIDEO -> "vidéo USB"
-        else -> "inconnue — à identifier"
+    // ── Service radio : un service à part, avec sa propre interface ──
+    private const val RADIO_PKG  = "com.saicmotor.service.radio"
+    private const val RADIO_ACT  = "com.saicmotor.service.radio.radioservice"
+    private const val DESC_RADIO = "com.saicmotor.sdk.radio.IRadioAppService"
+    private const val RADIO_NEXT       = 0xd
+    private const val RADIO_PREV       = 0xe
+    private const val RADIO_INFO       = 0x13   // getCurrentRadioInfo → RadioBean
+    private const val RADIO_PLAY       = 0x1b   // srcPlayRadio
+    private const val RADIO_PAUSE      = 0x1c   // srcPauseRadio
+
+    private fun nomSource(v: Int): String = when {
+        v == 0 -> "aucune"
+        v in SRC_RADIO_MIN..SRC_RADIO_MAX -> "radio"
+        v == SRC_BT -> "Bluetooth"
+        v == SRC_ONLINE -> "en ligne"
+        v == SRC_USB -> "USB"
+        v == SRC_USB_VIDEO -> "vidéo USB"
+        v == SRC_CARPLAY -> "CarPlay"
+        v == SRC_AA -> "Android Auto"
+        else -> "inconnue ($v)"
     }
 
     private enum class CmdMedia { SUIVANT, PRECEDENT, LECTURE_PAUSE }
@@ -3753,7 +3760,17 @@ object MG4Hardware {
      * Une action inconnue du firmware (SWI68/165 n'ont ni façade générique ni CarPlay/AA) fait
      * simplement échouer `bindService` : on rend null, et l'appelant passe au repli suivant.
      */
-    private fun mediaBinder(action: String, attenteMs: Long = 1200): IBinder? {
+    private fun mediaBinder(action: String, attenteMs: Long = 1200): IBinder? =
+        serviceBinder(action, MEDIA_PKG, MEDIA_CLS, attenteMs)
+
+    /**
+     * Binder d'un service SAIC, lié à la demande et mis en cache.
+     *
+     * [cls] est nul pour le service radio : il se lie par paquet + action, pas par classe —
+     * c'est ainsi que `RadioOptionManager` procède, et une liaison par classe échouerait.
+     */
+    private fun serviceBinder(action: String, pkg: String, cls: String?,
+                              attenteMs: Long = 1200): IBinder? {
         sMediaBinders[action]?.let { if (it.isBinderAlive) return it else sMediaBinders.remove(action) }
         val ctx = sAppContext ?: return null
 
@@ -3770,8 +3787,9 @@ object MG4Hardware {
             }
             sMediaConns[action] = conn
             val ok = try {
-                ctx.bindService(Intent(action).setClassName(MEDIA_PKG, MEDIA_CLS),
-                    conn, Context.BIND_AUTO_CREATE)
+                val intent = Intent(action)
+                if (cls != null) intent.setClassName(pkg, cls) else intent.setPackage(pkg)
+                ctx.bindService(intent, conn, Context.BIND_AUTO_CREATE)
             } catch (e: Exception) {
                 AppLogger.w(MEDIA_TAG, "bindService ${action.substringAfterLast('.')} : " +
                     "${(e.cause ?: e).message}")
@@ -3806,8 +3824,9 @@ object MG4Hardware {
      * journal à chaque étape : c'est lui, pas la valeur de retour, qui dira au volant quelle
      * voie a réellement agi.
      */
-    private fun mediaTransact(action: String, descripteur: String, code: Int): Boolean {
-        val binder = mediaBinder(action) ?: return false
+    private fun mediaTransact(action: String, descripteur: String, code: Int,
+                              pkg: String = MEDIA_PKG, cls: String? = MEDIA_CLS): Boolean {
+        val binder = serviceBinder(action, pkg, cls) ?: return false
         val data = Parcel.obtain()
         val reply = Parcel.obtain()
         return try {
@@ -3844,6 +3863,43 @@ object MG4Hardware {
         } catch (e: Exception) {
             AppLogger.w(MEDIA_TAG, "${action.substringAfterLast('.')} " +
                 "lecture tx=0x${Integer.toHexString(code)} : ${(e.cause ?: e).message}")
+            null
+        } finally {
+            data.recycle()
+            reply.recycle()
+        }
+    }
+
+    /**
+     * La radio joue-t-elle ? `null` si on ne peut pas conclure.
+     *
+     * `isPlaying()` du SDK radio se résume à `getCurrentRadioInfo().getRadioState() == 1`. Il
+     * faut donc lire le `RadioBean` renvoyé, dans l'ordre exact de son `writeToParcel` :
+     * enable(byte), name(String), rds(byte), cover(String), fréquence(int), type(int),
+     * **état(int)**. C'est le seul endroit du projet couplé à la sérialisation d'un bean SAIC —
+     * tout est sous try/catch, et un échec vaut `null`, jamais une supposition.
+     *
+     * Sans cette lecture, `isMusicActive` servait de repli : or il est **faux même quand la
+     * radio joue**, son flux ne passant pas par le canal musique. On envoyait donc toujours
+     * « lecture », jamais « pause » — d'où un raccourci sans effet.
+     */
+    private fun radioEnLecture(): Boolean? {
+        val binder = serviceBinder(RADIO_ACT, RADIO_PKG, null) ?: return null
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(DESC_RADIO)
+            binder.transact(RADIO_INFO, data, reply, 0)
+            reply.readException()
+            if (reply.readInt() == 0) return null      // bean nul
+            reply.readByte(); reply.readString()       // enable, nom
+            reply.readByte(); reply.readString()       // rds, pochette
+            reply.readInt(); reply.readInt()           // fréquence, type
+            val etat = reply.readInt()
+            AppLogger.i(MEDIA_TAG, "état radio = $etat (1 = en lecture)")
+            etat == 1
+        } catch (e: Exception) {
+            AppLogger.w(MEDIA_TAG, "état radio illisible : ${(e.cause ?: e).message}")
             null
         } finally {
             data.recycle()
@@ -3898,6 +3954,20 @@ object MG4Hardware {
      * 4. **La touche média Android**, dernier recours : c'est la seule voie sur les firmwares A9,
      *    où ce service SAIC n'existe pas, et la seule qui atteigne une session Bluetooth.
      */
+    /**
+     * Quand le code de source est inconnu, on DEMANDE aux lecteurs lequel joue.
+     *
+     * C'est ce qui rend le pilotage robuste malgré une table de sources incomplète : on ne
+     * commande que celui qui se déclare en lecture, donc jamais une source endormie — c'est
+     * exactement l'erreur qui faisait changer de source auparavant.
+     */
+    private fun sourceQuiJoue(): Int? {
+        if (mediaLireInt(ACT_BT, DESC_BT, 0x9)?.let { it != 0 } == true) return SRC_BT
+        if (mediaLireInt(ACT_USB, DESC_USB, 0x1e)?.let { it != 0 } == true) return SRC_USB
+        if (mediaLireInt(ACT_ONLINE, DESC_ONLINE, 0x6) == PLAYER_STATUS_START) return SRC_ONLINE
+        return null
+    }
+
     private fun commandeMedia(cmd: CmdMedia): Boolean {
         val src = mediaSourceCourante()
 
@@ -3912,48 +3982,74 @@ object MG4Hardware {
             })
         }
 
-        // ⚠️ AUCUNE CASCADE ICI, et c'est le cœur du correctif. Essayer les binders l'un après
-        // l'autre revenait à commander une source qui ne jouait pas — le Bluetooth répondait
-        // « oui » et se remettait à jouer, ce qui CHANGEAIT la source sous les doigts de
-        // l'utilisateur. On ne parle qu'à la source réellement active, ou à personne.
-        return when (src) {
-            SRC_BT -> mediaTransact(ACT_BT, DESC_BT, when (cmd) {
+        // ⚠️ AUCUNE CASCADE ENTRE SOURCES. Essayer les binders l'un après l'autre revenait à
+        // commander une source qui ne jouait pas : elle répondait « oui » et se remettait à
+        // jouer, ce qui CHANGEAIT la source sous les doigts de l'utilisateur.
+        val cible = if (src in SRC_RADIO_MIN..SRC_RADIO_MAX || src == SRC_BT ||
+                        src == SRC_ONLINE || src == SRC_USB || src == SRC_CARPLAY ||
+                        src == SRC_AA) src
+                    else sourceQuiJoue()?.also {
+                        AppLogger.i(MEDIA_TAG, "code $src inconnu — lecteur identifié : ${nomSource(it)}")
+                    } ?: src
+
+        return when {
+            cible in SRC_RADIO_MIN..SRC_RADIO_MAX -> {
+                // La radio a son propre service : next/previous y changent de station, et
+                // srcPlayRadio/srcPauseRadio sont les commandes que le launcher utilise.
+                // Un état illisible est traité comme « en lecture » : c'est l'état normal
+                // d'une radio qui est la source active, et une pause de trop se corrige d'un
+                // second appui — l'inverse laisserait le raccourci sans effet.
+                val joue = radioEnLecture() != false
+                val code = when (cmd) {
+                    CmdMedia.SUIVANT -> RADIO_NEXT
+                    CmdMedia.PRECEDENT -> RADIO_PREV
+                    CmdMedia.LECTURE_PAUSE -> if (joue) RADIO_PAUSE else RADIO_PLAY
+                }
+                val ok = mediaTransact(RADIO_ACT, DESC_RADIO, code, RADIO_PKG, null)
+                // Repli DANS la source uniquement : la façade générique s'adresse à la source
+                // courante, elle ne peut donc pas en réveiller une autre.
+                if (ok) true else mediaTransact(ACT_MEDIA, DESC_MEDIA, when (cmd) {
+                    CmdMedia.SUIVANT -> 5
+                    CmdMedia.PRECEDENT -> 4
+                    CmdMedia.LECTURE_PAUSE -> if (joue) 3 else 2
+                })
+            }
+
+            cible == SRC_BT -> mediaTransact(ACT_BT, DESC_BT, when (cmd) {
                 CmdMedia.SUIVANT -> 5
                 CmdMedia.PRECEDENT -> 4
-                CmdMedia.LECTURE_PAUSE -> if (enLecture(src)) 1 else 2
+                CmdMedia.LECTURE_PAUSE -> if (enLecture(cible)) 1 else 2
             })
 
-            SRC_USB -> mediaTransact(ACT_USB, DESC_USB, when (cmd) {
+            cible == SRC_USB -> mediaTransact(ACT_USB, DESC_USB, when (cmd) {
                 CmdMedia.SUIVANT -> 0x1a          // playNextMusic
                 CmdMedia.PRECEDENT -> 0x19        // playLastMusic
-                CmdMedia.LECTURE_PAUSE -> 0xc     // playOrPause : vraie bascule, aucun état à lire
+                CmdMedia.LECTURE_PAUSE -> 0xc     // playOrPause : vraie bascule
             })
 
-            SRC_ONLINE -> mediaTransact(ACT_ONLINE, DESC_ONLINE, when (cmd) {
+            cible == SRC_ONLINE -> mediaTransact(ACT_ONLINE, DESC_ONLINE, when (cmd) {
                 CmdMedia.SUIVANT -> 4
                 CmdMedia.PRECEDENT -> 3
-                CmdMedia.LECTURE_PAUSE -> if (enLecture(src)) 1 else 2
+                CmdMedia.LECTURE_PAUSE -> if (enLecture(cible)) 1 else 2
             })
 
-            SRC_CP, SRC_AA -> mediaTransact(ACT_CPAA, DESC_CPAA, when (cmd) {
+            cible == SRC_CARPLAY || cible == SRC_AA -> mediaTransact(ACT_CPAA, DESC_CPAA, when (cmd) {
                 CmdMedia.SUIVANT -> 4
                 CmdMedia.PRECEDENT -> 3
-                CmdMedia.LECTURE_PAUSE -> if (enLecture(src)) 2 else 1
+                // La projection n'expose pas son état : isMusicActive est le seul indice, et il
+                // suffit ici — il retombe à faux quand la lecture s'arrête vraiment.
+                CmdMedia.LECTURE_PAUSE -> if (enLecture(cible)) 2 else 1
             })
 
             else -> {
-                // Radio, vidéo, aucune source : le SDK n'expose pas de binder de pilotage pour
-                // elles. La façade générique s'adresse à la source courante, elle est donc la
-                // seule tentative acceptable — et si elle ne répond pas, on ne fait RIEN plutôt
-                // que de réveiller une autre source.
-                AppLogger.i(MEDIA_TAG, "source ${nomSource(src)} sans binder dédié — " +
+                AppLogger.i(MEDIA_TAG, "source ${nomSource(cible)} sans lecteur identifié — " +
                     "façade générique seule")
                 val ok = mediaTransact(ACT_MEDIA, DESC_MEDIA, when (cmd) {
                     CmdMedia.SUIVANT -> 5
                     CmdMedia.PRECEDENT -> 4
-                    CmdMedia.LECTURE_PAUSE -> if (enLecture(src)) 3 else 2
+                    CmdMedia.LECTURE_PAUSE -> if (enLecture(cible)) 3 else 2
                 })
-                if (!ok) AppLogger.i(MEDIA_TAG, "aucune action possible sur ${nomSource(src)}")
+                if (!ok) AppLogger.i(MEDIA_TAG, "aucune action possible sur ${nomSource(cible)}")
                 ok
             }
         }
