@@ -4,10 +4,13 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.media.AudioManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.Parcel
+import android.os.SystemClock
+import android.view.KeyEvent
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
 import com.mg4.control.debug.AppLogger
@@ -3659,6 +3662,64 @@ object MG4Hardware {
     @Volatile private var sDoorConnecting = false
     @Volatile private var sAnyFrontOpenPrev = false
     @Volatile private var sVolumeBeforeDrop = -1     // volume mémorisé à l'ouverture (pour restauration)
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Pistes audio : suivant / précédent
+    // ────────────────────────────────────────────────────────────────────────
+
+    private const val MEDIA_TAG = "MG4_MEDIA"
+
+    /**
+     * ⚠️ RIEN À VOIR AVEC LE VOLUME, malgré les apparences.
+     *
+     * Le volume est un réglage du **véhicule** : il passe par les gestionnaires SAIC
+     * ([setMediaVolume] → SmartSoundManager ou ICarAudioService), et il s'applique quoi qu'il
+     * soit en train de jouer.
+     *
+     * La piste, elle, appartient à l'**application qui joue**. Aucun gestionnaire véhicule ne
+     * sait passer au morceau suivant — il n'y a pas de « pistes » côté voiture. La seule voie
+     * est la touche média standard d'Android, que le système route vers la session média
+     * active : exactement ce que font un widget de lecteur ou les boutons d'un casque Bluetooth.
+     *
+     * Conséquence à connaître AVANT de tester : ça ne fonctionne qu'avec une source qui publie
+     * une **MediaSession** — Bluetooth, Android Auto, applications média Android. Une source
+     * purement OEM (radio, USB du launcher d'origine) peut parfaitement n'en publier aucune et
+     * ignorer la commande. Ce serait alors une limite de la source, pas un bug d'envoi : le log
+     * ci-dessous permet de faire la différence.
+     */
+    fun mediaNext(): Boolean = envoyerToucheMedia(KeyEvent.KEYCODE_MEDIA_NEXT)
+
+    /** Piste précédente. Mêmes réserves que [mediaNext]. */
+    fun mediaPrevious(): Boolean = envoyerToucheMedia(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+
+    /**
+     * Envoie une touche média au système, qui la remet à la session active.
+     *
+     * DOWN **puis** UP : une session n'a aucune obligation d'agir sur l'appui, plusieurs
+     * n'agissent qu'au relâchement. N'envoyer que le DOWN laisserait en plus une touche
+     * « enfoncée » du point de vue du système.
+     */
+    private fun envoyerToucheMedia(keyCode: Int): Boolean {
+        val am = sAppContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        if (am == null) {
+            AppLogger.w(MEDIA_TAG, "AudioManager indisponible — touche média non envoyée")
+            return false
+        }
+        return try {
+            val t = SystemClock.uptimeMillis()
+            am.dispatchMediaKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, keyCode, 0))
+            am.dispatchMediaKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_UP, keyCode, 0))
+            // `isMusicActive` ne dit pas QUI joue, mais il distingue les deux cas qu'on
+            // confondrait sinon : « la commande est partie dans le vide, rien ne jouait » et
+            // « quelque chose joue et n'a pas réagi ».
+            AppLogger.i(MEDIA_TAG, "touche ${KeyEvent.keyCodeToString(keyCode)} envoyée " +
+                "(lecture en cours = ${am.isMusicActive})")
+            true
+        } catch (e: Exception) {
+            AppLogger.w(MEDIA_TAG, "envoi impossible : ${(e.cause ?: e).message}")
+            false
+        }
+    }
 
     /** Baisse du volume à l'ouverture de porte : détection DLOCK_DOOR_OPEN_STS via CarPropertyManager.
      *  Lisible/fonctionnel uniquement sur SWI132 et SWI133 ; ailleurs le prop n'est pas exposé à l'app. */

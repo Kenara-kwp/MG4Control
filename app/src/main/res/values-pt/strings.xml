@@ -463,4 +463,8 @@
     <string name="adv_sc_enable_warn_title">O botão atribuído muda de função</string>
     <string name="adv_sc_enable_warn_msg">Um botão atribuído a um atalho avançado perde a sua função original: o MG4Control intercepta a tecla antes do launcher, que deixa de a receber.\n\nExemplo: se atribuir o botão Início, deixará de voltar ao launcher MG. Para o recuperar, atribua-lhe a ação « Iniciar um app » e escolha o launcher.\n\nA tecla é reservada por completo: atribuir apenas a pressão longa anula também a curta e a dupla.\n\nTudo volta ao normal ao eliminar o atalho em « Lista de atalhos ».</string>
     <string name="adv_sc_enable_warn_ok">Ativar</string>
+
+    <!-- Raccourcis : pistes audio -->
+    <string name="shortcuts_action_media_next">Faixa seguinte</string>
+    <string name="shortcuts_action_media_prev">Faixa anterior</string>
 </resources>

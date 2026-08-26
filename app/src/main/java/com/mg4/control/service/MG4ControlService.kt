@@ -63,7 +63,8 @@ class MG4ControlService : Service() {
             ShortcutAction.SEAT_HEAT_RIGHT_CYCLE, ShortcutAction.STEERING_HEAT_TOGGLE,
             ShortcutAction.DEFROST_FRONT_TOGGLE, ShortcutAction.DEFROST_REAR_TOGGLE,
             ShortcutAction.HVAC_RECIRC_CYCLE,
-            ShortcutAction.BRIGHTNESS_UP, ShortcutAction.BRIGHTNESS_DOWN
+            ShortcutAction.BRIGHTNESS_UP, ShortcutAction.BRIGHTNESS_DOWN,
+            ShortcutAction.MEDIA_NEXT, ShortcutAction.MEDIA_PREVIOUS
         )
 
 
@@ -530,6 +531,16 @@ class MG4ControlService : Service() {
                 val suivant = ExternalApi.cycleStep(actuel, 1, 3, 1)
                 AppLogger.i(TAG, "SHORTCUT sensibilité : $actuel → $suivant")
                 MG4Hardware.setDrowsinessSensitivity(suivant)
+            }
+
+            ShortcutAction.MEDIA_NEXT, ShortcutAction.MEDIA_PREVIOUS -> {
+                // Aucune lecture préalable : contrairement aux autres actions de ce bloc, il n'y
+                // a pas d'« état de piste » à connaître. On envoie la commande, c'est la source
+                // qui décide — d'où le passage par ce chemin plutôt que par les bascules à état
+                // mémorisé, qui alterneraient une fois sur deux.
+                val suivant = action == ShortcutAction.MEDIA_NEXT
+                AppLogger.i(TAG, "SHORTCUT piste ${if (suivant) "suivante" else "précédente"}")
+                if (suivant) MG4Hardware.mediaNext() else MG4Hardware.mediaPrevious()
             }
 
             ShortcutAction.REGEN_CYCLE -> {

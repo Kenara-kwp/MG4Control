@@ -463,4 +463,8 @@
     <string name="adv_sc_enable_warn_title">Il pulsante assegnato cambia ruolo</string>
     <string name="adv_sc_enable_warn_msg">Un pulsante assegnato a una scorciatoia avanzata perde la sua funzione originale: MG4Control intercetta il tasto prima del launcher, che non lo riceve più.\n\nEsempio: se assegni il pulsante Home, non riporterà più al launcher MG. Per recuperarlo, assegnagli l\'azione « Avvia un\'app » e scegli il launcher.\n\nIl tasto è riservato per intero: assegnare solo la pressione lunga annulla anche quella breve e quella doppia.\n\nTutto torna normale eliminando la scorciatoia in « Elenco scorciatoie ».</string>
     <string name="adv_sc_enable_warn_ok">Attiva</string>
+
+    <!-- Raccourcis : pistes audio -->
+    <string name="shortcuts_action_media_next">Traccia successiva</string>
+    <string name="shortcuts_action_media_prev">Traccia precedente</string>
 </resources>

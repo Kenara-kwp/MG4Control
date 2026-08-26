@@ -38,7 +38,12 @@ enum class ShortcutAction(val id: Int) {
     DEFROST_REAR_TOGGLE(27),
     HVAC_RECIRC_CYCLE(28),
     BRIGHTNESS_UP(29),
-    BRIGHTNESS_DOWN(30);
+    BRIGHTNESS_DOWN(30),
+
+    // Média : seules actions qui ne touchent NI au véhicule NI à un état mémorisé — elles
+    // envoient une touche au système, qui la remet à l'application en train de jouer.
+    MEDIA_NEXT(31),
+    MEDIA_PREVIOUS(32);
 
     companion object {
         fun fromId(id: Int) = values().firstOrNull { it.id == id } ?: NONE

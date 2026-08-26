@@ -463,4 +463,8 @@
     <string name="adv_sc_enable_warn_title">Assigned buttons change role</string>
     <string name="adv_sc_enable_warn_msg">A button assigned to an advanced shortcut loses its original function: MG4Control intercepts the key before the launcher, which no longer sees it at all.\n\nExample: assign the Home button and it no longer returns to the MG launcher. To get that back, give it the Launch an app action and pick the launcher.\n\nThe key is claimed as a whole: assigning only the long press also neutralises the short press and the double press.\n\nEverything returns to normal once the shortcut is deleted from Shortcut list.</string>
     <string name="adv_sc_enable_warn_ok">Enable</string>
+
+    <!-- Raccourcis : pistes audio -->
+    <string name="shortcuts_action_media_next">Next track</string>
+    <string name="shortcuts_action_media_prev">Previous track</string>
 </resources>
