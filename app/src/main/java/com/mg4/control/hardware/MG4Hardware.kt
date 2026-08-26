@@ -4069,16 +4069,50 @@ object MG4Hardware {
             return false
         }
 
+        // Une session annonce ce qu'elle sait faire dans `actions`. Ignorer cette déclaration
+        // revient à parler dans le vide : `skipToNext()` sur une session qui ne déclare pas
+        // ACTION_SKIP_TO_NEXT ne lève rien et ne fait rien — exactement ce qu'a vécu le testeur
+        // SWI131 sur Android Auto, session trouvée et en lecture, commande sans effet.
+        val actions = cible.playbackState?.actions ?: 0L
+        val requise = when (cmd) {
+            CmdMedia.SUIVANT -> PlaybackState.ACTION_SKIP_TO_NEXT
+            CmdMedia.PRECEDENT -> PlaybackState.ACTION_SKIP_TO_PREVIOUS
+            CmdMedia.LECTURE_PAUSE ->
+                PlaybackState.ACTION_PLAY_PAUSE or
+                    (if (joue != null) PlaybackState.ACTION_PAUSE else PlaybackState.ACTION_PLAY)
+        }
+        val declaree = (actions and requise) != 0L
+        AppLogger.i(MEDIA_TAG, "session ${cible.packageName} état=${cible.playbackState?.state} " +
+            "actions=0x${java.lang.Long.toHexString(actions)} ${cmd.name} déclarée=$declaree")
+
         return try {
-            when (cmd) {
-                CmdMedia.SUIVANT -> cible.transportControls.skipToNext()
-                CmdMedia.PRECEDENT -> cible.transportControls.skipToPrevious()
-                CmdMedia.LECTURE_PAUSE ->
-                    if (joue != null) cible.transportControls.pause()
-                    else cible.transportControls.play()
+            if (declaree) {
+                when (cmd) {
+                    CmdMedia.SUIVANT -> cible.transportControls.skipToNext()
+                    CmdMedia.PRECEDENT -> cible.transportControls.skipToPrevious()
+                    CmdMedia.LECTURE_PAUSE ->
+                        if (joue != null) cible.transportControls.pause()
+                        else cible.transportControls.play()
+                }
+            } else {
+                // Repli : le bouton média, envoyé À CETTE SESSION précise. Beaucoup
+                // d'applications — les projections en particulier — traitent les touches média
+                // sans rien déclarer dans `actions`.
+                //
+                // ⚠️ Ce n'est PAS le `dispatchMediaKeyEvent` global qui avait causé le
+                // changement de source : celui-ci vise le contrôleur qu'on a identifié comme
+                // étant celui qui joue. Aucune autre session ne peut l'intercepter.
+                val code = when (cmd) {
+                    CmdMedia.SUIVANT -> KeyEvent.KEYCODE_MEDIA_NEXT
+                    CmdMedia.PRECEDENT -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+                    CmdMedia.LECTURE_PAUSE -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                }
+                val t = SystemClock.uptimeMillis()
+                cible.dispatchMediaButtonEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, code, 0))
+                cible.dispatchMediaButtonEvent(KeyEvent(t, t, KeyEvent.ACTION_UP, code, 0))
+                AppLogger.i(MEDIA_TAG, "action non déclarée — bouton média ${
+                    KeyEvent.keyCodeToString(code)} envoyé à ${cible.packageName}")
             }
-            AppLogger.i(MEDIA_TAG, "session ${cible.packageName} → ${cmd.name} " +
-                "(état ${cible.playbackState?.state})")
             true
         } catch (e: Exception) {
             AppLogger.w(MEDIA_TAG, "commande de session refusée : ${(e.cause ?: e).message}")
@@ -4284,7 +4318,20 @@ object MG4Hardware {
                 val pkg = runCatching {
                     session.javaClass.getMethod("getPackageName").invoke(session)
                 }.getOrNull()
-                AppLogger.i(MEDIA_TAG, "  session : $pkg")
+                // Les ACTIONS déclarées valent autant que l'état : une session qui joue mais
+                // n'annonce pas SKIP_TO_NEXT laissera « piste suivante » sans effet, et rien
+                // dans le comportement ne permet de le deviner.
+                val etat = runCatching {
+                    session.javaClass.getMethod("getPlaybackState").invoke(session)
+                }.getOrNull()
+                val num = runCatching {
+                    etat?.javaClass?.getMethod("getState")?.invoke(etat) as? Int
+                }.getOrNull()
+                val actions = runCatching {
+                    etat?.javaClass?.getMethod("getActions")?.invoke(etat) as? Long
+                }.getOrNull()
+                AppLogger.i(MEDIA_TAG, "  session : $pkg état=${num ?: "?"} " +
+                    "actions=0x${java.lang.Long.toHexString(actions ?: 0L)}")
             }
         } catch (e: Exception) {
             val cause = e.cause ?: e
