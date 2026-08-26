@@ -2272,6 +2272,33 @@ object MG4Hardware {
             return false
         }
 
+        // ⚠️ GARDE D'ALLUMAGE — cause d'un ESC désactivé au démarrage, reproduite le 2026-08-26.
+        //
+        // Scénario : on monte dans la voiture alors que l'infodivertissement tourne déjà mais que
+        // le tableau de bord est encore éteint. Le service démarre et applique le profil, donc
+        // AVANT que le véhicule ne soit réveillé. À cet instant la propriété ESC ne reflète pas
+        // l'état réel — et comme l'écriture est une BASCULE pilotée par cette lecture, viser
+        // « ON » à partir d'un « OFF » erroné INVERSE un ESC qui était actif. Il est alors
+        // réellement désactivé, en silence.
+        //
+        // Le second passage (IGNITION_RUN, puis passage en D) relisait correctement et le
+        // remettait sur ON : d'où l'impression d'un réglage qui « revient tout seul ».
+        //
+        // On refuse donc d'agir sur un état d'allumage CONNU comme non-RUN. Un état illisible
+        // n'est pas un refus : sur un firmware où la propriété ne répond pas, bloquer priverait
+        // l'utilisateur du réglage sans rien protéger.
+        //
+        // Aucune fonction perdue : le véhicule remet l'ESC sur ON à chaque démarrage, et le
+        // profil est ré-appliqué 500 ms après IGNITION_RUN — un profil qui veut l'ESC sur OFF
+        // sera donc bien honoré, simplement un peu plus tard.
+        val allumage = getCurrentIgnitionState()
+        if (allumage == CarIgnitionItem.OFF || allumage == CarIgnitionItem.ACCESSORY ||
+            allumage == CarIgnitionItem.CRANK) {
+            AppLogger.w(SAFE_TAG, "ESC : véhicule pas en RUN (allumage=$allumage) — aucune " +
+                "action. Basculer maintenant partirait d'une lecture non fiable.")
+            return false
+        }
+
         val stable = lireEscStable() ?: return false
         if (stable == on) {
             AppLogger.i(SAFE_TAG, "ESC déjà ${if (on) "ON" else "OFF"} (confirmé " +
@@ -2309,6 +2336,10 @@ object MG4Hardware {
     fun runSafetyDiag() {
         AppLogger.i(SAFE_TAG, "── DIAG somnolence / sensibilité / ESC ──")
         AppLogger.i(SAFE_TAG, "firmware=${FirmwareInfo.getGeneration()} géré=${hasDrowsinessAndEsc()}")
+        // L'allumage conditionne toute écriture ESC : hors RUN, la bascule est refusée. Sans
+        // cette ligne, un rapport où l ESC « ne répond pas » resterait inexplicable.
+        AppLogger.i(SAFE_TAG, "allumage=${getCurrentIgnitionState()} (RUN=${CarIgnitionItem.RUN} " +
+            "→ seule valeur qui autorise une bascule ESC)")
         if (!hasDrowsinessAndEsc()) {
             AppLogger.i(SAFE_TAG, "→ firmware inconnu, aucune voie applicable")
             return
