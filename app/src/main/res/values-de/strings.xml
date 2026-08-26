@@ -467,4 +467,5 @@
     <!-- Raccourcis : pistes audio -->
     <string name="shortcuts_action_media_next">Nächster Titel</string>
     <string name="shortcuts_action_media_prev">Vorheriger Titel</string>
+    <string name="shortcuts_action_media_play_pause">Wiedergabe / Pause</string>
 </resources>

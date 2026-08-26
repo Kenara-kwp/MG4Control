@@ -139,6 +139,7 @@ class ShortcutsFragment : Fragment() {
             // session média d'Android, identique sur les six firmwares.
             add(ActionItem(getString(R.string.shortcuts_action_media_next),      ShortcutAction.MEDIA_NEXT))
             add(ActionItem(getString(R.string.shortcuts_action_media_prev),      ShortcutAction.MEDIA_PREVIOUS))
+            add(ActionItem(getString(R.string.shortcuts_action_media_play_pause), ShortcutAction.MEDIA_PLAY_PAUSE))
             add(ActionItem(getString(R.string.shortcuts_action_apply_profile),   ShortcutAction.APPLY_PROFILE))
             add(ActionItem(getString(R.string.shortcuts_action_profile_picker), ShortcutAction.PROFILE_PICKER))
             add(ActionItem(getString(R.string.shortcuts_action_open_app),       ShortcutAction.OPEN_APP))

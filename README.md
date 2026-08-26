@@ -109,7 +109,7 @@ Actions disponibles — celles qui dépendent du firmware n'apparaissent pas sur
 | Conduite | 1 Pédale · Régénération : niveau suivant · Éco. énergie |
 | Sécurité | ESC · Somnolence · Somnolence : sensibilité · Système Anticollision · ADAS · Panneaux (TSR) · Alerte survitesse · Alerte changement de limite · Son |
 | Confort | Siège chauffant gauche · Siège chauffant droit · Volant chauffant · Clim ON/OFF · Clim : température ± · Clim : ventilation ± · Dégivrage avant · Dégivrage arrière · Recirculation · Luminosité ± |
-| Média | Piste suivante · Piste précédente |
+| Média | Lecture / Pause · Piste suivante · Piste précédente |
 | Application et véhicule | Lancer un profil · Sélecteur de profil · Ouvrir MG4Control · Lancer une application · Éteindre la voiture |
 
 Les actions de confort et de sécurité **relisent l'état sur le véhicule à chaque pression** au lieu
@@ -813,7 +813,7 @@ Available actions — those depending on the firmware do not show up on the othe
 | Driving | One Pedal · Regeneration: next level · Energy saving |
 | Safety | ESC · Drowsiness · Drowsiness: sensitivity · Forward collision · ADAS · Traffic signs (TSR) · Overspeed alert · Speed limit change alert · Sound |
 | Comfort | Left seat heating · Right seat heating · Heated steering · Climate ON/OFF · Climate: temperature ± · Climate: fan ± · Front defrost · Rear defrost · Recirculation · Brightness ± |
-| Media | Next track · Previous track |
+| Media | Play / Pause · Next track · Previous track |
 | App and vehicle | Apply a profile · Profile picker · Open MG4Control · Launch an app · Power the car off |
 
 Comfort and safety actions **re-read the state from the vehicle on every press** instead of

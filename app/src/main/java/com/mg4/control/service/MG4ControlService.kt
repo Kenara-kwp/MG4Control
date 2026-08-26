@@ -64,7 +64,8 @@ class MG4ControlService : Service() {
             ShortcutAction.DEFROST_FRONT_TOGGLE, ShortcutAction.DEFROST_REAR_TOGGLE,
             ShortcutAction.HVAC_RECIRC_CYCLE,
             ShortcutAction.BRIGHTNESS_UP, ShortcutAction.BRIGHTNESS_DOWN,
-            ShortcutAction.MEDIA_NEXT, ShortcutAction.MEDIA_PREVIOUS
+            ShortcutAction.MEDIA_NEXT, ShortcutAction.MEDIA_PREVIOUS,
+            ShortcutAction.MEDIA_PLAY_PAUSE
         )
 
 
@@ -533,14 +534,19 @@ class MG4ControlService : Service() {
                 MG4Hardware.setDrowsinessSensitivity(suivant)
             }
 
-            ShortcutAction.MEDIA_NEXT, ShortcutAction.MEDIA_PREVIOUS -> {
+            ShortcutAction.MEDIA_NEXT, ShortcutAction.MEDIA_PREVIOUS,
+            ShortcutAction.MEDIA_PLAY_PAUSE -> {
                 // Aucune lecture préalable : contrairement aux autres actions de ce bloc, il n'y
-                // a pas d'« état de piste » à connaître. On envoie la commande, c'est la source
-                // qui décide — d'où le passage par ce chemin plutôt que par les bascules à état
-                // mémorisé, qui alterneraient une fois sur deux.
-                val suivant = action == ShortcutAction.MEDIA_NEXT
-                AppLogger.i(TAG, "SHORTCUT piste ${if (suivant) "suivante" else "précédente"}")
-                if (suivant) MG4Hardware.mediaNext() else MG4Hardware.mediaPrevious()
+                // a rien à connaître avant d'agir. Même la pause n'en demande pas — la touche
+                // PLAY_PAUSE est une bascule que la source résout elle-même. D'où le passage par
+                // ce chemin plutôt que par les bascules à état mémorisé, qui se désynchroniseraient
+                // dès que l'utilisateur toucherait à la lecture depuis l'écran d'origine.
+                AppLogger.i(TAG, "SHORTCUT média : ${action.name}")
+                when (action) {
+                    ShortcutAction.MEDIA_NEXT     -> MG4Hardware.mediaNext()
+                    ShortcutAction.MEDIA_PREVIOUS -> MG4Hardware.mediaPrevious()
+                    else                          -> MG4Hardware.mediaPlayPause()
+                }
             }
 
             ShortcutAction.REGEN_CYCLE -> {

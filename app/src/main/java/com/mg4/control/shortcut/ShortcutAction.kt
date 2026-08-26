@@ -43,7 +43,8 @@ enum class ShortcutAction(val id: Int) {
     // Média : seules actions qui ne touchent NI au véhicule NI à un état mémorisé — elles
     // envoient une touche au système, qui la remet à l'application en train de jouer.
     MEDIA_NEXT(31),
-    MEDIA_PREVIOUS(32);
+    MEDIA_PREVIOUS(32),
+    MEDIA_PLAY_PAUSE(33);
 
     companion object {
         fun fromId(id: Int) = values().firstOrNull { it.id == id } ?: NONE

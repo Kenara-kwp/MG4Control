@@ -3693,6 +3693,16 @@ object MG4Hardware {
     fun mediaPrevious(): Boolean = envoyerToucheMedia(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
 
     /**
+     * Bascule lecture / pause. Mêmes réserves que [mediaNext].
+     *
+     * On envoie bien `PLAY_PAUSE` et non `PLAY` ou `PAUSE` : c'est la **source** qui connaît son
+     * état, pas nous. Choisir à sa place supposerait de savoir si elle joue, ce qu'`isMusicActive`
+     * ne dit que globalement — au premier écart, la touche mettrait en pause une lecture déjà
+     * arrêtée et paraîtrait sans effet une fois sur deux.
+     */
+    fun mediaPlayPause(): Boolean = envoyerToucheMedia(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+
+    /**
      * Envoie une touche média au système, qui la remet à la session active.
      *
      * DOWN **puis** UP : une session n'a aucune obligation d'agir sur l'appui, plusieurs
