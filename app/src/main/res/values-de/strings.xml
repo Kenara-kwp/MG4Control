@@ -468,4 +468,8 @@
     <string name="shortcuts_action_media_next">Nächster Titel</string>
     <string name="shortcuts_action_media_prev">Vorheriger Titel</string>
     <string name="shortcuts_action_media_play_pause">Wiedergabe / Pause</string>
+
+    <!-- Raccourcis : volume -->
+    <string name="shortcuts_action_volume_up">Lautstärke +</string>
+    <string name="shortcuts_action_volume_down">Lautstärke -</string>
 </resources>

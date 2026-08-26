@@ -508,6 +508,9 @@ class SettingsFragment : Fragment() {
         MG4Hardware.runSpeedDiag()
         // Sonde climatisation : lecture seule, repère ce qui répond avant tout pilotage.
         MG4Hardware.runClimateDiag()
+        // Sonde média : qui joue, et surtout quelles sessions média existent — c'est ce qui
+        // décide si une touche « piste suivante » peut aboutir quelque part.
+        MG4Hardware.runMediaDiag()
         // Sonde consommation de données : lecture seule, aucune API véhicule impliquée.
         DataUsageProbe.run(ctx)
         // Sonde somnolence / sensibilité / ESC : lecture seule (elle ne bascule RIEN — un

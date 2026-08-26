@@ -65,7 +65,8 @@ class MG4ControlService : Service() {
             ShortcutAction.HVAC_RECIRC_CYCLE,
             ShortcutAction.BRIGHTNESS_UP, ShortcutAction.BRIGHTNESS_DOWN,
             ShortcutAction.MEDIA_NEXT, ShortcutAction.MEDIA_PREVIOUS,
-            ShortcutAction.MEDIA_PLAY_PAUSE
+            ShortcutAction.MEDIA_PLAY_PAUSE,
+            ShortcutAction.VOLUME_UP, ShortcutAction.VOLUME_DOWN
         )
 
 
@@ -532,6 +533,12 @@ class MG4ControlService : Service() {
                 val suivant = ExternalApi.cycleStep(actuel, 1, 3, 1)
                 AppLogger.i(TAG, "SHORTCUT sensibilité : $actuel → $suivant")
                 MG4Hardware.setDrowsinessSensitivity(suivant)
+            }
+
+            ShortcutAction.VOLUME_UP, ShortcutAction.VOLUME_DOWN -> {
+                val delta = if (action == ShortcutAction.VOLUME_UP) 1 else -1
+                AppLogger.i(TAG, "SHORTCUT volume ${if (delta > 0) "+" else "-"}")
+                MG4Hardware.mediaVolumeStep(delta)
             }
 
             ShortcutAction.MEDIA_NEXT, ShortcutAction.MEDIA_PREVIOUS,

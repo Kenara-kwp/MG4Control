@@ -3703,6 +3703,125 @@ object MG4Hardware {
     fun mediaPlayPause(): Boolean = envoyerToucheMedia(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
 
     /**
+     * Monte ou descend le volume média d'un cran.
+     *
+     * Deux voies, dans cet ordre :
+     *  1. la voie **SAIC** ([getMediaVolume] / [setMediaVolume]) — la même que la baisse à
+     *     l'ouverture de porte, déjà validée sur véhicule. C'est la seule qui donne un niveau
+     *     ABSOLU, donc un log exploitable et un vrai respect des bornes ;
+     *  2. à défaut, `AudioManager.adjustStreamVolume`, la voie Android standard. Elle ne dit pas
+     *     d'où l'on part, mais elle répond là où les managers SAIC ne sont pas liés — et elle
+     *     affiche l'indicateur système, ce qui donne un retour visuel.
+     *
+     * Contrairement aux touches média, aucune des deux ne dépend d'une application : le volume
+     * est un réglage du véhicule. C'est pourquoi ces raccourcis fonctionnent quelle que soit la
+     * source, y compris là où « piste suivante » reste sans effet.
+     */
+    fun mediaVolumeStep(delta: Int): Boolean {
+        val actuel = getMediaVolume()
+        val max = getMediaVolumeMax()
+        if (actuel >= 0 && max > 0) {
+            val cible = (actuel + delta).coerceIn(0, max)
+            if (cible == actuel) {
+                AppLogger.i(VOL_TAG, "volume déjà à la borne ($actuel/$max) — aucune écriture")
+                return true
+            }
+            AppLogger.i(VOL_TAG, "volume $actuel → $cible (max $max, voie SAIC)")
+            return setMediaVolume(cible)
+        }
+        val am = sAppContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        if (am == null) {
+            AppLogger.w(VOL_TAG, "volume : ni voie SAIC ni AudioManager — aucune action")
+            return false
+        }
+        return try {
+            am.adjustStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                if (delta > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
+                AudioManager.FLAG_SHOW_UI
+            )
+            AppLogger.i(VOL_TAG, "volume ${if (delta > 0) "+1" else "-1"} " +
+                "(voie Android — niveau SAIC illisible, actuel=$actuel max=$max)")
+            true
+        } catch (e: Exception) {
+            AppLogger.w(VOL_TAG, "volume : ${(e.cause ?: e).message}")
+            false
+        }
+    }
+
+    /**
+     * Sonde média, LECTURE SEULE — elle n'envoie aucune commande.
+     *
+     * Elle existe pour trancher la seule question qui compte quand une touche média reste sans
+     * effet : **la commande n'est-elle pas partie, ou est-elle partie sans destinataire ?** Vu
+     * de l'utilisateur les deux cas sont identiques, et `dispatchMediaKeyEvent` ne rend rien.
+     *
+     * Trois informations, de la plus sûre à la plus révélatrice :
+     *  • `isMusicActive` — quelque chose joue-t-il ;
+     *  • les flux audio actifs et, si le système le laisse voir, l'application qui les produit ;
+     *  • les **sessions média**. C'est le point décisif : `dispatchMediaKeyEvent` ne peut
+     *    atteindre qu'une session. S'il n'y en a aucune, aucune touche média n'aboutira jamais,
+     *    quel que soit le code envoyé — il faudra alors une autre voie.
+     */
+    fun runMediaDiag() {
+        val ctx = sAppContext ?: return
+        val am = ctx.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        if (am == null) {
+            AppLogger.w(MEDIA_TAG, "DIAG : AudioManager indisponible")
+            return
+        }
+        AppLogger.i(MEDIA_TAG, "── DIAG média ────────────────────────────────")
+        AppLogger.i(MEDIA_TAG, "lecture en cours (isMusicActive) = ${am.isMusicActive}")
+
+        // Qui produit du son. La liste est publique ; l'identité du client, elle, est masquée aux
+        // applications ordinaires — on la tente par réflexion, en app système.
+        try {
+            val configs = am.activePlaybackConfigurations
+            AppLogger.i(MEDIA_TAG, "flux audio actifs : ${configs.size}")
+            configs.forEachIndexed { i, c ->
+                val uid = runCatching {
+                    c.javaClass.getMethod("getClientUid").invoke(c) as? Int
+                }.getOrNull()
+                val paquets = uid?.let {
+                    runCatching { ctx.packageManager.getPackagesForUid(it)?.joinToString() }
+                        .getOrNull()
+                }
+                AppLogger.i(MEDIA_TAG, "  [$i] usage=${c.audioAttributes.usage} " +
+                    "contenu=${c.audioAttributes.contentType} uid=${uid ?: "?"} " +
+                    "paquet=${paquets ?: "inconnu"}")
+            }
+        } catch (e: Exception) {
+            AppLogger.w(MEDIA_TAG, "flux audio illisibles : ${(e.cause ?: e).message}")
+        }
+
+        try {
+            val msm = ctx.getSystemService("media_session")
+                ?: throw IllegalStateException("MediaSessionManager absent")
+            val m = msm.javaClass.getMethod("getActiveSessions", ComponentName::class.java)
+            @Suppress("UNCHECKED_CAST")
+            val sessions = m.invoke(msm, null) as? List<Any>
+            AppLogger.i(MEDIA_TAG, "sessions média actives : ${sessions?.size ?: 0}")
+            sessions?.forEach { session ->
+                val pkg = runCatching {
+                    session.javaClass.getMethod("getPackageName").invoke(session)
+                }.getOrNull()
+                AppLogger.i(MEDIA_TAG, "  session : $pkg")
+            }
+            if (sessions.isNullOrEmpty()) {
+                AppLogger.w(MEDIA_TAG, "AUCUNE session : les touches média ne peuvent aboutir " +
+                    "nulle part, la source ne passe pas par MediaSession")
+            }
+        } catch (e: Exception) {
+            val cause = e.cause ?: e
+            AppLogger.w(MEDIA_TAG, "sessions média illisibles : " +
+                "${cause.javaClass.simpleName} — ${cause.message} " +
+                "(SecurityException = il manque MEDIA_CONTENT_CONTROL au manifest, " +
+                "et l'entrée correspondante dans permission-allowlist.txt)")
+        }
+        AppLogger.i(MEDIA_TAG, "──────────────────────────────────────────────")
+    }
+
+    /**
      * Envoie une touche média au système, qui la remet à la session active.
      *
      * DOWN **puis** UP : une session n'a aucune obligation d'agir sur l'appui, plusieurs

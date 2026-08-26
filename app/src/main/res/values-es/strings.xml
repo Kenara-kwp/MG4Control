@@ -468,4 +468,8 @@
     <string name="shortcuts_action_media_next">Pista siguiente</string>
     <string name="shortcuts_action_media_prev">Pista anterior</string>
     <string name="shortcuts_action_media_play_pause">Reproducir / Pausa</string>
+
+    <!-- Raccourcis : volume -->
+    <string name="shortcuts_action_volume_up">Volumen +</string>
+    <string name="shortcuts_action_volume_down">Volumen -</string>
 </resources>

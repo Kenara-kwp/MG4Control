@@ -44,7 +44,12 @@ enum class ShortcutAction(val id: Int) {
     // envoient une touche au système, qui la remet à l'application en train de jouer.
     MEDIA_NEXT(31),
     MEDIA_PREVIOUS(32),
-    MEDIA_PLAY_PAUSE(33);
+    MEDIA_PLAY_PAUSE(33),
+
+    // Volume : réglage du VÉHICULE, contrairement aux trois précédentes. Il ne dépend d'aucune
+    // application et fonctionne donc même quand les touches média restent sans effet.
+    VOLUME_UP(34),
+    VOLUME_DOWN(35);
 
     companion object {
         fun fromId(id: Int) = values().firstOrNull { it.id == id } ?: NONE
