@@ -11,6 +11,7 @@ import android.os.Looper
 import android.os.Parcel
 import android.os.SystemClock
 import android.view.KeyEvent
+import java.util.concurrent.ConcurrentHashMap
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
 import com.mg4.control.debug.AppLogger
@@ -3664,43 +3665,226 @@ object MG4Hardware {
     @Volatile private var sVolumeBeforeDrop = -1     // volume mémorisé à l'ouverture (pour restauration)
 
     // ────────────────────────────────────────────────────────────────────────
-    // Pistes audio : suivant / précédent
+    // Pistes audio : suivant / précédent / lecture-pause
     // ────────────────────────────────────────────────────────────────────────
 
     private const val MEDIA_TAG = "MG4_MEDIA"
 
     /**
-     * ⚠️ RIEN À VOIR AVEC LE VOLUME, malgré les apparences.
+     * ⚠️ LES TOUCHES MÉDIA D'ANDROID NE SUFFISENT PAS ICI. Mesuré sur véhicule, pas supposé.
      *
-     * Le volume est un réglage du **véhicule** : il passe par les gestionnaires SAIC
-     * ([setMediaVolume] → SmartSoundManager ou ICarAudioService), et il s'applique quoi qu'il
-     * soit en train de jouer.
+     * `dispatchMediaKeyEvent` ne peut atteindre qu'une **MediaSession**. Or la sonde
+     * [runMediaDiag] n'en a trouvé qu'UNE sur la voiture : `com.android.bluetooth`. Ni les
+     * sources d'origine (radio, USB) ni Android Auto n'en publient. La touche partait donc dans
+     * le vide — sans la moindre erreur, ce qui la rendait indiscernable d'un envoi réussi.
      *
-     * La piste, elle, appartient à l'**application qui joue**. Aucun gestionnaire véhicule ne
-     * sait passer au morceau suivant — il n'y a pas de « pistes » côté voiture. La seule voie
-     * est la touche média standard d'Android, que le système route vers la session média
-     * active : exactement ce que font un widget de lecteur ou les boutons d'un casque Bluetooth.
-     *
-     * Conséquence à connaître AVANT de tester : ça ne fonctionne qu'avec une source qui publie
-     * une **MediaSession** — Bluetooth, Android Auto, applications média Android. Une source
-     * purement OEM (radio, USB du launcher d'origine) peut parfaitement n'en publier aucune et
-     * ignorer la commande. Ce serait alors une limite de la source, pas un bug d'envoi : le log
-     * ci-dessous permet de faire la différence.
+     * Le launcher ne passe pas par là. `MediaPlayControlManager.next()`, décompilé, appelle un
+     * binder DIFFÉRENT selon la source active. Tout transite par un service unique,
+     * [MEDIA_PKG] / [MEDIA_CLS], dont **l'action de l'intent choisit l'interface rendue**.
      */
-    fun mediaNext(): Boolean = envoyerToucheMedia(KeyEvent.KEYCODE_MEDIA_NEXT)
+    private const val MEDIA_PKG = "com.saicmotor.service.media"
+    private const val MEDIA_CLS = "com.saicmotor.service.media.MediaService"
 
-    /** Piste précédente. Mêmes réserves que [mediaNext]. */
-    fun mediaPrevious(): Boolean = envoyerToucheMedia(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+    // Actions de liaison et descripteurs AIDL — relevés dans le smali du launcher SWI133.
+    private const val ACT_MEDIA   = "com.saicmotor.service.media.MEDIA_PLAYER_ACTION"
+    private const val ACT_CPAA    = "com.saicmotor.service.media.CPAA_PLAYER_ACTION"
+    private const val ACT_BT      = "com.saicmotor.service.media.BT_MUSIC_ACTION"
+    private const val ACT_USB     = "com.saicmotor.service.media.MUSIC_PLAYER_ACTION"
+    private const val ACT_ONLINE  = "com.saicmotor.service.media.ONLINE_MUSIC_ACTION"
+    private const val ACT_STATUS  = "com.saicmotor.service.media.PLAY_STATUS_ACTION"
+
+    private const val DESC_MEDIA  = "com.saicmotor.sdk.media.IMediaPlayerBinderInterface"
+    private const val DESC_CPAA   = "com.saicmotor.sdk.media.ICpAaBinderInterface"
+    private const val DESC_BT     = "com.saicmotor.sdk.media.IBtMusicBinderInterface"
+    private const val DESC_USB    = "com.saicmotor.sdk.media.IMusicPlayerBinderInterface"
+    private const val DESC_ONLINE = "com.saicmotor.sdk.media.IOnlineMusicBinderInterface"
+    private const val DESC_STATUS = "com.saicmotor.sdk.media.IPlayStatusBinderInterface"
 
     /**
-     * Bascule lecture / pause. Mêmes réserves que [mediaNext].
-     *
-     * On envoie bien `PLAY_PAUSE` et non `PLAY` ou `PAUSE` : c'est la **source** qui connaît son
-     * état, pas nous. Choisir à sa place supposerait de savoir si elle joue, ce qu'`isMusicActive`
-     * ne dit que globalement — au premier écart, la touche mettrait en pause une lecture déjà
-     * arrêtée et paraîtrait sans effet une fois sur deux.
+     * Sources rendues par `getCurrentPlayer` — lues dans l'aiguillage de
+     * `MediaPlayControlManager.next()`, pas devinées. Les autres valeurs (radio, projection)
+     * n'y apparaissent pas : elles sont journalisées telles quelles pour être identifiées.
      */
-    fun mediaPlayPause(): Boolean = envoyerToucheMedia(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+    private const val PLAYER_USB    = 2
+    private const val PLAYER_ONLINE = 3
+    private const val PLAYER_BT     = 4
+
+    private enum class CmdMedia { SUIVANT, PRECEDENT, LECTURE_PAUSE }
+
+    // Accès croisé : onServiceConnected arrive sur le thread principal, la lecture se fait
+    // depuis le contexte IO du raccourci. Des HashMap simples se corrompraient silencieusement.
+    private val sMediaBinders = ConcurrentHashMap<String, IBinder>()
+    private val sMediaConns = ConcurrentHashMap<String, ServiceConnection>()
+
+    /**
+     * Binder du service média pour une action donnée, ou null.
+     *
+     * La liaison est asynchrone alors qu'un appui sur le volant attend une action immédiate :
+     * on attend donc brièvement le rattachement. C'est sans risque pour l'écran — tout le
+     * chemin des raccourcis s'exécute déjà sur un contexte IO.
+     *
+     * Une action inconnue du firmware (SWI68/165 n'ont ni façade générique ni CarPlay/AA) fait
+     * simplement échouer `bindService` : on rend null, et l'appelant passe au repli suivant.
+     */
+    private fun mediaBinder(action: String, attenteMs: Long = 1200): IBinder? {
+        sMediaBinders[action]?.let { if (it.isBinderAlive) return it else sMediaBinders.remove(action) }
+        val ctx = sAppContext ?: return null
+
+        if (!sMediaConns.containsKey(action)) {
+            val conn = object : ServiceConnection {
+                override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                    if (service != null) sMediaBinders[action] = service
+                    AppLogger.i(MEDIA_TAG, "lié à ${action.substringAfterLast('.')}")
+                }
+                override fun onServiceDisconnected(name: ComponentName?) {
+                    sMediaBinders.remove(action)
+                    AppLogger.w(MEDIA_TAG, "liaison perdue : ${action.substringAfterLast('.')}")
+                }
+            }
+            sMediaConns[action] = conn
+            val ok = try {
+                ctx.bindService(Intent(action).setClassName(MEDIA_PKG, MEDIA_CLS),
+                    conn, Context.BIND_AUTO_CREATE)
+            } catch (e: Exception) {
+                AppLogger.w(MEDIA_TAG, "bindService ${action.substringAfterLast('.')} : " +
+                    "${(e.cause ?: e).message}")
+                false
+            }
+            if (!ok) {
+                sMediaConns.remove(action)
+                AppLogger.w(MEDIA_TAG, "service média indisponible pour " +
+                    "${action.substringAfterLast('.')} (absent de ce firmware ?)")
+                return null
+            }
+        }
+
+        val limite = SystemClock.uptimeMillis() + attenteMs
+        while (SystemClock.uptimeMillis() < limite) {
+            sMediaBinders[action]?.let { return it }
+            try { Thread.sleep(40) } catch (_: InterruptedException) {}
+        }
+        AppLogger.w(MEDIA_TAG, "liaison ${action.substringAfterLast('.')} non établie en ${attenteMs} ms")
+        return null
+    }
+
+    /**
+     * Appelle une méthode SANS ARGUMENT du service média.
+     *
+     * ⚠️ Volontairement séparé de [binderTransact] : celui-ci écrit un areaId et une valeur —
+     * la forme des propriétés véhicule — et passe par le verrou de vitesse. Changer de piste
+     * n'est pas un réglage de conduite ; le bloquer au-delà d'une certaine vitesse n'aurait
+     * aucun sens.
+     *
+     * ⚠️ `transact` rend vrai dès que l'appel a été REÇU, pas qu'il a produit un effet. D'où le
+     * journal à chaque étape : c'est lui, pas la valeur de retour, qui dira au volant quelle
+     * voie a réellement agi.
+     */
+    private fun mediaTransact(action: String, descripteur: String, code: Int): Boolean {
+        val binder = mediaBinder(action) ?: return false
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(descripteur)
+            val ok = binder.transact(code, data, reply, 0)
+            reply.readException()
+            AppLogger.i(MEDIA_TAG, "${action.substringAfterLast('.')} tx=0x${Integer.toHexString(code)} → $ok")
+            ok
+        } catch (e: Exception) {
+            AppLogger.w(MEDIA_TAG, "${action.substringAfterLast('.')} " +
+                "tx=0x${Integer.toHexString(code)} : ${(e.cause ?: e).message}")
+            false
+        } finally {
+            data.recycle()
+            reply.recycle()
+        }
+    }
+
+    /** Source en cours de lecture selon le service média, ou -1 si illisible. */
+    private fun mediaSourceCourante(): Int {
+        val binder = mediaBinder(ACT_STATUS) ?: return -1
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(DESC_STATUS)
+            binder.transact(1, data, reply, 0)   // getCurrentPlayer
+            reply.readException()
+            val v = reply.readInt()
+            AppLogger.i(MEDIA_TAG, "source courante = $v " +
+                "(${when (v) {
+                    PLAYER_USB -> "USB"; PLAYER_ONLINE -> "en ligne"; PLAYER_BT -> "Bluetooth"
+                    else -> "inconnue — à identifier"
+                }})")
+            v
+        } catch (e: Exception) {
+            AppLogger.w(MEDIA_TAG, "source courante illisible : ${(e.cause ?: e).message}")
+            -1
+        } finally {
+            data.recycle()
+            reply.recycle()
+        }
+    }
+
+    /** Vrai si quelque chose joue — sert à choisir entre `play` et `pause`. */
+    private fun musiqueEnCours(): Boolean =
+        (sAppContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.isMusicActive == true
+
+    /**
+     * Exécute une commande média en essayant les voies dans l'ordre de fiabilité décroissante.
+     *
+     * 1. **La source déclarée par le service** : c'est la seule voie déterministe, celle que le
+     *    launcher emprunte lui-même.
+     * 2. **La façade générique** `MEDIA_PLAYER_ACTION`, qui n'aiguille pas — utile quand la
+     *    source courante est illisible ou inconnue de notre table. Absente de SWI68/165.
+     * 3. **CarPlay / Android Auto**, interface dédiée. Absente elle aussi de SWI68/165.
+     * 4. **La touche média Android**, dernier recours : c'est la seule voie sur les firmwares A9,
+     *    où ce service SAIC n'existe pas, et la seule qui atteigne une session Bluetooth.
+     */
+    private fun commandeMedia(cmd: CmdMedia): Boolean {
+        val joue = musiqueEnCours()
+
+        when (mediaSourceCourante()) {
+            PLAYER_BT -> if (mediaTransact(ACT_BT, DESC_BT, when (cmd) {
+                    CmdMedia.SUIVANT -> 5
+                    CmdMedia.PRECEDENT -> 4
+                    CmdMedia.LECTURE_PAUSE -> if (joue) 1 else 2
+                })) return true
+            PLAYER_USB -> if (mediaTransact(ACT_USB, DESC_USB, when (cmd) {
+                    CmdMedia.SUIVANT -> 0x1a          // playNextMusic
+                    CmdMedia.PRECEDENT -> 0x19        // playLastMusic
+                    CmdMedia.LECTURE_PAUSE -> 0xc     // playOrPause : vraie bascule
+                })) return true
+            PLAYER_ONLINE -> if (mediaTransact(ACT_ONLINE, DESC_ONLINE, when (cmd) {
+                    CmdMedia.SUIVANT -> 4
+                    CmdMedia.PRECEDENT -> 3
+                    CmdMedia.LECTURE_PAUSE -> if (joue) 1 else 2
+                })) return true
+        }
+
+        if (mediaTransact(ACT_MEDIA, DESC_MEDIA, when (cmd) {
+                CmdMedia.SUIVANT -> 5
+                CmdMedia.PRECEDENT -> 4
+                CmdMedia.LECTURE_PAUSE -> if (joue) 3 else 2
+            })) return true
+
+        if (mediaTransact(ACT_CPAA, DESC_CPAA, when (cmd) {
+                CmdMedia.SUIVANT -> 4
+                CmdMedia.PRECEDENT -> 3
+                CmdMedia.LECTURE_PAUSE -> if (joue) 2 else 1
+            })) return true
+
+        AppLogger.i(MEDIA_TAG, "aucune voie SAIC n'a répondu — repli sur la touche média Android")
+        return envoyerToucheMedia(when (cmd) {
+            CmdMedia.SUIVANT -> KeyEvent.KEYCODE_MEDIA_NEXT
+            CmdMedia.PRECEDENT -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+            CmdMedia.LECTURE_PAUSE -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+        })
+    }
+
+    fun mediaNext(): Boolean = commandeMedia(CmdMedia.SUIVANT)
+
+    fun mediaPrevious(): Boolean = commandeMedia(CmdMedia.PRECEDENT)
+
+    fun mediaPlayPause(): Boolean = commandeMedia(CmdMedia.LECTURE_PAUSE)
 
     /**
      * Monte ou descend le volume média d'un cran.
@@ -3714,8 +3898,7 @@ object MG4Hardware {
      *     affiche l'indicateur système, ce qui donne un retour visuel.
      *
      * Contrairement aux touches média, aucune des deux ne dépend d'une application : le volume
-     * est un réglage du véhicule. C'est pourquoi ces raccourcis fonctionnent quelle que soit la
-     * source, y compris là où « piste suivante » reste sans effet.
+     * est un réglage du véhicule.
      */
     fun mediaVolumeStep(delta: Int): Boolean {
         val actuel = getMediaVolume()
@@ -3750,50 +3933,21 @@ object MG4Hardware {
     }
 
     /**
-     * Sonde média, LECTURE SEULE — elle n'envoie aucune commande.
+     * Sonde média, LECTURE SEULE — elle n'envoie aucune commande de lecture.
      *
-     * Elle existe pour trancher la seule question qui compte quand une touche média reste sans
-     * effet : **la commande n'est-elle pas partie, ou est-elle partie sans destinataire ?** Vu
-     * de l'utilisateur les deux cas sont identiques, et `dispatchMediaKeyEvent` ne rend rien.
-     *
-     * Trois informations, de la plus sûre à la plus révélatrice :
-     *  • `isMusicActive` — quelque chose joue-t-il ;
-     *  • les flux audio actifs et, si le système le laisse voir, l'application qui les produit ;
-     *  • les **sessions média**. C'est le point décisif : `dispatchMediaKeyEvent` ne peut
-     *    atteindre qu'une session. S'il n'y en a aucune, aucune touche média n'aboutira jamais,
-     *    quel que soit le code envoyé — il faudra alors une autre voie.
+     * Elle a déjà tranché la question de départ : une seule MediaSession existe sur la voiture
+     * (`com.android.bluetooth`), ce qui condamnait la voie des touches média. Elle reste utile
+     * pour la suite : identifier la valeur de `getCurrentPlayer` des sources non encore
+     * répertoriées (radio, projection), et vérifier quelles interfaces répondent sur un
+     * firmware donné.
      */
     fun runMediaDiag() {
         val ctx = sAppContext ?: return
         val am = ctx.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-        if (am == null) {
-            AppLogger.w(MEDIA_TAG, "DIAG : AudioManager indisponible")
-            return
-        }
         AppLogger.i(MEDIA_TAG, "── DIAG média ────────────────────────────────")
-        AppLogger.i(MEDIA_TAG, "lecture en cours (isMusicActive) = ${am.isMusicActive}")
+        AppLogger.i(MEDIA_TAG, "lecture en cours (isMusicActive) = ${am?.isMusicActive}")
 
-        // Qui produit du son. La liste est publique ; l'identité du client, elle, est masquée aux
-        // applications ordinaires — on la tente par réflexion, en app système.
-        try {
-            val configs = am.activePlaybackConfigurations
-            AppLogger.i(MEDIA_TAG, "flux audio actifs : ${configs.size}")
-            configs.forEachIndexed { i, c ->
-                val uid = runCatching {
-                    c.javaClass.getMethod("getClientUid").invoke(c) as? Int
-                }.getOrNull()
-                val paquets = uid?.let {
-                    runCatching { ctx.packageManager.getPackagesForUid(it)?.joinToString() }
-                        .getOrNull()
-                }
-                AppLogger.i(MEDIA_TAG, "  [$i] usage=${c.audioAttributes.usage} " +
-                    "contenu=${c.audioAttributes.contentType} uid=${uid ?: "?"} " +
-                    "paquet=${paquets ?: "inconnu"}")
-            }
-        } catch (e: Exception) {
-            AppLogger.w(MEDIA_TAG, "flux audio illisibles : ${(e.cause ?: e).message}")
-        }
-
+        // Sessions média : c'est ce qui a montré que les touches média ne pouvaient pas aboutir.
         try {
             val msm = ctx.getSystemService("media_session")
                 ?: throw IllegalStateException("MediaSessionManager absent")
@@ -3807,16 +3961,20 @@ object MG4Hardware {
                 }.getOrNull()
                 AppLogger.i(MEDIA_TAG, "  session : $pkg")
             }
-            if (sessions.isNullOrEmpty()) {
-                AppLogger.w(MEDIA_TAG, "AUCUNE session : les touches média ne peuvent aboutir " +
-                    "nulle part, la source ne passe pas par MediaSession")
-            }
         } catch (e: Exception) {
             val cause = e.cause ?: e
             AppLogger.w(MEDIA_TAG, "sessions média illisibles : " +
-                "${cause.javaClass.simpleName} — ${cause.message} " +
-                "(SecurityException = il manque MEDIA_CONTENT_CONTROL au manifest, " +
-                "et l'entrée correspondante dans permission-allowlist.txt)")
+                "${cause.javaClass.simpleName} — ${cause.message}")
+        }
+
+        // Service média SAIC : quelles interfaces répondent, et sur quelle source.
+        AppLogger.i(MEDIA_TAG, "service SAIC $MEDIA_PKG :")
+        mediaSourceCourante()
+        listOf(ACT_MEDIA to "façade générique", ACT_CPAA to "CarPlay/AA", ACT_BT to "Bluetooth",
+               ACT_USB to "USB", ACT_ONLINE to "en ligne").forEach { (action, nom) ->
+            val lie = mediaBinder(action, attenteMs = 400) != null
+            AppLogger.i(MEDIA_TAG, "  $nom (${action.substringAfterLast('.')}) : " +
+                if (lie) "lié ✓" else "absent")
         }
         AppLogger.i(MEDIA_TAG, "──────────────────────────────────────────────")
     }
@@ -3827,6 +3985,8 @@ object MG4Hardware {
      * DOWN **puis** UP : une session n'a aucune obligation d'agir sur l'appui, plusieurs
      * n'agissent qu'au relâchement. N'envoyer que le DOWN laisserait en plus une touche
      * « enfoncée » du point de vue du système.
+     *
+     * ⚠️ Dernier recours uniquement — voir l'avertissement en tête de section.
      */
     private fun envoyerToucheMedia(keyCode: Int): Boolean {
         val am = sAppContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -3838,9 +3998,6 @@ object MG4Hardware {
             val t = SystemClock.uptimeMillis()
             am.dispatchMediaKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, keyCode, 0))
             am.dispatchMediaKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_UP, keyCode, 0))
-            // `isMusicActive` ne dit pas QUI joue, mais il distingue les deux cas qu'on
-            // confondrait sinon : « la commande est partie dans le vide, rien ne jouait » et
-            // « quelque chose joue et n'a pas réagi ».
             AppLogger.i(MEDIA_TAG, "touche ${KeyEvent.keyCodeToString(keyCode)} envoyée " +
                 "(lecture en cours = ${am.isMusicActive})")
             true
