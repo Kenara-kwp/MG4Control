@@ -3806,6 +3806,59 @@ object MG4Hardware {
     private const val RUI_NEXT_UP   = 11
     private const val RUI_PREV_UP   = 12
 
+    /**
+     * S'assure que le helper audio A9 est joignable, et le récupère sinon.
+     *
+     * ⚠️ Sans ça, sa perte était DÉFINITIVE pour la durée du processus, et personne ne s'en
+     * apercevait :
+     *  • [audioGetArg] et [audioSet3] mettent `sAudioHelper` à null dès que son binder meurt ;
+     *  • [initAudio] refuse de refaire la liaison tant que `sAudioServiceConn` existe — or
+     *    `onServiceDisconnected` ne l'efface pas ;
+     *  • le helper est un binder de SECOND niveau, obtenu par une requête au CarAdapter : même
+     *    quand ce dernier va bien, plus rien ne le redemande.
+     *
+     * Le volume basculait alors en silence sur `AudioManager`, jusqu'à la prochaine ouverture de
+     * l'application — la seule à appeler [initAudio]. Vu de l'utilisateur : un volume qui
+     * « marchait avant » et ne marche plus, sans rien avoir changé.
+     */
+    private fun assurerHelperAudio() {
+        if (!isA9Sound()) return
+        if (sAudioHelper?.isBinderAlive == true) return
+        val ctx = sAppContext ?: return
+
+        // Le CarAdapter répond encore : il suffit de lui redemander le helper.
+        if (sCarAdapterBinder?.isBinderAlive == true) {
+            AppLogger.i(VOL_TAG, "helper audio perdu — nouvelle requête au CarAdapter")
+            tryGetAudioHelper()
+            if (sAudioHelper?.isBinderAlive == true) return
+        }
+
+        // Le service lui-même est parti : on repart d'une liaison neuve. L'ancienne connexion
+        // est détachée d'abord, sinon on en accumulerait une par tentative.
+        AppLogger.i(VOL_TAG, "CarAdapter injoignable — nouvelle liaison audio")
+        sAudioServiceConn?.let { conn ->
+            runCatching { ctx.applicationContext.unbindService(conn) }
+        }
+        sAudioServiceConn = null
+        sCarAdapterBinder = null
+        initAudio(ctx)
+
+        // La liaison est asynchrone. Sans cette attente, le premier appui échouerait et seul le
+        // suivant agirait — un raccourci qui « marche une fois sur deux » est pire qu'un
+        // raccourci qui ne marche pas, on ne sait pas quoi en conclure. L'appelant est déjà sur
+        // un contexte IO, l'attente ne coûte rien à l'écran.
+        val limite = SystemClock.uptimeMillis() + MEDIA_BIND_MS
+        while (SystemClock.uptimeMillis() < limite) {
+            if (sAudioHelper?.isBinderAlive == true) {
+                AppLogger.i(VOL_TAG, "helper audio récupéré")
+                return
+            }
+            try { Thread.sleep(40) } catch (_: InterruptedException) {}
+        }
+        AppLogger.w(VOL_TAG, "helper audio toujours absent après ${MEDIA_BIND_MS} ms — " +
+            "le volume passera par AudioManager")
+    }
+
     /** Envoie une commande à la pile de projection. Rend faux si le service ne répond pas. */
     private fun ruiEnvoyer(valeur: Int): Boolean {
         val binder = serviceBinder("", RUI_PKG, RUI_CLS) ?: return false
@@ -4382,6 +4435,7 @@ object MG4Hardware {
      * est un réglage du véhicule.
      */
     fun mediaVolumeStep(delta: Int): Boolean {
+        assurerHelperAudio()
         val actuel = getMediaVolume()
         val max = getMediaVolumeMax()
         if (actuel >= 0 && max > 0) {

@@ -134,6 +134,11 @@ class MG4ControlService : Service() {
         AppLogger.i(TAG, "onCreate")
         startForeground(NOTIF_ID, buildNotification())
         MG4Hardware.init(applicationContext)
+        // ⚠️ Le helper audio A9 n'était lié que par MainActivity. Résultat : le raccourci
+        // « Volume + / - » ne faisait rien tant que l'utilisateur n'avait pas ouvert
+        // l'application au moins une fois depuis le démarrage — signalé sur SWI131, et
+        // parfaitement logique une fois vu d'ici. Le service, lui, démarre au boot.
+        MG4Hardware.initAudio(applicationContext)
         registerHardkeyReceiver()
         registerBtAclReceiver()        // [BT-PROFILES]
         registerSkinChangeReceiver()   // [THEME-AUTO]
