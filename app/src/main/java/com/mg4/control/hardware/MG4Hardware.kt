@@ -4031,12 +4031,17 @@ object MG4Hardware {
      * voie a réellement agi.
      */
     private fun mediaTransact(action: String, descripteur: String, code: Int,
-                              pkg: String = MEDIA_PKG, cls: String? = MEDIA_CLS): Boolean {
+                              pkg: String = MEDIA_PKG, cls: String? = MEDIA_CLS,
+                              arg: Int? = null): Boolean {
         val binder = serviceBinder(action, pkg, cls) ?: return false
         val data = Parcel.obtain()
         val reply = Parcel.obtain()
         return try {
             data.writeInterfaceToken(descripteur)
+            // ⚠️ Toutes ces méthodes ne sont pas sans argument. Omettre celui qu'attend le
+            // service ne provoque aucune erreur : il lit un parcel vide et obtient 0 — une
+            // valeur parfaitement valide, mais qui n'est pas celle voulue.
+            if (arg != null) data.writeInt(arg)
             val ok = binder.transact(code, data, reply, 0)
             reply.readException()
             AppLogger.i(MEDIA_TAG, "${action.substringAfterLast('.')} tx=0x${Integer.toHexString(code)} → $ok")
@@ -4076,20 +4081,25 @@ object MG4Hardware {
         }
     }
 
+    /** Bande et état de la radio, lus en une seule interrogation. */
+    private data class InfoRadio(val type: Int, val enLecture: Boolean)
+
     /**
-     * La radio joue-t-elle ? `null` si on ne peut pas conclure.
+     * Lit le `RadioBean` courant : bande écoutée et lecture en cours. `null` si illisible.
      *
-     * `isPlaying()` du SDK radio se résume à `getCurrentRadioInfo().getRadioState() == 1`. Il
-     * faut donc lire le `RadioBean` renvoyé, dans l'ordre exact de son `writeToParcel` :
-     * enable(byte), name(String), rds(byte), cover(String), fréquence(int), type(int),
-     * **état(int)**. C'est le seul endroit du projet couplé à la sérialisation d'un bean SAIC —
-     * tout est sous try/catch, et un échec vaut `null`, jamais une supposition.
+     * Les deux informations viennent du même appel parce qu'elles sont dans le même bean, et
+     * qu'une seconde interrogation donnerait au mieux le même résultat, au pire un résultat
+     * décalé.
      *
-     * Sans cette lecture, `isMusicActive` servait de repli : or il est **faux même quand la
-     * radio joue**, son flux ne passant pas par le canal musique. On envoyait donc toujours
-     * « lecture », jamais « pause » — d'où un raccourci sans effet.
+     * ⚠️ Lecture dans l'ordre EXACT de `writeToParcel` : enable(byte), nom(String), rds(byte),
+     * pochette(String), fréquence(int), **type(int)**, **état(int)**. C'est le seul endroit du
+     * projet couplé à la sérialisation d'un bean SAIC — tout est sous try/catch, et un échec
+     * vaut `null`, jamais une supposition.
+     *
+     * `isPlaying()` du SDK radio se résume à `getRadioState() == 1` ; `next()`/`previous()`, eux,
+     * reçoivent `getRadioType()`.
      */
-    private fun radioEnLecture(): Boolean? {
+    private fun radioInfo(): InfoRadio? {
         val binder = serviceBinder(RADIO_ACT, RADIO_PKG, null) ?: return null
         val data = Parcel.obtain()
         val reply = Parcel.obtain()
@@ -4100,49 +4110,13 @@ object MG4Hardware {
             if (reply.readInt() == 0) return null      // bean nul
             reply.readByte(); reply.readString()       // enable, nom
             reply.readByte(); reply.readString()       // rds, pochette
-            reply.readInt(); reply.readInt()           // fréquence, type
+            reply.readInt()                            // fréquence
+            val type = reply.readInt()
             val etat = reply.readInt()
-            AppLogger.i(MEDIA_TAG, "état radio = $etat (1 = en lecture)")
-            etat == 1
+            AppLogger.i(MEDIA_TAG, "radio : type=$type état=$etat (1 = en lecture)")
+            InfoRadio(type, etat == 1)
         } catch (e: Exception) {
             AppLogger.w(MEDIA_TAG, "état radio illisible : ${(e.cause ?: e).message}")
-            null
-        } finally {
-            data.recycle()
-            reply.recycle()
-        }
-    }
-
-    /**
-     * CarPlay / Android Auto joue-t-il ? `null` si on ne peut pas conclure.
-     *
-     * `getLastCpAaAudioInfoBean` (tx 0x7) rend un `AudioInfoBean` dont le champ `mPlayState`
-     * vaut 3 en lecture — la carte média du launcher le compare à cette valeur exacte. Il faut
-     * dérouler le bean dans l'ordre de son `writeToParcel` : id(long), durée(long), puis sept
-     * chaînes, deux longs, une chaîne, et enfin **l'état(int)**.
-     *
-     * Sans cette lecture, la projection retombait sur `isMusicActive`, qui reste vrai deux à
-     * trois secondes après une pause : le raccourci renvoyait une pause au lieu d'une reprise,
-     * et il fallait patienter avant que la bascule redevienne possible.
-     */
-    private fun cpAaEnLecture(): Boolean? {
-        val binder = serviceBinder(ACT_CPAA, MEDIA_PKG, MEDIA_CLS) ?: return null
-        val data = Parcel.obtain()
-        val reply = Parcel.obtain()
-        return try {
-            data.writeInterfaceToken(DESC_CPAA)
-            binder.transact(0x7, data, reply, 0)
-            reply.readException()
-            if (reply.readInt() == 0) return null       // bean nul : rien à conclure
-            reply.readLong(); reply.readLong()          // id, durée
-            repeat(7) { reply.readString() }            // nom, pochette, chemin, artiste, utilisateur, avatar, album
-            reply.readLong(); reply.readLong()          // ajout, dernière lecture
-            reply.readString()                          // position lisible
-            val etat = reply.readInt()
-            AppLogger.i(MEDIA_TAG, "état projection = $etat ($PLAYER_STATUS_START = en lecture)")
-            etat == PLAYER_STATUS_START
-        } catch (e: Exception) {
-            AppLogger.w(MEDIA_TAG, "état projection illisible : ${(e.cause ?: e).message}")
             null
         } finally {
             data.recycle()
@@ -4345,16 +4319,29 @@ object MG4Hardware {
             cible in SRC_RADIO_MIN..SRC_RADIO_MAX -> {
                 // La radio a son propre service : next/previous y changent de station, et
                 // srcPlayRadio/srcPauseRadio sont les commandes que le launcher utilise.
+                val info = radioInfo()
                 // Un état illisible est traité comme « en lecture » : c'est l'état normal
                 // d'une radio qui est la source active, et une pause de trop se corrige d'un
                 // second appui — l'inverse laisserait le raccourci sans effet.
-                val joue = radioEnLecture() != false
+                val joue = info?.enLecture != false
                 val code = when (cmd) {
                     CmdMedia.SUIVANT -> RADIO_NEXT
                     CmdMedia.PRECEDENT -> RADIO_PREV
                     CmdMedia.LECTURE_PAUSE -> if (joue) RADIO_PAUSE else RADIO_PLAY
                 }
-                val ok = mediaTransact(RADIO_ACT, DESC_RADIO, code, RADIO_PKG, null)
+
+                // ⚠️ `next` et `previous` attendent la BANDE écoutée, contrairement à
+                // play/pause. Sans elle le service lit 0 et bascule en FM : mesuré sur SWI133,
+                // une station DAB retombait systématiquement en FM. Bande inconnue = on
+                // s'abstient, plutôt que de changer de bande dans le dos de l'utilisateur.
+                val bande = if (cmd == CmdMedia.LECTURE_PAUSE) null else info?.type
+                if (cmd != CmdMedia.LECTURE_PAUSE && bande == null) {
+                    AppLogger.w(MEDIA_TAG, "radio : bande illisible — aucune action " +
+                        "(l'envoyer sans la bande ferait basculer en FM)")
+                    return false
+                }
+
+                val ok = mediaTransact(RADIO_ACT, DESC_RADIO, code, RADIO_PKG, null, bande)
                 // Repli DANS la source uniquement : la façade générique s'adresse à la source
                 // courante, elle ne peut donc pas en réveiller une autre.
                 if (ok) true else mediaTransact(ACT_MEDIA, DESC_MEDIA, when (cmd) {
