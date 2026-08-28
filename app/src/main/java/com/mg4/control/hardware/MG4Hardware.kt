@@ -4210,6 +4210,25 @@ object MG4Hardware {
      *    où ce service SAIC n'existe pas, et la seule qui atteigne une session Bluetooth.
      */
     /**
+     * Une session est-elle en lecture ? `null` si on ne peut pas les consulter.
+     *
+     * ⚠️ Sert à décider du sens de la bascule pour la projection, à la place de `isMusicActive`.
+     * Ce dernier reste vrai plusieurs secondes après un arrêt — le piège déjà rencontré sur les
+     * autres sources : après une pause, on renvoyait une pause au lieu d'une reprise.
+     */
+    private fun sessionJoue(): Boolean? {
+        val ctx = sAppContext ?: return null
+        val msm = ctx.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
+            ?: return null
+        return try {
+            msm.getActiveSessions(null)
+                .any { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
      * Pilotage par **session média** — la voie du framework Android.
      *
      * C'est ainsi que le launcher d'origine procède sur les firmwares A9 : son `MediaModel`
@@ -4242,7 +4261,18 @@ object MG4Hardware {
         val joue = sessions.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
         val cible = joue
             ?: if (cmd == CmdMedia.LECTURE_PAUSE)
-                   sessions.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PAUSED }
+                   // ⚠️ Pour REPRENDRE, on ne demande pas un état précis mais une CAPACITÉ.
+                   // Exiger STATE_PAUSED était trop strict : mesuré sur SWI132, la radio mise en
+                   // pause ne se déclare pas forcément « en pause » — elle peut annoncer arrêtée
+                   // ou aucun état. On ne trouvait alors aucune cible et la reprise était
+                   // impossible, alors que la pause fonctionnait parfaitement.
+                   //
+                   // La liste est ordonnée par priorité : la première session capable de
+                   // reprendre est la plus récemment active, donc celle que l'utilisateur veut.
+                   sessions.firstOrNull {
+                       ((it.playbackState?.actions ?: 0L) and
+                           (PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PLAY_PAUSE)) != 0L
+                   }
                else null
 
         if (cible == null) {
@@ -4348,7 +4378,9 @@ object MG4Hardware {
             // La session couvre radio, Bluetooth et USB sur ces firmwares. Ce qu'elle ne couvre
             // pas, c'est la projection : elle ne déclare ni piste suivante ni précédente. D'où
             // le service allgo, qui est justement la voie que leur launcher emprunte.
-            if (ruiMedia(cmd, musiqueEnCours())) return true
+            // L'état vient des sessions, pas d'isMusicActive : c'est la seule source fiable
+            // ici, et `sessionMedia` vient justement de les consulter.
+            if (ruiMedia(cmd, sessionJoue() ?: musiqueEnCours())) return true
 
             // Ultime recours, si l'énumération des sessions est refusée : la touche média, mais
             // UNIQUEMENT si quelque chose joue. Sans ce garde-fou, l'envoyer pendant que la
