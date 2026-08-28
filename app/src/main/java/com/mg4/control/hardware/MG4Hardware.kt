@@ -4081,6 +4081,42 @@ object MG4Hardware {
         }
     }
 
+    /**
+     * CarPlay / Android Auto joue-t-il ? `null` si on ne peut pas conclure.
+     *
+     * `getLastCpAaAudioInfoBean` (tx 0x7) rend un `AudioInfoBean` dont le champ `mPlayState`
+     * vaut 3 en lecture — la carte média du launcher le compare à cette valeur exacte. Il faut
+     * dérouler le bean dans l'ordre de son `writeToParcel` : id(long), durée(long), puis sept
+     * chaînes, deux longs, une chaîne, et enfin **l'état(int)**.
+     *
+     * Sans cette lecture, la projection retombait sur `isMusicActive`, qui reste vrai deux à
+     * trois secondes après une pause : le raccourci renvoyait une pause au lieu d'une reprise,
+     * et il fallait patienter avant que la bascule redevienne possible.
+     */
+    private fun cpAaEnLecture(): Boolean? {
+        val binder = serviceBinder(ACT_CPAA, MEDIA_PKG, MEDIA_CLS) ?: return null
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(DESC_CPAA)
+            binder.transact(0x7, data, reply, 0)
+            reply.readException()
+            if (reply.readInt() == 0) return null       // bean nul : rien à conclure
+            reply.readLong(); reply.readLong()          // id, durée
+            repeat(7) { reply.readString() }            // nom, pochette, chemin, artiste, utilisateur, avatar, album
+            reply.readLong(); reply.readLong()          // ajout, dernière lecture
+            reply.readString()                          // position lisible
+            val etat = reply.readInt()
+            AppLogger.i(MEDIA_TAG, "état projection = $etat ($PLAYER_STATUS_START = en lecture)")
+            etat == PLAYER_STATUS_START
+        } catch (e: Exception) {
+            AppLogger.w(MEDIA_TAG, "état projection illisible : ${(e.cause ?: e).message}")
+            null
+        } finally {
+            data.recycle()
+            reply.recycle()
+        }
+    }
     /** Bande et état de la radio, lus en une seule interrogation. */
     private data class InfoRadio(val type: Int, val enLecture: Boolean)
 
@@ -4271,6 +4307,32 @@ object MG4Hardware {
         return null
     }
 
+    /**
+     * Façade générique `MEDIA_PLAYER_ACTION` — elle s'adresse à la source courante, sans
+     * aiguillage. Présente sur SWI133 seulement.
+     *
+     * ⚠️ `play` (tx 2) attend un TYPE DE MÉDIA : le launcher lui passe
+     * `getLastMediaInfoBean().getMediaType()`. `next`, `prev` et `pause` n'attendent rien.
+     *
+     * On ne l'appelle donc PAS pour reprendre une lecture : l'envoyer sans type ferait lire 0 au
+     * service — `MEDIA_TYPE_NONE` — et le résultat serait au mieux sans effet, au pire une
+     * source démarrée au hasard. Même principe que la bande radio : sans l'argument, on
+     * s'abstient. Cette voie n'est de toute façon qu'un repli ; si un rapport montre qu'on
+     * s'y arrête vraiment, on lira le bean pour obtenir le type.
+     */
+    private fun facadeGenerique(cmd: CmdMedia, joue: Boolean): Boolean {
+        if (cmd == CmdMedia.LECTURE_PAUSE && !joue) {
+            AppLogger.i(MEDIA_TAG, "façade générique : reprise impossible sans type de média — " +
+                "aucune action")
+            return false
+        }
+        return mediaTransact(ACT_MEDIA, DESC_MEDIA, when (cmd) {
+            CmdMedia.SUIVANT -> 5
+            CmdMedia.PRECEDENT -> 4
+            CmdMedia.LECTURE_PAUSE -> 3   // pause : sans argument
+        })
+    }
+
     private fun commandeMedia(cmd: CmdMedia): Boolean {
         val src = mediaSourceCourante()
 
@@ -4344,11 +4406,7 @@ object MG4Hardware {
                 val ok = mediaTransact(RADIO_ACT, DESC_RADIO, code, RADIO_PKG, null, bande)
                 // Repli DANS la source uniquement : la façade générique s'adresse à la source
                 // courante, elle ne peut donc pas en réveiller une autre.
-                if (ok) true else mediaTransact(ACT_MEDIA, DESC_MEDIA, when (cmd) {
-                    CmdMedia.SUIVANT -> 5
-                    CmdMedia.PRECEDENT -> 4
-                    CmdMedia.LECTURE_PAUSE -> if (joue) 3 else 2
-                })
+                if (ok) true else facadeGenerique(cmd, joue)
             }
 
             cible == SRC_BT -> mediaTransact(ACT_BT, DESC_BT, when (cmd) {
@@ -4385,11 +4443,7 @@ object MG4Hardware {
             else -> {
                 AppLogger.i(MEDIA_TAG, "source ${nomSource(cible)} sans lecteur identifié — " +
                     "façade générique")
-                mediaTransact(ACT_MEDIA, DESC_MEDIA, when (cmd) {
-                    CmdMedia.SUIVANT -> 5
-                    CmdMedia.PRECEDENT -> 4
-                    CmdMedia.LECTURE_PAUSE -> if (enLecture(cible)) 3 else 2
-                })
+                facadeGenerique(cmd, enLecture(cible))
             }
         }
         if (ok) return true
