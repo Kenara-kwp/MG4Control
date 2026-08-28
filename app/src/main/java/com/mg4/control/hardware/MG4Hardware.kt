@@ -4189,8 +4189,18 @@ object MG4Hardware {
             AppLogger.i(MEDIA_TAG, "état de lecture (source ${nomSource(source)}) = $reel")
             return reel
         }
+        // Les sessions AVANT isMusicActive : elles disent un état réel, lui reste vrai
+        // plusieurs secondes après un arrêt. Sans cet ordre, la projection sur SWI68 et SWI165 —
+        // où l interface CarPlay/AA du SDK n existe pas, donc où l état n est jamais exposé —
+        // gardait le drapeau trompeur, et une pause suivie d une reprise renvoyait une pause.
+        val parSession = sessionJoue()
+        if (parSession != null) {
+            AppLogger.i(MEDIA_TAG, "état non exposé par ${nomSource(source)} — sessions = $parSession")
+            return parSession
+        }
         val repli = musiqueEnCours()
-        AppLogger.i(MEDIA_TAG, "état non exposé par ${nomSource(source)} — repli isMusicActive = $repli")
+        AppLogger.i(MEDIA_TAG, "état non exposé par ${nomSource(source)} et sessions muettes — " +
+            "repli isMusicActive = $repli")
         return repli
     }
 
