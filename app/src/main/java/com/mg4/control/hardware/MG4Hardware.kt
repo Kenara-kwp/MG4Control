@@ -3785,6 +3785,13 @@ object MG4Hardware {
     //   • SWI68 / 165 / 69 / 131 / 132 : ce service-ci, celui de la pile de projection allgo,
     //     que le launcher appelle lui-même.
     // Aucun firmware n'a les deux, aucun n'en est dépourvu.
+    /**
+     * Préfixe des paquets de la pile de projection allgo.
+     *
+     * Sert à RECONNAÎTRE sa session média pour ne surtout pas s'en servir — voir [sessionMedia].
+     */
+    private const val PREFIXE_PROJECTION = "com.allgo."
+
     private const val RUI_PKG = "com.allgo.rui"
     private const val RUI_CLS = "com.allgo.rui.RemoteUIService"
     private const val DESC_RUI = "com.allgo.rui.IRemoteUIService"
@@ -4288,6 +4295,22 @@ object MG4Hardware {
         if (cible == null) {
             AppLogger.i(MEDIA_TAG, "aucune session exploitable parmi ${sessions.size} " +
                 "(${sessions.joinToString { "${it.packageName}:${it.playbackState?.state}" }})")
+            return false
+        }
+
+        // ⚠️ LA SESSION DE PROJECTION EST À ÉCARTER, quoi qu'elle déclare.
+        //
+        // Mesuré sur deux véhicules : elle annonce PAUSE, PLAY et PLAY_PAUSE (actions=0x240286)
+        // et n'en honore AUCUN — sur SWI132, lecture et pause restaient sans effet alors que
+        // `déclarée=true`. Elle n'annonce pas non plus les changements de piste, qui ne
+        // marchaient pas davantage sur SWI131.
+        //
+        // Autrement dit, ses déclarations ne valent rien. Le service allgo, lui, fonctionne pour
+        // les trois commandes : on lui rend la main immédiatement plutôt que de perdre l'appui
+        // dans une session qui acquiesce sans agir.
+        if (cible.packageName?.startsWith(PREFIXE_PROJECTION) == true) {
+            AppLogger.i(MEDIA_TAG, "session ${cible.packageName} = projection — écartée, " +
+                "ses déclarations ne sont pas honorées (voie allgo)")
             return false
         }
 
