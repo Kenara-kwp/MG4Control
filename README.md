@@ -27,6 +27,7 @@ You enjoy MG4Control and want to support its development ?
 9. [API externe](#api-externe-keymapper-tasker)
 10. [Compilation et installation](#compilation-et-installation)
 11. [Permissions requises](#permissions-requises)
+12. [Licence](#licence)
 
 ---
 
@@ -714,6 +715,22 @@ adb shell pm install -r --system /sdcard/app-debug.apk
 | `DOWNLOAD_WITHOUT_NOTIFICATION` | Téléchargement silencieux de l'APK de mise à jour |
 | `WRITE_EXTERNAL_STORAGE` | Enregistrement APK dans le dossier Téléchargements |
 
+---
+
+## Licence
+
+| Versions | Licence |
+|---|---|
+| jusqu'à **2.6.5** incluse | MIT — [`LICENSE.MIT`](LICENSE.MIT) |
+| à partir de **2.6.6** | **GNU GPL v3** ou ultérieure — [`COPYING`](COPYING) |
+
+Les versions déjà publiées restent sous MIT : une licence accordée ne se révoque pas. À partir de
+la 2.6.6, toute version modifiée que vous redistribuez doit l'être sous GPL, **code source
+inclus**.
+
+L'avis MIT est conservé pour le code publié sous ce régime avant le basculement, contributions de
+tiers comprises. Détails dans [`LICENCE.md`](LICENCE.md).
+
 </details>
 
 ---
@@ -733,6 +750,7 @@ adb shell pm install -r --system /sdcard/app-debug.apk
 9. [External API](#external-api-keymapper-tasker)
 10. [Build & Installation](#build--installation)
 11. [Required Permissions](#required-permissions)
+12. [Licence](#licence-1)
 
 ---
 
@@ -1405,6 +1423,21 @@ adb shell pm install -r --system /sdcard/app-debug.apk
 | `INTERNET` | Update check (GitHub API) |
 | `DOWNLOAD_WITHOUT_NOTIFICATION` | Silent download of the update APK |
 | `WRITE_EXTERNAL_STORAGE` | Saving the APK into the Downloads folder |
+
+---
+
+## Licence
+
+| Versions | Licence |
+|---|---|
+| up to and including **2.6.5** | MIT — [`LICENSE.MIT`](LICENSE.MIT) |
+| from **2.6.6** onwards | **GNU GPL v3** or later — [`COPYING`](COPYING) |
+
+Already published versions stay under MIT: a granted licence cannot be revoked. From 2.6.6, any
+modified version you redistribute must also be released under the GPL, **source code included**.
+
+The MIT notice is retained for the code published under that regime before the switch, third-party
+contributions included. Details in [`LICENCE.md`](LICENCE.md).
 
 ---
 
